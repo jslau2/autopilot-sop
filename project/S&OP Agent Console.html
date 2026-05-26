@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>S&OP Agent Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg-base:      oklch(0.09 0.007 245);
+  --bg-surface:   oklch(0.12 0.006 245);
+  --bg-card:      oklch(0.155 0.005 245);
+  --bg-card-h:    oklch(0.185 0.005 245);
+  --bg-input:     oklch(0.13 0.006 245);
+  --border:       oklch(0.32 0.008 245);
+  --border-s:     oklch(0.24 0.007 245);
+  --text-1:       oklch(0.94 0.005 235);
+  --text-2:       oklch(0.76 0.008 245);
+  --text-3:       oklch(0.54 0.007 245);
+  --accent:       oklch(0.72 0.17 162);
+  --success:      oklch(0.74 0.18 145);
+  --warning:      oklch(0.80 0.18 78);
+  --danger:       oklch(0.65 0.20 25);
+
+  --ag-planner:   oklch(0.80 0.16 78);
+  --ag-demand:    oklch(0.68 0.17 255);
+  --ag-spi:       oklch(0.74 0.15 190);
+  --ag-inventory: oklch(0.72 0.18 325);
+  --ag-tooling:   oklch(0.70 0.17 55);
+  --ag-capacity:  oklch(0.72 0.17 148);
+  --ag-wip:       oklch(0.70 0.20 308);
+  --ag-finance:   oklch(0.73 0.19 48);
+  --ag-risk:      oklch(0.70 0.21 15);
+  --ag-masterdata: oklch(0.74 0.14 235);
+  --ag-procurement:oklch(0.73 0.16 276);
+  --ag-optimizer:  oklch(0.77 0.19 110);
+
+  --font-ui:   'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif:'Playfair Display', Georgia, serif;
+  --radius: 7px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font-ui);font-size:13px;background:var(--bg-base);color:var(--text-1);-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--font-mono)}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-s);border-radius:3px}
+
+/* ── Shell ───────────────────────────────── */
+.console{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── Header ──────────────────────────────── */
+.con-header{
+  display:flex;align-items:center;gap:12px;
+  padding:0 18px;height:46px;
+  background:var(--bg-surface);border-bottom:1px solid var(--border-s);
+  flex-shrink:0;
+}
+.con-brand{display:flex;align-items:center;gap:7px}
+.con-brand-name{font-size:13px;font-weight:600;letter-spacing:-0.01em}
+.con-brand-sep{color:var(--border);font-size:16px;font-weight:200}
+.con-brand-page{font-size:12px;color:var(--text-2)}
+.con-nav-btn{
+  font-size:11.5px;color:var(--text-2);
+  padding:4px 10px;border-radius:5px;
+  border:1px solid var(--border-s);background:var(--bg-card);
+  transition:all 0.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px;
+}
+.con-nav-btn:hover{color:var(--text-1);border-color:var(--border)}
+.con-status-pill{
+  font-size:11px;font-weight:500;padding:3px 10px;border-radius:12px;
+}
+.sp-running{color:var(--success);background:oklch(from var(--success) l c h / 0.12)}
+.sp-paused {color:var(--warning);background:oklch(from var(--warning) l c h / 0.12);animation:sp-blink 1.2s ease-in-out infinite}
+.sp-done   {color:var(--text-2); background:var(--bg-card)}
+@keyframes sp-blink{0%,100%{opacity:1}50%{opacity:0.6}}
+.con-elapsed{font-family:var(--font-mono);font-size:11px;color:var(--text-3);min-width:36px;text-align:right}
+.con-spacer{flex:1}
+
+/* ── Body ────────────────────────────────── */
+.con-body{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* ── Left panel ──────────────────────────── */
+.con-left{
+  width:290px;flex-shrink:0;
+  display:flex;flex-direction:column;
+  border-right:1px solid var(--border-s);
+  overflow:hidden;
+}
+.session-card{
+  padding:14px 16px;border-bottom:1px solid var(--border-s);
+  background:var(--bg-surface);flex-shrink:0;
+}
+.sc-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px}
+.sc-goal{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--text-1);line-height:1.5;margin-bottom:10px}
+.sc-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sc-stat{background:var(--bg-card);border:1px solid var(--border-s);border-radius:5px;padding:6px 9px}
+.sc-stat-val{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--text-1);line-height:1}
+.sc-stat-lbl{font-size:10px;color:var(--text-2);margin-top:2px}
+
+.msg-bus{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+.msg-bus-hd{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 14px;border-bottom:1px solid var(--border-s);flex-shrink:0;
+  background:var(--bg-surface);
+}
+.msg-bus-title{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2)}
+.msg-live{display:flex;align-items:center;gap:4px;margin-left:auto;font-size:9px;font-weight:700;color:var(--success);letter-spacing:.07em}
+.msg-live-dot{width:5px;height:5px;background:var(--success);border-radius:50%;animation:live-blink 1.5s ease-in-out infinite}
+@keyframes live-blink{0%,100%{opacity:1}50%{opacity:.3}}
+.msg-list{flex:1;overflow-y:auto;padding:4px 0}
+.msg-row{
+  display:grid;grid-template-columns:80px auto;gap:6px;
+  padding:5px 14px;border-bottom:1px solid var(--border-s);
+  transition:background .1s;
+}
+.msg-row:hover{background:var(--bg-card)}
+.msg-row:last-child{border-bottom:none}
+.msg-agents{display:flex;align-items:center;gap:3px;flex-wrap:nowrap}
+.msg-agent-from{font-size:9.5px;font-weight:600;white-space:nowrap}
+.msg-arrow{font-size:9px;color:var(--text-3);flex-shrink:0}
+.msg-agent-to{font-size:9.5px;font-weight:600;white-space:nowrap}
+.msg-agent-all{font-size:9.5px;font-weight:600;color:var(--text-3)}
+.msg-content{}
+.msg-tag{
+  display:inline-block;font-size:8.5px;font-weight:700;
+  padding:1px 5px;border-radius:3px;margin-bottom:2px;
+  letter-spacing:.04em;
+}
+.msg-tag-begin {background:oklch(from var(--accent) l c h / 0.15);color:var(--accent)}
+.msg-tag-ack   {background:oklch(from var(--success) l c h / 0.14);color:var(--success)}
+.msg-tag-alert {background:oklch(from var(--warning) l c h / 0.14);color:var(--warning)}
+.msg-tag-escalate{background:oklch(from var(--danger) l c h / 0.14);color:var(--danger)}
+.msg-tag-pause {background:oklch(from var(--warning) l c h / 0.14);color:var(--warning)}
+.msg-text{font-size:11px;color:var(--text-1);line-height:1.4}
+.msg-ts{font-family:var(--font-mono);font-size:9px;color:var(--text-3);margin-top:2px}
+
+/* ── Right panel: agent grid ─────────────── */
+.con-right{flex:1;overflow-y:auto;padding:14px;min-width:0}
+.agent-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+.agent-card{
+  background:var(--bg-card);border:1px solid var(--border-s);
+  border-radius:var(--radius);overflow:hidden;
+  display:flex;flex-direction:column;
+  transition:border-color .2s;
+}
+.agent-card:hover{border-color:var(--border)}
+.agent-card.is-planner{grid-column:1/-1} /* Planner spans full width */
+
+.ac-header{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-bottom:1px solid var(--border-s);
+  background:var(--bg-surface);
+}
+.ac-icon-wrap{flex-shrink:0;transform:scale(0.78);transform-origin:center;margin:-4px 0}
+.ac-name{font-size:13px;font-weight:600}
+.ac-sub{font-size:10px;color:var(--text-2);margin-top:1px}
+.ac-badge{
+  margin-left:auto;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:10px;letter-spacing:.05em;text-transform:uppercase;
+}
+.ac-badge-running{background:oklch(from var(--success) l c h / 0.14);color:var(--success)}
+.ac-badge-done   {background:var(--bg-base);color:var(--text-3)}
+.ac-badge-paused {background:oklch(from var(--warning) l c h / 0.14);color:var(--warning);animation:sp-blink 1.2s ease-in-out infinite}
+.ac-badge-idle   {background:var(--bg-base);color:var(--text-3)}
+
+.ac-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1}
+
+.ac-task{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ac-task-id{
+  font-family:var(--font-mono);font-size:10px;font-weight:500;
+  padding:2px 7px;border-radius:4px;flex-shrink:0;
+}
+.ac-task-label{font-size:12px;font-weight:500;color:var(--text-1)}
+.ac-task-idle{font-size:11.5px;color:var(--text-3)}
+
+.ac-progress-wrap{display:flex;flex-direction:column;gap:3px}
+.ac-progress-row{display:flex;justify-content:space-between;align-items:baseline}
+.ac-progress-pct{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text-1)}
+.ac-progress-eta{font-family:var(--font-mono);font-size:9.5px;color:var(--text-2)}
+.ac-progress-track{height:4px;background:var(--border-s);border-radius:2px;overflow:hidden}
+.ac-progress-fill{
+  height:100%;border-radius:2px;
+  transition:width .5s ease;
+  position:relative;overflow:hidden;
+}
+.ac-progress-fill.is-running::after{
+  content:'';position:absolute;top:0;left:-60%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  animation:shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer{0%{left:-60%}100%{left:110%}}
+
+.ac-output{
+  font-family:var(--font-mono);font-size:11px;color:var(--text-1);
+  background:var(--bg-base);border:1px solid var(--border-s);
+  border-radius:4px;padding:5px 8px;line-height:1.5;
+}
+.ac-output-lbl{font-size:8.5px;color:var(--text-2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+
+.ac-log{display:flex;flex-direction:column;gap:2px}
+.ac-log-entry{
+  font-size:10.5px;color:var(--text-2);
+  padding:2px 0;border-bottom:1px solid var(--border-s);
+  display:flex;gap:7px;align-items:baseline;
+  animation:log-in .3s ease;
+}
+@keyframes log-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.ac-log-entry:last-child{border-bottom:none}
+.ac-log-ts{font-family:var(--font-mono);font-size:9px;color:var(--text-3);flex-shrink:0}
+.ac-log-msg{color:var(--text-1);font-size:11px}
+
+.ac-footer{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 12px;border-top:1px solid var(--border-s);
+  background:var(--bg-surface);
+}
+.ac-foot-item{font-family:var(--font-mono);font-size:9.5px;color:var(--text-2)}
+.ac-foot-item span{color:var(--text-1);font-weight:500}
+
+/* ── Bottom event bar ────────────────────── */
+.con-eventbar{
+  height:130px;flex-shrink:0;
+  border-top:1px solid var(--border-s);
+  background:var(--bg-surface);
+  display:flex;flex-direction:column;
+}
+.evb-hd{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 14px;border-bottom:1px solid var(--border-s);flex-shrink:0;
+}
+.evb-title{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.evb-count{font-family:var(--font-mono);font-size:9.5px;color:var(--text-3)}
+.evb-live{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:var(--success);letter-spacing:.07em;margin-left:auto}
+.evb-list{flex:1;overflow-y:auto;padding:2px 0}
+.evb-row{display:flex;align-items:baseline;gap:8px;padding:2.5px 14px;transition:background .1s}
+.evb-row:hover{background:var(--bg-card)}
+.evb-ts  {font-family:var(--font-mono);font-size:9.5px;color:var(--text-3);flex-shrink:0;min-width:82px}
+.evb-icon{font-size:9.5px;flex-shrink:0}
+.evb-icon-start{color:var(--accent)}
+.evb-icon-done {color:var(--success)}
+.evb-icon-question{color:var(--warning)}
+.evb-icon-answer{color:var(--accent)}
+.evb-icon-log  {color:var(--text-3)}
+.evb-agent{font-size:10px;font-weight:500;flex-shrink:0;min-width:90px}
+.evb-msg  {font-size:11.5px;color:var(--text-1)}
+
+/* ── Guided tour ─────────────────────────── */
+.tour-backdrop{position:fixed;inset:0;z-index:997;cursor:default}
+.tour-spot{position:fixed;z-index:998;pointer-events:none;border-radius:8px;box-shadow:0 0 0 9999px oklch(0 0 0/.78);border:2px solid var(--accent);outline:4px solid oklch(from var(--accent) l c h/.22);transition:all .38s cubic-bezier(.4,0,.2,1)}
+.tour-tip{position:fixed;z-index:999;width:300px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:17px 19px 13px;box-shadow:0 20px 60px oklch(0 0 0/.65);animation:tip-in .3s cubic-bezier(.4,0,.2,1)}
+@keyframes tip-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.tour-tip-badge{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.tour-tip-title{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:7px;line-height:1.3}
+.tour-tip-desc{font-size:12px;color:var(--text-2);line-height:1.65;margin-bottom:13px}
+.tour-controls{display:flex;align-items:center;gap:8px}
+.tour-skip{font-size:11px;color:var(--text-3);transition:color .15s;background:none;border:none;cursor:pointer}
+.tour-skip:hover{color:var(--text-2)}
+.tour-spacer{flex:1}
+.tour-back{font-size:12px;color:var(--text-2);padding:6px 11px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;transition:background .15s}
+.tour-back:hover{background:var(--bg-card)}
+.tour-next{font-size:12px;font-weight:600;color:var(--bg-base);background:var(--accent);padding:6px 15px;border-radius:6px;border:none;cursor:pointer;transition:opacity .15s}
+.tour-next:hover{opacity:.85}
+.tour-progress{display:flex;gap:4px;margin-bottom:5px}
+.tour-dot{width:5px;height:5px;border-radius:50%;background:var(--border);transition:background .2s}
+.tour-dot.active{background:var(--accent)}
+.tour-help-btn{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--border-s);color:var(--text-2);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.tour-help-btn:hover{background:rgba(255,255,255,.12);color:var(--text-1)}
+
+/* ── Question modal ──────────────────────── */
+.q-overlay{position:fixed;inset:0;background:oklch(0 0 0/.72);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center;animation:q-in .2s ease}
+@keyframes q-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.q-modal{width:540px;max-width:92vw;background:var(--bg-surface);border:1px solid var(--ag-planner);border-radius:10px;box-shadow:0 0 0 1px oklch(from var(--ag-planner) l c h/.2),0 24px 80px oklch(0 0 0/.6);overflow:hidden;animation:qm-in .25s cubic-bezier(.4,0,.2,1)}
+@keyframes qm-in{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.qm-hd{display:flex;align-items:center;gap:10px;padding:13px 17px;border-bottom:1px solid oklch(from var(--ag-planner) l c h/.2);background:oklch(from var(--ag-planner) l c h/.06)}
+.qm-agent{font-size:12px;font-weight:600;color:var(--ag-planner)}
+.qm-badge{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--warning);background:oklch(from var(--warning) l c h/.12);padding:2px 7px;border-radius:4px}
+.qm-body{padding:18px 17px 8px}
+.qm-text{font-family:var(--font-ui);font-weight:300;font-size:14.5px;line-height:1.7;color:var(--text-1);white-space:pre-wrap;margin-bottom:16px}
+.qm-form{display:flex;flex-direction:column;gap:9px;padding-bottom:16px}
+.qm-textarea{width:100%;min-height:70px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-1);font-size:13px;padding:9px 11px;resize:vertical;outline:none;transition:border-color .15s;line-height:1.5}
+.qm-textarea:focus{border-color:var(--ag-planner)}
+.qm-textarea::placeholder{color:var(--text-3)}
+.qm-submit{align-self:flex-end;background:var(--ag-planner);color:var(--bg-base);font-size:13px;font-weight:600;padding:7px 18px;border-radius:6px;transition:opacity .15s}
+.qm-submit:hover:not(:disabled){opacity:.88}
+.qm-submit:disabled{opacity:.35;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ═══ Agents ═════════════════════════════════════════════════ */
+const AGENTS = {
+  planner:  { name:'Planner',         sub:'Orchestrator',         color:'var(--ag-planner)',   code:'PLN' },
+  demand:   { name:'AutoML Forecast', sub:'AutoML · Model Selection', color:'var(--ag-demand)',   code:'AML' },
+  spi:      { name:'SPI Analyst',      sub:'Sales · Prod · Inv',   color:'var(--ag-spi)',       code:'SPI' },
+  inventory:{ name:'Inventory Mgmt',   sub:'ABC · Safety Stock',   color:'var(--ag-inventory)', code:'INV' },
+  masterdata: { name:'Master Data',    sub:'MDM · BOM · Routing',        color:'var(--ag-masterdata)',  code:'MDM' },
+  procurement: { name:'Procurement',    sub:'ATP · CTP · Supplier Commit',  color:'var(--ag-procurement)', code:'PRO' },
+  optimizer:   { name:'Plan Optimizer', sub:'MILP · CP-SAT · Pareto',       color:'var(--ag-optimizer)',   code:'OPT' },
+  tooling:  { name:'Tooling & Mold',   sub:'Die Sets · Asset Life',color:'var(--ag-tooling)',   code:'TLG' },
+  capacity: { name:'Capacity Plan',    sub:'Assembly Loading',     color:'var(--ag-capacity)',  code:'CAP' },
+  wip:      { name:'WIP',              sub:'PO · Shop Floor',      color:'var(--ag-wip)',       code:'WIP' },
+  finance:  { name:'Finance',          sub:'P&L · Margin · OTIF',  color:'var(--ag-finance)',   code:'FIN' },
+  risk:     { name:'Risk',             sub:'Constraints · Quality',color:'var(--ag-risk)',      code:'RSK' },
+};
+const AGENT_ORDER = ['planner','masterdata','procurement','demand','spi','inventory','tooling','capacity','wip','optimizer','finance','risk'];
+
+/* ═══ Bobble head icon (self-contained) ══════════════════════ */
+const AGI_CSS = `
+  .agi{display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0}
+  .agi svg{overflow:visible}
+  .agi-running svg{filter:drop-shadow(0 0 5px var(--agi-clr))}
+  .agi-paused svg{filter:drop-shadow(0 0 4px #f5c842)}
+  .agi-arc-spin{animation:agi-spin 1.8s linear infinite}
+  @keyframes agi-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+  .agi-bob{animation:agi-bob 1.3s ease-in-out infinite}
+  @keyframes agi-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .agi-tilt{transform:rotate(-12deg);transform-origin:20px 20px}
+  .agi-blink{animation:agi-blink 3.8s ease-in-out infinite}
+  @keyframes agi-blink{0%,44%,58%,100%{transform:scaleY(1)}51%{transform:scaleY(0.07)}}
+  .agi-orbit{animation:agi-orbit 2.2s linear infinite;transform-origin:20px 20px}
+  @keyframes agi-orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+`;
+
+/* inject AGI CSS immediately */
+(function(){
+  if (document.getElementById('__agi')) return;
+  const s = document.createElement('style'); s.id='__agi'; s.textContent=AGI_CSS;
+  document.head.appendChild(s);
+})();
+
+function AgentIcon({ color, status, size=36 }) {
+  const L=status==='running', P=status==='paused', D=status==='done', I=!L&&!P&&!D;
+  const c=size/2, r=size*.47, hr=size*.35, eyeRy=I?size*.04:size*.07;
+  const ex1=c-size*.13, ex2=c+size*.13, ey=c-size*.04;
+  return (
+    <div className={`agi agi-${status||'idle'}`} style={{'--agi-clr':color}}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="var(--agi-clr)" strokeWidth=".8" opacity=".12"/>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="var(--agi-clr)" strokeWidth="1.6"
+          strokeDasharray={L?'20 76':P?'28 68':'6 90'} strokeLinecap="round"
+          opacity={L?.9:P?.6:.18} className={L?'agi-arc-spin':''}
+          style={{transformOrigin:`${c}px ${c}px`,transform:'rotate(-90deg)'}}/>
+        {L&&<g className="agi-orbit"><circle cx={c} cy={size*.08} r="1.4" fill="var(--agi-clr)" opacity=".85"/></g>}
+        <g className={L?'agi-bob':P?'agi-tilt':''} style={{transformOrigin:`${c}px ${c}px`}}>
+          <circle cx={c} cy={c} r={hr} fill="var(--bg-base,#0c0e1a)" stroke="var(--agi-clr)"
+            strokeWidth={L?1.5:.9} opacity={L?1:P?.9:.45}/>
+          {L&&<><circle cx={ex1} cy={ey} r={size*.1} fill="var(--agi-clr)" opacity=".1"/>
+              <circle cx={ex2} cy={ey} r={size*.1} fill="var(--agi-clr)" opacity=".1"/></>}
+          <g className={L?'agi-blink':''} style={{transformOrigin:`${ex1}px ${ey}px`}}>
+            <ellipse cx={ex1} cy={ey} rx={size*.065} ry={eyeRy} fill="var(--agi-clr)" opacity={L?1:P?.9:.35}/>
+          </g>
+          <g className={L?'agi-blink':''} style={{transformOrigin:`${ex2}px ${ey}px`}}>
+            <ellipse cx={ex2} cy={ey} rx={size*.065} ry={eyeRy} fill="var(--agi-clr)" opacity={L?1:P?.9:.35}/>
+          </g>
+          {L&&<path d={`M${ex1} ${c+hr*.35} Q${c} ${c+hr*.7} ${ex2} ${c+hr*.35}`} fill="none"
+            stroke="var(--agi-clr)" strokeWidth="1.3" strokeLinecap="round" opacity=".85"/>}
+          {P&&<><line x1={c} y1={c+hr*.2} x2={c} y2={c+hr*.55} stroke="#f5c842" strokeWidth="1.4" strokeLinecap="round"/>
+              <circle cx={c} cy={c+hr*.7} r=".8" fill="#f5c842"/></>}
+          {D&&<path d={`M${ex1} ${c+hr*.35} Q${c} ${c+hr*.7} ${ex2} ${c+hr*.35}`} fill="none"
+            stroke="var(--agi-clr)" strokeWidth=".9" strokeLinecap="round" opacity=".4"/>}
+          {I&&<line x1={ex1} y1={c+hr*.45} x2={ex2} y2={c+hr*.45}
+            stroke="var(--agi-clr)" strokeWidth=".9" strokeLinecap="round" opacity=".3"/>}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+/* ═══ Console simulation data ════════════════════════════════ */
+const SIM = {
+  planner:{
+    tasks:[
+      {id:'PLN-001',label:'Parse Goal & Build Task Graph',start:0,  end:3.0, out:'13 wk horizon · 847 SKUs · 9 agents'},
+      {id:'PLN-002',label:'Orchestrate & Monitor Agents', start:3.0,end:null,out:'4 of 9 agents active'},
+    ],
+    logs:[
+      {at:0.3,msg:'Parsing Q3-2026 S&OP goal: 847 SKUs, 12 plants, OTIF ≥ 98%'},
+      {at:1.2,msg:'Building multi-agent dependency graph…'},
+      {at:2.0,msg:'Constraint flags: Line 4 bottleneck, Supplier X +4wk LT'},
+      {at:3.0,msg:'Graph ready — dispatching 4 parallel agents'},
+      {at:5.0,msg:'SPI: inventory loaded, WOS 4.2'},
+      {at:8.0,msg:'Signal from Demand: SKU-88X +34% spike confirmed'},
+      {at:8.9,msg:'Signal from Tooling: D-88X die-set bottleneck ⚠'},
+      {at:11.0,msg:'Conflict: assembly + tooling capacity insufficient for spike'},
+      {at:11.3,msg:'Escalating to decision layer — pausing pipeline'},
+    ],
+    model:'claude-opus-4-5',
+  },
+  demand:{
+    tasks:[
+      {id:'AML-001',label:'Ingest & Auto Feature Engineering',     start:3.2, end:5.5, out:'109,512 rows · 84 auto-features · 3 signals merged'},
+      {id:'AML-002',label:'AutoML Model Tournament (5 trials)',     start:5.6, end:9.0, out:'TFT Ensemble wins · MAPE 5.6% · bias −1.8%'},
+    ],
+    logs:[
+      {at:3.5,msg:'Auto-ingesting 36-month shipment history + 14 promo events + external signals'},
+      {at:4.5,msg:'AutoML feature engineering: 84 lag/Fourier/promo features generated'},
+      {at:5.6,msg:'Tournament START — 5 models: ETS · Prophet · LightGBM · N-BEATS · TFT'},
+      {at:6.4,msg:'Trial 2/5: Prophet+regressor CV MAPE 6.2%'},
+      {at:7.0,msg:'Trial 3/5: LightGBM CV MAPE 5.8%'},
+      {at:7.6,msg:'Trial 4/5: N-BEATS CV MAPE 6.9%'},
+      {at:8.0,msg:'Trial 5/5: TFT Ensemble CV MAPE 5.6% ← WINNER'},
+      {at:8.2,msg:'SPIKE: SKU-88X July 4–11 +34% — trade show confirmed ⚠'},
+    ],
+    model:'AutoML · TFT Ensemble',
+  },
+  spi:{
+    tasks:[
+      {id:'SPI-001',label:'Load Inventory Snapshot (SAP)',      start:3.2, end:5.0, out:'$12.4M · WOS 4.2 · 44 below SS'},
+      {id:'SPI-002',label:'Production Status Review',           start:5.2, end:7.8, out:'234 orders · Line 4 98.3% ⚠'},
+      {id:'SPI-003',label:'S&P&I Three-Way Reconciliation',     start:9.5, end:11.2,out:'44 SKUs short · 1,240 units · $442k'},
+    ],
+    logs:[
+      {at:3.4,msg:'SAP S/4HANA connected (client 100) — reading inventory'},
+      {at:4.2,msg:'On-hand $12.4M · WOS 4.2 wk · 44 SKUs below safety stock'},
+      {at:5.2,msg:'Reading 234 open production orders (AUFK + AFPO)'},
+      {at:6.8,msg:'Line 4 at 98.3% utilisation — confirmed bottleneck'},
+      {at:7.6,msg:'47 orders at risk — Supplier X component shortage'},
+      {at:9.7,msg:'Reconciling 2.34M demand vs 2.19M supply vs $12.4M inventory'},
+      {at:10.8,msg:'Gap: 44 SKUs · 1,240 units · $442k revenue exposure'},
+    ],
+    model:'claude-opus-4-5',
+  },
+  inventory:{
+    tasks:[
+      {id:'INV-001',label:'ABC Velocity Classification',       start:5.2,end:8.2,  out:'169 A-class · 12 dead-stock · $340k'},
+      {id:'INV-002',label:'Replenishment Policy Update',       start:null,end:null, out:'Awaiting decision'},
+    ],
+    logs:[
+      {at:5.5,msg:'Loading 12-month cumulative revenue by SKU'},
+      {at:6.5,msg:'A-class threshold: $14.7M / 169 SKUs (80% revenue)'},
+      {at:7.5,msg:'B: 254 SKUs · C: 424 SKUs · Dead-stock: 12 ($340k)'},
+      {at:8.1,msg:'ABC complete — awaiting Planner decision for policies'},
+    ],
+    model:'claude-opus-4-5',
+  },
+  masterdata:{
+    tasks:[
+      {id:'MDM-001',label:'BOM / Routing / UoM Validation',  start:3.2, end:6.8, out:'847 SKUs · 34 BOM gaps · 3 vendors deduped'},
+      {id:'MDM-002',label:'Cleanse & Quality Score',          start:6.9, end:8.3, out:'31/34 gaps resolved · quality 98.7%'},
+    ],
+    logs:[
+      {at:3.5,msg:'Validating 847 SKU masters · 3,240 BOM records · 12 plant routings'},
+      {at:4.2,msg:'Checking lead times, lot sizes, UoMs, plant/SKU activation flags'},
+      {at:5.0,msg:'Validating factory calendars — 12 plants × 13 weeks'},
+      {at:5.4,msg:'⚠ 34 BOM records missing components — attempting alternate mapping'},
+      {at:6.2,msg:'3 duplicate vendors detected and merged in ERP'},
+      {at:7.0,msg:'Auto-resolving 34 BOM gaps via alternate component mapping'},
+      {at:8.0,msg:'31/34 resolved · 3 records require Master Data Steward review'},
+    ],
+    model:'claude-haiku-4-5',
+  },
+  procurement:{
+    tasks:[
+      {id:'PRO-001',label:'ATP / CTP — Critical Components',  start:3.2, end:7.5, out:'892 components · 12 ATP gaps · 3 CTP risks'},
+      {id:'PRO-002',label:'Supplier Commit Plan',              start:7.6, end:10.5,out:'127 POs · $3.8M · 8 expedited · 98.2% coverage'},
+    ],
+    logs:[
+      {at:3.5,msg:'Querying ATP positions for 892 critical components across 24 suppliers'},
+      {at:4.5,msg:'Checking supplier capacity confirmations for Q3 horizon'},
+      {at:5.5,msg:'MOQ constraints: 14 SKUs require batch-size adjustment'},
+      {at:6.2,msg:'⚠ 12 ATP gaps — Supplier X allocation limit reached'},
+      {at:6.8,msg:'CTP: 3 components cannot be promised within required lead time'},
+      {at:7.6,msg:'Generating supplier commit plan — 127 POs across 24 suppliers'},
+      {at:9.0,msg:'8 critical components expedited — confirming with suppliers'},
+      {at:10.4,msg:'Commit plan locked — $3.8M · 98.2% material coverage'},
+    ],
+    model:'claude-opus-4-5',
+  },
+  tooling:{
+    tasks:[
+      {id:'TLG-001',label:'Die Set & Mold Audit',              start:5.3,end:8.8,  out:'284 audited · 12 at-risk · D-88X critical'},
+      {id:'TLG-002',label:'Tooling Allocation Plan',           start:null,end:null, out:'Awaiting decision'},
+    ],
+    logs:[
+      {at:5.6,msg:'Auditing 284 active die sets across 6 plants'},
+      {at:6.5,msg:'Checking shot counts, cycle times, maintenance schedules'},
+      {at:7.4,msg:'D-88X: 94% util · 92% shot-count life — bottleneck ⚠'},
+      {at:8.0,msg:'12 aging molds identified (>95% util or shot threshold)'},
+      {at:8.6,msg:'3 new molds needed for W28 launches — 12wk LT'},
+      {at:8.7,msg:'Bottleneck confirmed — escalating D-88X to Planner'},
+    ],
+    model:'claude-opus-4-5',
+  },
+  capacity:{tasks:[{id:'CAP-001',label:'Assembly Loading Plan',start:null,end:null,out:'Queued'}],logs:[{at:3.2,msg:'Ready — awaiting S&P&I reconciliation'}],model:'claude-opus-4-5'},
+  wip:     {tasks:[{id:'WIP-001',label:'Purchase Order Plan', start:null,end:null,out:'Queued'}],logs:[{at:3.2,msg:'MRP ready — awaiting reconciliation inputs'}],model:'claude-opus-4-5'},
+  finance: {tasks:[{id:'FIN-001',label:'P&L Reconciliation',  start:null,end:null,out:'Queued'}],logs:[{at:3.2,msg:'P&L model loaded — awaiting operational plan'}],model:'claude-opus-4-5'},
+  risk:    {tasks:[{id:'RSK-001',label:'Risk & Constraint Check',start:null,end:null,out:'Queued'}],logs:[{at:3.2,msg:'Risk register pre-loaded — 5 known constraints flagged'}],model:'claude-opus-4-5'},
+};
+
+const MESSAGES = [
+  {at:0.4, from:'planner',   to:'demand',    tag:'BEGIN', text:'Forecast horizon W22–W34, 847 SKUs, attach promotional calendar'},
+  {at:0.4, from:'planner',   to:'spi',       tag:'BEGIN', text:'Load inventory from SAP S/4HANA client 100, sync WIP'},
+  {at:2.5, from:'planner',   to:'inventory', tag:'BEGIN', text:'Run ABC velocity analysis once inventory snapshot is ready'},
+  {at:2.5, from:'planner',   to:'tooling',   tag:'BEGIN', text:'Audit 284 die sets — flag util >85% and shot-count thresholds'},
+  {at:5.0, from:'spi',       to:'planner',   tag:'ACK',   text:'Inventory loaded: $12.4M · WOS 4.2 · 44 SKUs below safety stock'},
+  {at:7.8, from:'spi',       to:'planner',   tag:'ACK',   text:'Production reviewed: Line 4 at 98.3%, 47 orders at risk'},
+  {at:8.0, from:'demand',    to:'planner',   tag:'ALERT', text:'SKU-88X July 4–11 +34% — trade show confirmed, demand spike flagged'},
+  {at:8.2, from:'inventory', to:'planner',   tag:'ACK',   text:'ABC done: 169 A-class SKUs · 12 dead-stock items ($340k)'},
+  {at:8.8, from:'tooling',   to:'planner',   tag:'ALERT', text:'D-88X at 94% util + 92% shot-count life — bottleneck confirmed ⚠'},
+  {at:9.5, from:'planner',   to:'spi',       tag:'BEGIN', text:'Run three-way reconciliation using finalized demand forecast'},
+  {at:11.2,from:'spi',       to:'planner',   tag:'ESCALATE',text:'Gap 1,240 units · $442k · assembly + tooling both constrained'},
+  {at:11.4,from:'planner',   to:'all',       tag:'PAUSE', text:'Decision required — pausing pipeline, awaiting human input'},
+];
+
+/* ═══ Helper: derive agent state at time t ═══════════════════ */
+function getAgentState(agentId, t) {
+  const sim = SIM[agentId];
+  if (!sim) return { status:'idle', task:null, progress:0, logs:[], out:'' };
+
+  const currentTask = sim.tasks.find(tk => tk.start != null && tk.start <= t && (tk.end == null || tk.end > t));
+  const lastDone    = [...sim.tasks].reverse().find(tk => tk.end != null && tk.end <= t);
+  const activeTask  = currentTask || lastDone;
+
+  let progress = 0, status = 'idle';
+  if (currentTask) {
+    status = 'running';
+    if (currentTask.end == null) {
+      progress = Math.min(95, ((t - currentTask.start) % 8) / 8 * 100);
+    } else {
+      progress = Math.min(99, (t - currentTask.start) / (currentTask.end - currentTask.start) * 100);
+    }
+  } else if (lastDone) {
+    status = 'done'; progress = 100;
+  }
+
+  const logs = sim.logs.filter(l => l.at <= t).slice(-4);
+  return { status, task: activeTask, progress, logs, out: activeTask?.out || '' };
+}
+
+function nowTs(offset=0) {
+  const d = new Date(Date.now() + offset * 60000);
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+/* ═══ Agent card ═════════════════════════════════════════════ */
+function AgentCard({ agentId, t, isPlanner }) {
+  const ag = AGENTS[agentId];
+  const { status, task, progress, logs, out } = getAgentState(agentId, t);
+  const cssColor = ag.color;
+
+  const badgeClass = { running:'ac-badge-running', done:'ac-badge-done', paused:'ac-badge-paused', idle:'ac-badge-idle' }[status] || 'ac-badge-idle';
+  const badgeLabel = { running:'● Live', done:'✓ Done', paused:'⏸ Paused', idle:'Idle' }[status] || 'Idle';
+
+  const pct = Math.round(progress);
+  const eta = status === 'running' && task?.end != null
+    ? `~${Math.max(0,(task.end - t)).toFixed(0)}s left`
+    : status === 'running' ? 'ongoing' : '';
+
+  return (
+    <div className={`agent-card${isPlanner ? ' is-planner' : ''}`}
+         style={{ borderTopColor: cssColor, borderTopWidth: 2 }}>
+
+      {/* Header */}
+      <div className="ac-header">
+        <div className="ac-icon-wrap">
+          <AgentIcon color={cssColor} status={status} size={isPlanner ? 40 : 34}/>
+        </div>
+        <div>
+          <div className="ac-name" style={{ color: cssColor }}>{ag.name}</div>
+          <div className="ac-sub">{ag.sub}</div>
+        </div>
+        <div className={`ac-badge ${badgeClass}`}>{badgeLabel}</div>
+      </div>
+
+      {/* Body */}
+      <div className="ac-body">
+
+        {/* Task ID + label */}
+        {task ? (
+          <div className="ac-task">
+            <span className="ac-task-id mono"
+              style={{ background: cssColor + '18', color: cssColor, borderRadius:4, padding:'2px 7px' }}>
+              S&OP-Q3-{task.id}
+            </span>
+            <span className="ac-task-label">{task.label}</span>
+          </div>
+        ) : (
+          <div className="ac-task-idle">No active task — standing by</div>
+        )}
+
+        {/* Progress */}
+        {status !== 'idle' && (
+          <div className="ac-progress-wrap">
+            <div className="ac-progress-row">
+              <span className="ac-progress-pct">{pct}%</span>
+              {eta && <span className="ac-progress-eta">{eta}</span>}
+            </div>
+            <div className="ac-progress-track">
+              <div className={`ac-progress-fill${status==='running'?' is-running':''}`}
+                style={{ width:`${pct}%`, background:`linear-gradient(90deg, ${cssColor}aa, ${cssColor})` }}/>
+            </div>
+          </div>
+        )}
+
+        {/* Live output */}
+        {out && status !== 'idle' && (
+          <div className="ac-output">
+            <div className="ac-output-lbl">Output</div>
+            {out}
+          </div>
+        )}
+
+        {/* Mini log */}
+        {logs.length > 0 && (
+          <div className="ac-log">
+            {logs.map((l, i) => (
+              <div key={i} className="ac-log-entry">
+                <span className="ac-log-ts">{nowTs(-(t - l.at) * 0.1)}</span>
+                <span className="ac-log-msg">{l.msg}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      {status !== 'idle' && task && (
+        <div className="ac-footer">
+          {ag.model && <span className="ac-foot-item">model <span>{ag.model}</span></span>}
+          <span className="ac-foot-item">elapsed <span>{task.start != null ? (Math.min(t, task.end ?? t) - task.start).toFixed(1) : '—'}s</span></span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Message bus ════════════════════════════════════════════ */
+function MessageBus({ t }) {
+  const listRef = useRef(null);
+  const visible = MESSAGES.filter(m => m.at <= t);
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [visible.length]);
+
+  const tagClass = (tag) => ({
+    BEGIN:'msg-tag-begin', ACK:'msg-tag-ack', ALERT:'msg-tag-alert',
+    ESCALATE:'msg-tag-escalate', PAUSE:'msg-tag-pause',
+  }[tag] || 'msg-tag-begin');
+
+  return (
+    <div className="msg-bus">
+      <div className="msg-bus-hd">
+        <span className="msg-bus-title">Message Bus</span>
+        <span style={{fontFamily:'var(--font-mono)',fontSize:9,color:'var(--text-3)'}}>{visible.length} msgs</span>
+        <div className="msg-live"><span className="msg-live-dot"/>LIVE</div>
+      </div>
+      <div className="msg-list" ref={listRef}>
+        {visible.map((m, i) => {
+          const fromAg = AGENTS[m.from];
+          const toAg   = m.to === 'all' ? null : AGENTS[m.to];
+          return (
+            <div key={i} className="msg-row">
+              <div className="msg-agents">
+                <span className="msg-agent-from" style={{ color: fromAg?.color }}>{fromAg?.name.split(' ')[0]}</span>
+                <span className="msg-arrow">→</span>
+                {toAg
+                  ? <span className="msg-agent-to" style={{ color: toAg.color }}>{toAg.name.split(' ')[0]}</span>
+                  : <span className="msg-agent-all">All</span>
+                }
+              </div>
+              <div className="msg-content">
+                <span className={`msg-tag ${tagClass(m.tag)}`}>{m.tag}</span>
+                <div className="msg-text">{m.text}</div>
+                <div className="msg-ts">{nowTs(-(t - m.at) * 0.1)}</div>
+              </div>
+            </div>
+          );
+        })}
+        {visible.length === 0 && (
+          <div style={{padding:'16px 14px',color:'var(--text-3)',fontSize:11}}>Waiting for pipeline messages…</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Console guided tour ════════════════════════════════════ */
+const CONSOLE_TOUR = [
+  { title:'Welcome to Agent Console', desc:'This view gives you deep orchestration visibility — every agent\'s current task ID, live progress, reasoning log, and the inter-agent message bus. It\'s the engine room behind the Pipeline View.', sel:null, pos:'center' },
+  { title:'Session Overview', desc:'The left panel shows the active planning goal, how many agents are currently live, tasks completed, and elapsed time. These stats update in real time as the pipeline runs.', sel:'.session-card', pos:'right' },
+  { title:'Inter-Agent Message Bus', desc:'Watch agents communicate in real time. Messages are tagged BEGIN, ACK, ALERT, ESCALATE, or PAUSE — coloured by sender and receiver. This is how the Planner orchestrates the team without a single hard-coded workflow.', sel:'.msg-bus', pos:'right' },
+  { title:'Planner — the Orchestrator', desc:'The Planner spans the full width because it\'s the central coordinator. It builds the task graph, dispatches jobs to all other agents, monitors their outputs, and escalates decisions it can\'t resolve autonomously.', sel:'.agent-card.is-planner', pos:'bottom' },
+  { title:'Agent Cards & Task IDs', desc:'Each agent card shows a unique task ID (e.g. S&OP-Q3-DEM-002), the current job label, a live progress bar with shimmer, the latest computed output, and a rolling mini-log of the last 4 actions. Click or explore any card.', sel:'.agent-grid', pos:'left' },
+  { title:'Event Feed & Navigation', desc:'The event feed at the bottom logs every action across all agents in reverse-chronological order. Use ← Pipeline View in the header to return to the swimlane overview and toggle between macro and micro views.', sel:'.con-eventbar', pos:'top' },
+];
+
+function ConsoleTourOverlay({ onClose }) {
+  const [step, setStep] = useState(0);
+  const [rect, setRect] = useState(null);
+
+  useEffect(() => {
+    const s = CONSOLE_TOUR[step];
+    if (!s.sel) { setRect(null); return; }
+    const el = document.querySelector(s.sel);
+    if (!el) { setRect(null); return; }
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.top, left: r.left, w: r.width, h: r.height });
+  }, [step]);
+
+  const cur = CONSOLE_TOUR[step];
+  const total = CONSOLE_TOUR.length;
+  const next = () => step < total - 1 ? setStep(s => s + 1) : onClose();
+  const back = () => step > 0 && setStep(s => s - 1);
+
+  const tipStyle = (() => {
+    const TW = 300, PAD = 14;
+    if (!rect || cur.pos === 'center') return { position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)' };
+    const WW = window.innerWidth, WH = window.innerHeight;
+    const safe = x => Math.max(PAD, Math.min(WW - TW - PAD, x));
+    if (cur.pos === 'bottom') return { position:'fixed', top: rect.top + rect.h + 16, left: safe(rect.left + rect.w/2 - TW/2) };
+    if (cur.pos === 'top')    return { position:'fixed', bottom: WH - rect.top + 16,  left: safe(rect.left + rect.w/2 - TW/2) };
+    if (cur.pos === 'right')  return { position:'fixed', top: Math.max(PAD, rect.top + rect.h/2 - 110), left: Math.min(WW - TW - PAD, rect.left + rect.w + 16) };
+    if (cur.pos === 'left')   return { position:'fixed', top: Math.max(PAD, rect.top + rect.h/2 - 110), right: WW - rect.left + 16 };
+    return { position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)' };
+  })();
+
+  return (
+    <>
+      <div className="tour-backdrop" onClick={onClose}/>
+      {rect && <div className="tour-spot" style={{ top: rect.top-5, left: rect.left-5, width: rect.w+10, height: rect.h+10 }}/>}
+      <div className="tour-tip" style={tipStyle}>
+        <div className="tour-progress">{CONSOLE_TOUR.map((_,i) => <span key={i} className={`tour-dot${i===step?' active':''}`}/>)}</div>
+        <div className="tour-tip-badge">Step {step+1} of {total}</div>
+        <div className="tour-tip-title">{cur.title}</div>
+        <p className="tour-tip-desc">{cur.desc}</p>
+        <div className="tour-controls">
+          <button className="tour-skip" onClick={onClose}>Skip tour</button>
+          <span className="tour-spacer"/>
+          {step > 0 && <button className="tour-back" onClick={back}>← Back</button>}
+          <button className="tour-next" onClick={next}>{step===total-1?'✓ Done':'Next →'}</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ═══ Question modal ═════════════════════════════════════════ */
+function QuestionModal({ onAnswer, onTerminate }) {
+  const [text, setText] = useState('');
+  const Q = 'Demand Forecast flags a +34% volume spike on SKU-88X (July 4–11) — confirmed trade show. Both assembly and tooling present binding constraints:\n\n  · Assembly Line 4: headroom only +18% without overtime\n  · Die-set D-88X: 94% utilisation, 92% of shot-count life\n\nWhich approach?\n\n  (A) Approve 840 OT hours + expedite D-88X reconditioning W24 — cost +$178k, OTIF protected\n  (B) Accept partial shortfall — 1,240 units short, 3 key accounts at risk\n  (C) Defer 2 lower-margin SKUs to Q4 — frees headroom, margin −$89k';
+  const submit = (e) => { e.preventDefault(); if (!text.trim()) return; onAnswer(text.trim()); };
+  return (
+    <div className="q-overlay">
+      <div className="q-modal">
+        <div className="qm-hd">
+          <span className="qm-agent">Planner</span>
+          <span className="qm-badge">⏸ Decision Required</span>
+        </div>
+        <div className="qm-body">
+          <p className="qm-text">{Q}</p>
+          <form className="qm-form" onSubmit={submit}>
+            <textarea className="qm-textarea" value={text} onChange={e=>setText(e.target.value)}
+              placeholder="State your decision…" autoFocus rows={3}/>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <button type="button" onClick={onTerminate}
+                style={{fontSize:11.5,fontWeight:500,color:'var(--danger)',background:'oklch(from var(--danger) l c h/.1)',border:'1px solid oklch(from var(--danger) l c h/.3)',padding:'6px 12px',borderRadius:6,cursor:'pointer'}}>
+                ⛔ Terminate session
+              </button>
+              <span style={{flex:1}}/>
+              <button type="submit" className="qm-submit" disabled={!text.trim()}>Confirm Decision →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ App ════════════════════════════════════════════════════ */
+function App() {
+  const [tick, setTick]         = useState(0);
+  const [answered, setAnswered]   = useState(false);
+  const [showTour, setShowTour]   = useState(() => !localStorage.getItem('console-tour-done'));
+  const closeTour = () => { localStorage.setItem('console-tour-done','1'); setShowTour(false); };
+  const SPEED = 1.5;
+  const S = useRef({ t:0, events:[], done:false, paused:false, manualPaused:false }).current;
+  const speedRef = useRef(SPEED);
+
+  // RAF loop
+  useEffect(() => {
+    let last = performance.now(), frame = 0, rafId;
+    const tick = (now) => {
+      const dt = Math.min((now-last)/1000, 0.1) * speedRef.current;
+      last = now;
+      if (!S.paused && !S.manualPaused && !S.done) {
+        S.t += dt;
+        // Add events from simulation logs
+        AGENT_ORDER.forEach(aid => {
+          SIM[aid]?.logs.forEach((l, i) => {
+            const key = `${aid}-${i}`;
+            if (!S._seen) S._seen = new Set();
+            if (!S._seen.has(key) && l.at <= S.t) {
+              S._seen.add(key);
+              S.events.push({ ts: nowTs(), type:'log', agent:aid, message:l.msg });
+            }
+          });
+        });
+        // Check question pause
+        if (S.t >= 11.4 && !S.paused && !answered) { S.paused = true; }
+        if (S.t >= 32 && answered) { S.done = true; }
+      }
+      frame++;
+      if (frame % 3 === 0) setTick(t=>t+1);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [answered]);
+
+  const handleTerminate = () => {
+    S.paused = false;
+    S.done = true;
+    S.pendingQuestion = null;
+    S.events.push({ ts:nowTs(), type:'log', agent:'user', message:'⛔ Session terminated by user' });
+    setAnswered(true);
+    setTick(t => t+1);
+  };
+
+  const handleAnswer = (ans) => {
+    S.events.push({ ts:nowTs(), type:'answer', agent:'user', message:`Decision: "${ans.slice(0,70)}${ans.length>70?'…':''}"` });
+    S.paused = false;
+    setAnswered(true);
+    setTick(t=>t+1);
+  };
+
+  const t = S.t;
+  const runningCount = AGENT_ORDER.filter(id => getAgentState(id, t).status === 'running').length;
+  const doneCount    = AGENT_ORDER.filter(id => getAgentState(id, t).status === 'done').length;
+  const sessionStatus = S.done ? 'done' : S.paused ? 'paused' : S.manualPaused ? 'paused' : 'running';
+  const statusLabel  = S.done ? '✓ Complete' : S.paused ? '⏸ Decision Required' : S.manualPaused ? '⏸ Paused' : '● Running';
+
+  const EVT_ICON = { start:'▶', done:'✓', question:'⏸', answer:'↳', log:'·' };
+
+  return (
+    <div className="console">
+      {/* Header */}
+      <div className="con-header">
+        <div className="con-brand">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span className="con-brand-name">Autopilot S&amp;OP</span>
+          <span className="con-brand-sep">·</span>
+          <span className="con-brand-page">Agent Console</span>
+        </div>
+        <a href="index.html" className="con-nav-btn">⌂ Home</a>
+        <a href="Autopilot S&OP Planner.html" className="con-nav-btn">← Pipeline View</a>
+        <a href="S&OP Agent Settings.html" className="con-nav-btn">⚙ Agent Settings</a>
+        <a href="S&OP Agent Manager.html" className="con-nav-btn">📊 Agent Manager</a>
+        <span className="con-spacer"/>
+        {!S.done && !S.paused && (
+          <button className="con-nav-btn" onClick={()=>{ S.manualPaused=!S.manualPaused; setTick(t=>t+1); }}
+            style={{color: S.manualPaused ? 'var(--success)' : 'var(--text-2)'}}>
+            {S.manualPaused ? '▶ Resume' : '⏸ Pause'}
+          </button>
+        )}
+        <div className={`con-status-pill sp-${sessionStatus}`}>{statusLabel}</div>
+        <span className="con-elapsed mono">{t.toFixed(1)}s</span>
+        <button className="tour-help-btn" onClick={()=>setShowTour(true)}
+          style={{width:'auto',padding:'4px 10px',borderRadius:5,fontSize:11,display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
+          ↺ Tour
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="con-body">
+
+        {/* Left: session overview + message bus */}
+        <div className="con-left">
+          <div className="session-card">
+            <div className="sc-label">Session Goal</div>
+            <div className="sc-goal">Q3-2026 S&OP · APAC · OTIF ≥ 98% · Margin ≥ 22%</div>
+            <div className="sc-stats">
+              <div className="sc-stat">
+                <div className="sc-stat-val" style={{color:'var(--success)'}}>{runningCount}</div>
+                <div className="sc-stat-lbl">Agents Live</div>
+              </div>
+              <div className="sc-stat">
+                <div className="sc-stat-val">{doneCount}</div>
+                <div className="sc-stat-lbl">Tasks Done</div>
+              </div>
+              <div className="sc-stat">
+                <div className="sc-stat-val mono" style={{fontSize:13}}>
+                  {S.paused ? <span style={{color:'var(--warning)'}}>PAUSED</span> : S.manualPaused ? <span style={{color:'var(--warning)'}}>PAUSED</span> : S.done ? <span style={{color:'var(--success)'}}>DONE</span> : <span style={{color:'var(--success)'}}>RUNNING</span>}
+                </div>
+                <div className="sc-stat-lbl">Pipeline</div>
+              </div>
+              <div className="sc-stat">
+                <div className="sc-stat-val mono" style={{fontSize:13}}>{t.toFixed(0)}s</div>
+                <div className="sc-stat-lbl">Elapsed</div>
+              </div>
+            </div>
+          </div>
+          <MessageBus t={t}/>
+        </div>
+
+        {/* Right: agent grid */}
+        <div className="con-right">
+          <div className="agent-grid">
+            {AGENT_ORDER.map(id => (
+              <AgentCard key={id} agentId={id} t={t} isPlanner={id==='planner'}/>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Event feed */}
+      <div className="con-eventbar">
+        <div className="evb-hd">
+          <span className="evb-title">Event Feed</span>
+          <span className="evb-count">{S.events.length} events</span>
+          {!S.done && <div className="evb-live"><span className="msg-live-dot"/>LIVE</div>}
+        </div>
+        <div className="evb-list">
+          {[...S.events].reverse().slice(0,30).map((e,i) => {
+            const ag = AGENTS[e.agent];
+            return (
+              <div key={i} className="evb-row">
+                <span className="evb-ts mono">{e.ts}</span>
+                <span className={`evb-icon evb-icon-${e.type}`}>{EVT_ICON[e.type]||'·'}</span>
+                <span className="evb-agent" style={{color:ag?.color||'var(--text-2)'}}>{ag?.name||'User'}</span>
+                <span className="evb-msg">{e.message}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Question modal */}
+      {S.paused && !answered && <QuestionModal onAnswer={handleAnswer} onTerminate={handleTerminate}/>}
+      {showTour && <ConsoleTourOverlay onClose={closeTour}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="80" fill="#0c0e1a"/>
+    <rect x="0" y="0" width="30" height="80" fill="#11131f"/>
+    <rect x="32" y="10" width="40" height="28" rx="3" fill="#161928" stroke="#4a90d9" stroke-width=".8" stroke-opacity=".5"/>
+    <rect x="74" y="10" width="40" height="28" rx="3" fill="#161928" stroke="#c8933f" stroke-width=".8" stroke-opacity=".5"/>
+    <rect x="32" y="42" width="40" height="28" rx="3" fill="#161928" stroke="#38a89d" stroke-width=".8" stroke-opacity=".5"/>
+    <rect x="74" y="42" width="40" height="28" rx="3" fill="#161928" stroke="#8b6fd4" stroke-width=".8" stroke-opacity=".5"/>
+    <circle cx="42" cy="19" r="4" fill="none" stroke="#4a90d9" stroke-width=".8"/>
+    <circle cx="42" cy="19" r="2" fill="#11131f" stroke="#4a90d9" stroke-width=".5"/>
+    <circle cx="84" cy="19" r="4" fill="none" stroke="#c8933f" stroke-width=".8"/>
+    <circle cx="84" cy="19" r="2" fill="#11131f" stroke="#c8933f" stroke-width=".5"/>
+    <text x="6" y="13" font-size="3.5" fill="#c8933f" font-family="monospace">▰</text>
+    <text x="11" y="13" font-size="3" fill="#8899aa" font-family="monospace">Console</text>
+  </svg>
+</template>
+</body>
+</html>

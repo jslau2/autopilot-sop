@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Autopilot ML — Pipeline Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,400;1,500;1,600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+/* ─── Variables ──────────────────────────────────────────────────────── */
+:root {
+  --bg-base:        oklch(0.09 0.008 252);
+  --bg-surface:     oklch(0.12 0.007 252);
+  --bg-card:        oklch(0.155 0.006 252);
+  --bg-card-h:      oklch(0.185 0.006 252);
+  --bg-input:       oklch(0.13 0.007 252);
+  --border:         oklch(0.23 0.007 252);
+  --border-subtle:  oklch(0.17 0.006 252);
+  --text-1:         oklch(0.92 0.006 240);
+  --text-2:         oklch(0.58 0.009 250);
+  --text-3:         oklch(0.38 0.008 250);
+  --accent:         oklch(0.72 0.18 162);
+  --danger:         oklch(0.65 0.20 25);
+  --success:        oklch(0.74 0.18 145);
+  --warning:        oklch(0.80 0.18 78);
+
+  /* Agent palette — same chroma/lightness, varied hue */
+  --ag-scientist:   oklch(0.80 0.16 78);
+  --ag-researcher:  oklch(0.68 0.17 248);
+  --ag-eda:         oklch(0.76 0.15 197);
+  --ag-feature:     oklch(0.74 0.17 147);
+  --ag-modeling:    oklch(0.70 0.20 300);
+  --ag-review:      oklch(0.72 0.19 38);
+  --ag-finetuning:  oklch(0.70 0.22 2);
+
+  --font-ui:    'DM Sans', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+  --font-serif: 'Playfair Display', Georgia, serif;
+
+  --sidebar-w:   244px;
+  --drawer-w:    420px;
+  --toolbar-h:   46px;
+  --eventbar-h:  172px;
+  --radius:      7px;
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background: var(--bg-base);
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.mono { font-family: var(--font-mono); }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; }
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-surface);
+}
+
+/* ─── App shell ──────────────────────────────────────────────────────── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+/* ─── Sidebar ────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-1);
+}
+.brand-icon { opacity: 0.9; flex-shrink: 0; }
+.brand-name { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.brand-tag {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.sb-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sb-sessions { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.sb-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.project-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-2);
+  transition: background 0.15s;
+}
+.project-item:hover { background: var(--bg-card); }
+.project-item.is-active { color: var(--text-1); background: var(--bg-card); }
+.project-bullet {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.project-active-pill {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  opacity: 0.8;
+}
+.sb-ghost-btn {
+  font-size: 11.5px;
+  color: var(--text-3);
+  padding: 4px 2px;
+  margin-top: 2px;
+  width: 100%;
+  text-align: left;
+  transition: color 0.15s;
+}
+.sb-ghost-btn:hover { color: var(--text-2); }
+
+.drop-zone {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: oklch(from var(--accent) l c h / 0.06); }
+.dz-icon { font-size: 18px; color: var(--text-3); margin-bottom: 4px; }
+.dz-hint { font-size: 11px; color: var(--text-3); margin-bottom: 6px; }
+.dz-current {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11.5px; color: var(--text-2); font-weight: 500;
+}
+.dz-file-dot { width: 5px; height: 5px; background: var(--success); border-radius: 50%; }
+.dz-stats { font-size: 10.5px; color: var(--text-3); margin-top: 2px; font-family: var(--font-mono); }
+.dz-uploading { font-size: 11px; color: var(--accent); }
+
+.session-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; margin-bottom: 6px; }
+.session-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.session-item:hover { background: var(--bg-card); }
+.session-item.is-active { background: var(--bg-card); }
+.sess-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sess-running { background: var(--success); box-shadow: 0 0 6px var(--success); animation: sess-pulse 2s ease-in-out infinite; }
+.sess-done    { background: var(--text-3); }
+@keyframes sess-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.sess-body { min-width: 0; }
+.sess-name { font-size: 12px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sess-time { font-size: 10.5px; color: var(--text-3); }
+
+.sidebar-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.footer-hint { font-size: 10.5px; color: var(--text-3); }
+
+/* ─── Main toolbar ───────────────────────────────────────────────────── */
+.main-toolbar {
+  height: var(--toolbar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+.toolbar-goal {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.goal-text {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
+.view-btn {
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.view-btn:hover { background: var(--bg-card); color: var(--text-1); }
+.view-btn.is-active { background: var(--bg-card); border-color: var(--border); color: var(--text-1); }
+.key-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+.status-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 12px;
+  letter-spacing: 0.01em;
+}
+.status-pill.sp-running { color: var(--success); background: oklch(from var(--success) l c h / 0.12); }
+.status-pill.sp-paused  { color: var(--warning); background: oklch(from var(--warning) l c h / 0.12); animation: sp-blink 1.2s ease-in-out infinite; }
+.status-pill.sp-done    { color: var(--text-2);  background: var(--bg-card); }
+@keyframes sp-blink { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.elapsed-time {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-3);
+  min-width: 42px;
+  text-align: right;
+}
+
+/* ─── Graph area ─────────────────────────────────────────────────────── */
+.main-graph {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--bg-base);
+}
+
+/* ─── Swimlane ───────────────────────────────────────────────────────── */
+.swimlane-root {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+.swim-labels {
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+}
+.agent-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 0;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+.agent-color-bar {
+  width: 3px;
+  align-self: stretch;
+  flex-shrink: 0;
+  border-radius: 0 2px 2px 0;
+}
+.agent-label-text { min-width: 0; padding: 6px 0; }
+.agent-label-name { display: block; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.agent-label-sub  { display: block; font-size: 10px; color: var(--text-3); margin-top: 1px; }
+
+.swim-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  scroll-behavior: auto;
+}
+.swim-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.swim-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 5px;
+}
+.ruler-tick::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 6px;
+  background: var(--border);
+}
+.ruler-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-3);
+  margin-left: 3px;
+  user-select: none;
+}
+.playhead {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.swim-lane {
+  position: relative;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.swim-lane:last-child { border-bottom: none; }
+.lane-grid {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--border-subtle);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Step cards */
+.step-card {
+  position: absolute;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--ac, var(--border));
+  background: var(--bg-card);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  user-select: none;
+  min-width: 0;
+}
+.step-card:hover { background: var(--bg-card-h); }
+.step-card.sc-selected {
+  border-color: var(--ac) !important;
+  box-shadow: 0 0 0 1px var(--ac) inset;
+}
+.step-card.sc-running {
+  animation: card-glow 2.2s ease-in-out infinite;
+}
+@keyframes card-glow {
+  0%,100% { box-shadow: 0 0 8px color-mix(in oklch, var(--ac) 20%, transparent); }
+  50%      { box-shadow: 0 0 0 1px color-mix(in oklch, var(--ac) 50%, transparent), 0 0 22px color-mix(in oklch, var(--ac) 35%, transparent); }
+}
+.step-card.sc-paused {
+  border-left-color: var(--warning) !important;
+  animation: card-pulse 1.3s ease-in-out infinite;
+}
+@keyframes card-pulse { 0%,100%{opacity:1} 50%{opacity:0.65} }
+.step-card.sc-done { opacity: 0.82; }
+
+.sc-accent { width: 0; } /* left border is handled via border-left */
+.sc-body {
+  flex: 1;
+  padding: 5px 8px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.sc-label {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-1);
+}
+.sc-metrics {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.sc-chip {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-2);
+  background: var(--bg-surface);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.sc-tokens {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-3);
+}
+.sc-pause-icon {
+  width: 18px;
+  align-self: center;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.sc-spin {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid color-mix(in oklch, var(--ac) 30%, transparent);
+  border-top-color: var(--ac);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.connectors-svg {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+.time-cursor {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: var(--accent);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ─── Timeline view ──────────────────────────────────────────────────── */
+.tl-root {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+  position: relative;
+}
+.tl-track {
+  position: absolute;
+  left: 65px;
+  top: 24px;
+  bottom: 24px;
+  width: 1px;
+  background: var(--border-subtle);
+}
+.tl-items { display: flex; flex-direction: column; gap: 0; }
+.tl-item {
+  display: flex;
+  gap: 14px;
+  padding: 10px 0;
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding-left: 0;
+  transition: background 0.1s;
+  position: relative;
+}
+.tl-item:hover .tl-content { background: var(--bg-surface); }
+.tl-item.tl-selected .tl-content { background: var(--bg-card); border-color: var(--border); }
+
+.tl-node-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 80px;
+  flex-shrink: 0;
+  padding-top: 12px;
+  position: relative;
+}
+.tl-node {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+.tl-node-pulse {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: tl-pulse 2s ease-in-out infinite;
+}
+@keyframes tl-pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.6);opacity:0} }
+.tl-node-check, .tl-node-q {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--bg-base);
+}
+.tl-connector-line {
+  flex: 1;
+  width: 1px;
+  background: var(--border-subtle);
+  min-height: 20px;
+}
+
+.tl-content {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tl-row1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.tl-agent-pill {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.tl-label { font-size: 13px; font-weight: 500; color: var(--text-1); }
+.tl-status-badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tl-badge-running { background: oklch(from var(--success) l c h / 0.14); color: var(--success); }
+.tl-badge-done    { background: var(--bg-surface); color: var(--text-3); }
+.tl-badge-paused  { background: oklch(from var(--warning) l c h / 0.14); color: var(--warning); }
+
+.tl-row2 { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.tl-time-val, .tl-dur, .tl-tok { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
+
+.tl-metrics { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tl-metric-chip {
+  display: flex; gap: 4px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+}
+.tl-metric-k { color: var(--text-3); }
+.tl-metric-v { color: var(--text-1); }
+
+.tl-question-preview {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: oklch(from var(--warning) l c h / 0.08);
+  border-left: 2px solid var(--warning);
+  border-radius: 0 4px 4px 0;
+}
+.tl-q-icon { font-size: 11px; color: var(--warning); flex-shrink: 0; margin-top: 1px; }
+.tl-q-text { font-family: var(--font-serif); font-style: italic; font-size: 11.5px; color: var(--text-2); }
+.tl-empty  { padding: 40px; text-align: center; color: var(--text-3); font-size: 12px; }
+
+/* ─── Event stream ───────────────────────────────────────────────────── */
+.event-bar {
+  height: var(--eventbar-h);
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+}
+.event-bar-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.evb-title { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; color: var(--text-3); text-transform: uppercase; }
+.evb-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+.evb-live  {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--success);
+  margin-left: auto;
+}
+.live-dot {
+  width: 6px; height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: live-blink 1.5s ease-in-out infinite;
+}
+@keyframes live-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.evb-done { margin-left: auto; font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-3); }
+
+.event-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  font-size: 11.5px;
+}
+.evt-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 14px;
+  transition: background 0.1s;
+}
+.evt-row:hover { background: var(--bg-card); }
+.evt-question { background: oklch(from var(--warning) l c h / 0.06); }
+.evt-answer   { background: oklch(from var(--accent) l c h / 0.05); }
+.evt-ts { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); flex-shrink: 0; min-width: 90px; }
+.evt-icon { font-size: 10px; flex-shrink: 0; min-width: 12px; }
+.evt-icon-start    { color: var(--accent); }
+.evt-icon-done     { color: var(--success); }
+.evt-icon-question { color: var(--warning); }
+.evt-icon-answer   { color: var(--accent); }
+.evt-icon-log      { color: var(--text-3); }
+.evt-agent { font-size: 10.5px; font-weight: 500; flex-shrink: 0; min-width: 90px; }
+.evt-agent-user { color: var(--text-2); }
+.evt-msg { color: var(--text-2); }
+.evt-empty { padding: 20px 14px; color: var(--text-3); }
+
+/* ─── Detail Drawer ──────────────────────────────────────────────────── */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.4);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  animation: overlay-in 0.2s ease;
+}
+@keyframes overlay-in { from{opacity:0} to{opacity:1} }
+.drawer {
+  width: var(--drawer-w);
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  animation: drawer-in 0.25s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+@keyframes drawer-in { from{transform:translateX(100%)} to{transform:translateX(0)} }
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+.drawer-agent-pill {
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.drawer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  flex: 1;
+  min-width: 0;
+}
+.drawer-close {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-2);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.drawer-close:hover { background: var(--bg-card-h); }
+
+.drawer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.meta-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px 6px 0;
+  min-width: 80px;
+}
+.meta-cell-label { font-size: 9.5px; color: var(--text-3); letter-spacing: 0.05em; text-transform: uppercase; }
+.meta-cell-val   { font-size: 12px; color: var(--text-1); }
+
+.meta-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-block;
+}
+.badge-running { background: oklch(from var(--success) l c h / 0.14); color: var(--success); }
+.badge-done    { background: var(--bg-card); color: var(--text-2); }
+.badge-paused  { background: oklch(from var(--warning) l c h / 0.14); color: var(--warning); }
+
+.drawer-question-block {
+  margin: 12px 16px;
+  padding: 12px 14px;
+  background: oklch(from var(--warning) l c h / 0.07);
+  border: 1px solid oklch(from var(--warning) l c h / 0.25);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+.dqb-label { font-size: 10px; font-weight: 600; color: var(--warning); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+.dqb-text  {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-1);
+  white-space: pre-wrap;
+}
+.dqb-answer { margin-top: 10px; padding-top: 10px; border-top: 1px solid oklch(from var(--warning) l c h / 0.2); }
+.dqb-answer-label { display: block; font-size: 9.5px; color: var(--text-3); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+.dqb-answer-text  { font-size: 12px; color: var(--text-2); }
+
+.drawer-metrics { padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.dm-header { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.dm-grid   { display: flex; flex-direction: column; gap: 4px; }
+.dm-row    { display: flex; align-items: baseline; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border-subtle); }
+.dm-row:last-child { border-bottom: none; }
+.dm-key { font-size: 11.5px; color: var(--text-2); text-transform: capitalize; }
+.dm-val { font-family: var(--font-mono); font-size: 11px; color: var(--text-1); }
+
+.drawer-tabs { display: flex; gap: 0; padding: 8px 16px 0; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.dtab {
+  font-size: 11.5px;
+  padding: 6px 12px;
+  color: var(--text-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  text-transform: capitalize;
+}
+.dtab:hover  { color: var(--text-2); }
+.dtab.dtab-active { color: var(--text-1); border-bottom-color: var(--accent); }
+
+.drawer-body { flex: 1; overflow-y: auto; }
+.tab-body { padding: 16px; }
+.tab-empty { font-size: 12px; color: var(--text-3); font-style: italic; }
+.code-pre {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  padding: 12px;
+  line-height: 1.6;
+}
+.reasoning-text {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+/* ─── Question modal ─────────────────────────────────────────────────── */
+.q-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.72);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: q-in 0.2s ease;
+}
+@keyframes q-in { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+.q-modal {
+  width: 520px;
+  max-width: 90vw;
+  background: var(--bg-surface);
+  border: 1px solid var(--ag-scientist);
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px oklch(from var(--ag-scientist) l c h / 0.2), 0 24px 80px oklch(0 0 0 / 0.6), 0 0 60px oklch(from var(--ag-scientist) l c h / 0.12);
+  overflow: hidden;
+  animation: q-modal-in 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes q-modal-in { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.qm-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid oklch(from var(--ag-scientist) l c h / 0.2);
+  background: oklch(from var(--ag-scientist) l c h / 0.06);
+}
+.qm-agent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ag-scientist);
+}
+.qm-paused-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warning);
+  background: oklch(from var(--warning) l c h / 0.12);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.qm-body { padding: 20px 18px 8px; }
+.qm-question-text {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-1);
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  margin-bottom: 18px;
+}
+.qm-form { display: flex; flex-direction: column; gap: 10px; padding-bottom: 18px; }
+.qm-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  font-size: 13px;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+.qm-textarea:focus { border-color: var(--ag-scientist); }
+.qm-textarea::placeholder { color: var(--text-3); }
+.qm-submit {
+  align-self: flex-end;
+  background: var(--ag-scientist);
+  color: var(--bg-base);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 6px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.qm-submit:hover:not(:disabled) { opacity: 0.88; }
+.qm-submit:active:not(:disabled) { transform: scale(0.98); }
+.qm-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar             { width: 5px; height: 5px; }
+::-webkit-scrollbar-track       { background: transparent; }
+::-webkit-scrollbar-thumb       { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="components/sidebar.jsx"></script>
+<script type="text/babel" src="components/swimlane.jsx"></script>
+<script type="text/babel" src="components/timeline.jsx"></script>
+<script type="text/babel" src="components/drawer.jsx"></script>
+<script type="text/babel" src="components/events.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
+
+/* ═══ Global agent registry ═══════════════════════════════════════════ */
+const AGENTS = {
+  scientist:  { id:'scientist',  name:'Scientist',      sub:'Orchestrator',  color:'var(--ag-scientist)'  },
+  researcher: { id:'researcher', name:'Researcher',     sub:'Web & Papers',  color:'var(--ag-researcher)' },
+  eda:        { id:'eda',        name:'EDA',            sub:'Data Analysis', color:'var(--ag-eda)'        },
+  feature:    { id:'feature',    name:'Feature Eng.',   sub:'Transforms',    color:'var(--ag-feature)'    },
+  modeling:   { id:'modeling',   name:'Modeling',       sub:'Train & Eval',  color:'var(--ag-modeling)'   },
+  review:     { id:'review',     name:'Review',         sub:'QA & Critique', color:'var(--ag-review)'     },
+  finetuning: { id:'finetuning', name:'Fine Tuning',    sub:'Optimization',  color:'var(--ag-finetuning)' },
+};
+const AGENT_ORDER = ['scientist','researcher','eda','feature','modeling','review','finetuning'];
+window.AGENTS      = AGENTS;
+window.AGENT_ORDER = AGENT_ORDER;
+
+const DashboardContext = createContext(null);
+window.DashboardContext = DashboardContext;
+
+/* ═══ Simulation helpers ═══════════════════════════════════════════════ */
+function nowTs() {
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function startStep(S, def) {
+  S.steps[def.id] = {
+    status:'running', startT: S.elapsedT, endT:null,
+    tokens:0, metrics:null, output:null, question:null, type:'task',
+    ...def,
+  };
+  S.events.push({ ts:nowTs(), type:'start', agent:def.agent, message:`▶ ${def.label}`, stepId:def.id });
+}
+
+function completeStep(S, id, patch, msg) {
+  const s = S.steps[id];
+  if (!s) return;
+  Object.assign(s, { status:'done', endT:S.elapsedT, ...patch });
+  S.events.push({ ts:nowTs(), type:'done', agent:s.agent, message:`✓ ${msg}`, stepId:id });
+}
+
+function tokenUpdate(S, id, tokens) {
+  if (S.steps[id]) S.steps[id].tokens = tokens;
+}
+
+function addLog(S, agent, message) {
+  S.events.push({ ts:nowTs(), type:'log', agent, message, stepId:null });
+}
+
+function pauseForQuestion(S, id, agent, label, deps, qtext) {
+  S.steps[id] = {
+    id, agent, label, deps,
+    status:'paused', type:'question',
+    startT:S.elapsedT, endT:null,
+    tokens:0, metrics:null, output:null,
+    question:{ text:qtext },
+  };
+  S.pendingQuestion = { stepId:id, text:qtext };
+  S.paused = true;
+  S.events.push({ ts:nowTs(), type:'question', agent, message:'⏸ Pipeline paused — awaiting user clarification', stepId:id });
+}
+
+/* ═══ Pre-question event queue ═════════════════════════════════════════ */
+const PRE_Q1 = [
+  { at:0.0,  act:(S)=>startStep(S,{id:'sci-plan',agent:'scientist',label:'Parse Goal & Plan',model:'claude-opus-4-5',deps:[]}) },
+  { at:0.4,  act:(S)=>addLog(S,'scientist','Analyzing session goal: telecom churn prediction, recall ≥ 0.85') },
+  { at:1.6,  act:(S)=>tokenUpdate(S,'sci-plan',842) },
+  { at:2.4,  act:(S)=>addLog(S,'scientist','Generating multi-agent task graph…') },
+  { at:3.0,  act:(S)=>completeStep(S,'sci-plan',{tokens:2231,output:{tasks:4,strategy:'parallel',model:'LightGBM candidate'}},'Plan complete — 4 parallel agents queued') },
+
+  { at:3.1,  act:(S)=>startStep(S,{id:'res-lit',agent:'researcher',label:'Literature Review',model:'claude-opus-4-5',deps:['sci-plan']}) },
+  { at:3.1,  act:(S)=>startStep(S,{id:'eda-load',agent:'eda',label:'Load & Profile Dataset',model:'claude-opus-4-5',deps:['sci-plan']}) },
+  { at:3.3,  act:(S)=>addLog(S,'researcher','Querying arXiv: "telecom churn prediction 2024"') },
+  { at:3.4,  act:(S)=>addLog(S,'eda','Reading telco-churn.csv — 7,043 rows × 21 cols') },
+
+  { at:4.3,  act:(S)=>tokenUpdate(S,'res-lit',1240) },
+  { at:4.5,  act:(S)=>completeStep(S,'eda-load',{tokens:891,metrics:{rows:'7,043',cols:'21',missing:'3.2%',churn_rate:'14.5%'}},'Dataset loaded: 7,043 rows, 14.5% churn rate') },
+  { at:4.6,  act:(S)=>startStep(S,{id:'eda-explore',agent:'eda',label:'Exploratory Analysis',model:'claude-opus-4-5',deps:['eda-load']}) },
+  { at:4.8,  act:(S)=>addLog(S,'eda','Computing Pearson correlations & distribution profiles…') },
+
+  { at:5.9,  act:(S)=>tokenUpdate(S,'eda-explore',1820) },
+  { at:6.5,  act:(S)=>completeStep(S,'res-lit',{tokens:4210,metrics:{papers:'18',methods:'7',recommended:'LightGBM + SHAP'}},'Literature: LightGBM + SHAP recommended across 11/18 studies') },
+  { at:7.2,  act:(S)=>completeStep(S,'eda-explore',{tokens:3150,metrics:{strong_predictors:'8',outliers:'142',top_feature:'tenure'}},'EDA: tenure & contract type are strongest predictors') },
+
+  { at:7.3,  act:(S)=>startStep(S,{id:'feat-plan',agent:'feature',label:'Feature Plan',model:'claude-opus-4-5',deps:['eda-explore','res-lit']}) },
+  { at:7.6,  act:(S)=>addLog(S,'feature','Planning 34 candidate features: interactions, time-based aggregates…') },
+  { at:8.5,  act:(S)=>tokenUpdate(S,'feat-plan',1560) },
+
+  { at:9.0,  act:(S)=>completeStep(S,'feat-plan',{tokens:1820},'Feature plan ready: 34 features across 6 groups') },
+  { at:9.15, act:(S)=>pauseForQuestion(S,'sci-q1','scientist','Clarification Needed',['feat-plan'],
+    'The dataset contains 23 duplicate customer IDs with conflicting churn labels — this affects ~0.3% of records and recall could vary ±1.2pp.\n\nShould I:\n  (A) Keep the most recent record per customer\n  (B) Merge by majority label vote\n  (C) Exclude duplicates entirely') },
+];
+
+/* ═══ Post-question event queue ════════════════════════════════════════ */
+const POST_Q1 = [
+  { at:0.0,  act:(S)=>{ const q=S.steps['sci-q1']; if(q){q.status='done';q.endT=S.elapsedT;} } },
+  { at:0.3,  act:(S)=>addLog(S,'scientist','User answer received. Applying dedup strategy and continuing…') },
+  { at:0.5,  act:(S)=>startStep(S,{id:'feat-eng',agent:'feature',label:'Engineer Features',model:'claude-opus-4-5',deps:['sci-q1']}) },
+  { at:0.7,  act:(S)=>addLog(S,'feature','Engineering 34 features — applying user dedup strategy…') },
+  { at:2.0,  act:(S)=>tokenUpdate(S,'feat-eng',2180) },
+  { at:4.5,  act:(S)=>completeStep(S,'feat-eng',{tokens:5120,metrics:{features:'34 created',dropped:'3',top:'tenure_x_contract'}},'Feature engineering done: 34 features, top: tenure×contract') },
+
+  { at:5.0,  act:(S)=>startStep(S,{id:'mod-train',agent:'modeling',label:'Train Models',model:'claude-opus-4-5',deps:['feat-eng']}) },
+  { at:5.3,  act:(S)=>addLog(S,'modeling','Training LightGBM, XGBoost, LogisticRegression — 5-fold StratifiedKFold…') },
+  { at:7.2,  act:(S)=>tokenUpdate(S,'mod-train',4340) },
+  { at:9.5,  act:(S)=>addLog(S,'modeling','LightGBM converged — val_recall=0.891, val_f1=0.843') },
+  { at:12.0, act:(S)=>completeStep(S,'mod-train',{tokens:8740,metrics:{best:'LightGBM',f1:'0.847',recall:'0.892',auc:'0.934',models:'3 trained'}},'Training complete: LightGBM wins (F1=0.847, Recall=0.892)') },
+
+  { at:12.5, act:(S)=>startStep(S,{id:'rev-eval',agent:'review',label:'Model Evaluation',model:'claude-opus-4-5',deps:['mod-train']}) },
+  { at:12.8, act:(S)=>addLog(S,'review','Evaluating against recall threshold ≥ 0.85 — checking for leakage…') },
+  { at:14.5, act:(S)=>completeStep(S,'rev-eval',{tokens:3210,metrics:{verdict:'PASS ✓',recall:'0.892 ≥ 0.85',precision:'0.819',concerns:'None'}},'Review passed — recall threshold met, no data leakage') },
+
+  { at:15.0, act:(S)=>startStep(S,{id:'sci-select',agent:'scientist',label:'Select Best Model',deps:['rev-eval']}) },
+  { at:15.8, act:(S)=>completeStep(S,'sci-select',{tokens:910},'Decision: LightGBM → Fine Tuning') },
+
+  { at:16.0, act:(S)=>startStep(S,{id:'ft-tune',agent:'finetuning',label:'Hyperparameter Tuning',model:'claude-opus-4-5',deps:['sci-select']}) },
+  { at:16.3, act:(S)=>addLog(S,'finetuning','Running Optuna: 50 trials, maximize recall with F1 ≥ 0.84…') },
+  { at:18.5, act:(S)=>tokenUpdate(S,'ft-tune',2840) },
+  { at:20.0, act:(S)=>completeStep(S,'ft-tune',{tokens:4520,metrics:{trials:'50',improvement:'+1.3% F1',f1:'0.861',recall:'0.908'}},'Tuning complete: recall 0.892 → 0.908 (+1.6pp)') },
+
+  { at:20.5, act:(S)=>startStep(S,{id:'ft-final',agent:'finetuning',label:'Final Evaluation',deps:['ft-tune']}) },
+  { at:22.0, act:(S)=>completeStep(S,'ft-final',{tokens:1840,metrics:{f1:'0.861',recall:'0.908',precision:'0.819',auc:'0.941'}},'Final: F1=0.861 · Recall=0.908 · AUC=0.941') },
+
+  { at:22.5, act:(S)=>startStep(S,{id:'sci-done',agent:'scientist',label:'Session Complete',deps:['ft-final']}) },
+  { at:23.5, act:(S)=>{ completeStep(S,'sci-done',{tokens:1200},'🏁 Churn model ready · Recall 0.908 (+5.8pp over target)'); S.sessionStatus='done'; } },
+];
+
+/* ═══ Tweak defaults ═══════════════════════════════════════════════════ */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "speed": 1.5,
+  "density": "normal",
+  "showConnectors": true,
+  "showMetrics": true,
+  "timeScale": 60
+}/*EDITMODE-END*/;
+
+/* ═══ Question modal ═══════════════════════════════════════════════════ */
+function QuestionModal({ question, onAnswer }) {
+  const [text, setText] = useState('');
+  const submit = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    onAnswer(text.trim());
+    setText('');
+  };
+
+  return (
+    <div className="q-overlay">
+      <div className="q-modal">
+        <div className="qm-header">
+          <span className="qm-agent-name">Scientist</span>
+          <span className="qm-paused-badge">⏸ Pipeline Paused</span>
+        </div>
+        <div className="qm-body">
+          <p className="qm-question-text">{question.text}</p>
+          <form className="qm-form" onSubmit={submit}>
+            <textarea
+              className="qm-textarea"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Type your answer and press Resume…"
+              autoFocus
+            />
+            <button type="submit" className="qm-submit" disabled={!text.trim()}>
+              Resume Pipeline →
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ App root ═════════════════════════════════════════════════════════ */
+function App() {
+  const [tick,            setTick]           = useState(0);
+  const [selectedStepId,  setSelectedStepId]  = useState(null);
+  const [viewMode,        setViewMode]        = useState('swimlane');
+  const [activeSessionId, setActiveSessionId] = useState('sess-001');
+
+  const { TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakToggle, TweakSlider } = window;
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  /* Simulation state — lives in a ref so RAF writes don't trigger renders */
+  const S = useRef({
+    steps:{}, events:[], elapsedT:0, postQ1T:0,
+    paused:false, postQ1Mode:false, pendingQuestion:null,
+    processed:new Set(), sessionStatus:'running', done:false,
+  }).current;
+
+  const speedRef = useRef(tweaks.speed);
+  useEffect(() => { speedRef.current = tweaks.speed; }, [tweaks.speed]);
+
+  /* RAF tick */
+  useEffect(() => {
+    let last = performance.now();
+    let frame = 0;
+    let rafId;
+
+    const tick = (now) => {
+      const dt = Math.min((now - last) / 1000, 0.1) * speedRef.current;
+      last = now;
+
+      if (!S.done && !S.paused) {
+        S.elapsedT += dt;
+
+        const queue = S.postQ1Mode ? POST_Q1 : PRE_Q1;
+        const t     = S.postQ1Mode ? S.postQ1T : S.elapsedT;
+
+        queue.forEach((evt, i) => {
+          const key = (S.postQ1Mode ? 'p_' : 'q_') + i;
+          if (!S.processed.has(key) && evt.at <= t) {
+            S.processed.add(key);
+            evt.act(S);
+          }
+        });
+
+        if (S.postQ1Mode) S.postQ1T += dt;
+        if (S.sessionStatus === 'done') S.done = true;
+      }
+
+      frame++;
+      if (frame % 3 === 0) setTick(t => t + 1); /* ~20 fps renders */
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  /* Keyboard shortcuts */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+      if (e.key === 't' || e.key === 'T') setViewMode(v => v === 'swimlane' ? 'timeline' : 'swimlane');
+      if (e.key === 'Escape') setSelectedStepId(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  /* Answer question callback */
+  const answerQuestion = useCallback((answer) => {
+    const { stepId } = S.pendingQuestion;
+    if (S.steps[stepId]) {
+      S.steps[stepId].output = { answer };
+      S.steps[stepId].status = 'done';
+      S.steps[stepId].endT   = S.elapsedT;
+    }
+    S.events.push({ ts: nowTs(), type:'answer', agent:'user', message:`↳ "${answer.slice(0,80)}${answer.length>80?'…':''}"`, stepId });
+    S.pendingQuestion = null;
+    S.paused          = false;
+    S.postQ1Mode      = true;
+    S.postQ1T         = 0;
+    setTick(t => t + 1);
+  }, []);
+
+  const stepsArr = Object.values(S.steps);
+  const pxPerSec = tweaks.timeScale || 60;
+
+  /* Status pill label */
+  const statusLabel = S.sessionStatus === 'done' ? 'Complete'
+    : S.paused ? '⏸ Paused'
+    : '● Running';
+  const statusClass = S.sessionStatus === 'done' ? 'sp-done' : S.paused ? 'sp-paused' : 'sp-running';
+
+  const ctxValue = {
+    steps: S.steps,
+    stepsArr,
+    events: S.events,
+    elapsedT: S.elapsedT,
+    pendingQuestion: S.pendingQuestion,
+    sessionStatus: S.sessionStatus,
+    selectedStepId, setSelectedStepId,
+    viewMode, setViewMode,
+    activeSessionId, setActiveSessionId,
+    tweaks, setTweak,
+    answerQuestion,
+  };
+
+  return (
+    <DashboardContext.Provider value={ctxValue}>
+      <div className="app">
+
+        {/* Left sidebar */}
+        <Sidebar />
+
+        {/* Main area */}
+        <div className="main-area">
+
+          {/* Toolbar */}
+          <div className="main-toolbar">
+            <div className="toolbar-goal">
+              <em className="goal-text">
+                Predict customer churn for Telco — optimising for recall · sess-001
+              </em>
+            </div>
+            <div className="toolbar-right">
+              <button
+                className={`view-btn${viewMode==='swimlane'?' is-active':''}`}
+                onClick={() => setViewMode('swimlane')}
+              >Swimlane</button>
+              <button
+                className={`view-btn${viewMode==='timeline'?' is-active':''}`}
+                onClick={() => setViewMode('timeline')}
+              >Timeline <span className="key-hint">T</span></button>
+              <div className={`status-pill ${statusClass}`}>{statusLabel}</div>
+              <span className="elapsed-time mono">{S.elapsedT.toFixed(1)}s</span>
+            </div>
+          </div>
+
+          {/* Graph */}
+          <div className="main-graph">
+            {viewMode === 'swimlane'
+              ? <SwimlaneGraph pxPerSec={pxPerSec} density={tweaks.density} />
+              : <LinearTimeline />
+            }
+          </div>
+
+          {/* Event stream */}
+          <EventStreamBar />
+
+        </div>
+
+        {/* Detail drawer */}
+        {selectedStepId && (
+          <DetailDrawer stepId={selectedStepId} onClose={() => setSelectedStepId(null)} />
+        )}
+
+        {/* Question modal */}
+        {S.pendingQuestion && (
+          <QuestionModal question={S.pendingQuestion} onAnswer={answerQuestion} />
+        )}
+
+        {/* Tweaks panel */}
+        <TweaksPanel>
+          <TweakSection label="Playback" />
+          <TweakRadio
+            label="Speed"
+            value={String(tweaks.speed)}
+            options={['0.5','1','1.5','2','4']}
+            onChange={v => setTweak('speed', Number(v))}
+          />
+          <TweakSection label="Display" />
+          <TweakRadio
+            label="Density"
+            value={tweaks.density}
+            options={['compact','normal','spacious']}
+            onChange={v => setTweak('density', v)}
+          />
+          <TweakSlider
+            label="Time scale"
+            value={tweaks.timeScale}
+            min={30} max={120} step={10} unit="px/s"
+            onChange={v => setTweak('timeScale', v)}
+          />
+          <TweakToggle
+            label="Connectors"
+            value={tweaks.showConnectors}
+            onChange={v => setTweak('showConnectors', v)}
+          />
+          <TweakToggle
+            label="Inline metrics"
+            value={tweaks.showMetrics}
+            onChange={v => setTweak('showMetrics', v)}
+          />
+        </TweaksPanel>
+
+      </div>
+    </DashboardContext.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="80" fill="#0d0f1a"/>
+    <rect x="0" y="0" width="28" height="80" fill="#131620"/>
+    <rect x="29" y="18" width="88" height="1" fill="#2a2d40" opacity="0.8"/>
+    <rect x="29" y="60" width="88" height="1" fill="#2a2d40" opacity="0.8"/>
+    <rect x="33" y="23" width="40" height="8" rx="2" fill="#1e2235" stroke="#c8933f" stroke-width="0.8" stroke-opacity="0.6"/>
+    <rect x="33" y="34" width="30" height="8" rx="2" fill="#1e2235" stroke="#4a7ec9" stroke-width="0.8" stroke-opacity="0.6"/>
+    <rect x="65" y="34" width="25" height="8" rx="2" fill="#1e2235" stroke="#38adb0" stroke-width="0.8" stroke-opacity="0.6"/>
+    <rect x="33" y="45" width="35" height="8" rx="2" fill="#1e2235" stroke="#5aad6a" stroke-width="0.8" stroke-opacity="0.6"/>
+    <text x="6" y="13" font-size="5" fill="#c8933f" font-family="monospace">⌬</text>
+    <text x="13" y="13" font-size="4.5" fill="#8899aa" font-family="monospace">Autopilot ML</text>
+  </svg>
+</template>
+</body>
+</html>

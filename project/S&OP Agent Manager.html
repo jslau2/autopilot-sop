@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>S&OP Agent Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:oklch(0.09 0.007 245);--surface:oklch(0.12 0.006 245);--card:oklch(0.155 0.005 245);
+  --card-h:oklch(0.185 0.005 245);--border:oklch(0.30 0.007 245);--border-s:oklch(0.22 0.006 245);
+  --text-1:oklch(0.94 0.005 235);--text-2:oklch(0.74 0.008 245);--text-3:oklch(0.52 0.007 245);
+  --accent:oklch(0.72 0.17 162);--success:oklch(0.74 0.18 145);--warning:oklch(0.80 0.18 78);--danger:oklch(0.65 0.20 25);
+  --ag-planner:oklch(0.80 0.16 78);--ag-demand:oklch(0.68 0.17 255);--ag-spi:oklch(0.74 0.15 190);
+  --ag-inventory:oklch(0.72 0.18 325);--ag-tooling:oklch(0.70 0.17 55);--ag-capacity:oklch(0.72 0.17 148);
+  --ag-wip:oklch(0.70 0.20 308);--ag-finance:oklch(0.73 0.19 48);--ag-risk:oklch(0.70 0.21 15);--ag-masterdata:oklch(0.74 0.14 235);
+  --font-ui:'DM Sans',system-ui,sans-serif;--font-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font-ui);font-size:13px;background:var(--bg);color:var(--text-1);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-s);border-radius:3px}
+
+.page{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* header */
+.hdr{display:flex;align-items:center;gap:12px;height:46px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--border-s);flex-shrink:0}
+.hdr-brand{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:-0.01em}
+.hdr-sep{color:var(--border);font-size:15px;font-weight:200;margin:0 2px}
+.hdr-page{font-size:12px;font-weight:500;color:var(--text-2)}
+.hdr-nav{font-size:11.5px;color:var(--text-2);padding:4px 10px;border-radius:5px;border:1px solid var(--border-s);background:var(--card);transition:all .15s;text-decoration:none;display:inline-flex;align-items:center}
+.hdr-nav:hover{color:var(--text-1);border-color:var(--border)}
+.hdr-spacer{flex:1}
+.gov-badge{display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:6px;background:oklch(from var(--accent) l c h/.1);border:1px solid oklch(from var(--accent) l c h/.3)}
+.gov-label{font-size:9px;color:var(--text-3);letter-spacing:.06em;text-transform:uppercase}
+.gov-name{font-size:11px;font-weight:600;color:var(--accent)}
+
+/* body layout */
+.body{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* LEFT PANEL */
+.left-panel{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-s);overflow:hidden}
+.lp-top-bar{padding:8px 14px;border-bottom:1px solid var(--border-s);background:var(--surface);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.lp-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.lp-scroll{overflow-y:auto;flex:1}
+
+/* agent selector list */
+.agent-selector{display:flex;flex-direction:column;gap:1px;padding:8px;border-bottom:1px solid var(--border-s)}
+.agent-sel-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .15s}
+.agent-sel-item:hover{background:var(--card)}
+.agent-sel-item.active{background:var(--card);border:1px solid var(--border-s)}
+.asi-color-bar{width:3px;height:22px;border-radius:2px;flex-shrink:0}
+.asi-name{font-size:12px;font-weight:500;flex:1}
+.asi-verdict{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;flex-shrink:0}
+.v-exceeds{background:oklch(from var(--accent) l c h/.2);color:var(--accent)}
+.v-meets{background:oklch(from var(--success) l c h/.2);color:var(--success)}
+.v-revision{background:oklch(from var(--warning) l c h/.15);color:var(--warning)}
+
+/* agent overview block */
+.agent-overview{padding:16px 14px;border-bottom:1px solid var(--border-s)}
+.ao-section-lbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px}
+.ao-icon-radar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+
+/* profile table */
+.profile-table{width:100%;border-collapse:collapse;font-size:11px}
+.profile-table td{padding:4px 0;color:var(--text-2);vertical-align:top}
+.profile-table td:first-child{color:var(--text-3);width:115px;font-size:10.5px}
+.profile-table td:last-child{color:var(--text-1);font-family:var(--font-mono);font-size:11px;text-align:right}
+.profile-table tr{border-bottom:1px solid var(--border-s)}
+.profile-table tr:last-child{border-bottom:none}
+.pt-highlight{color:var(--text-1)!important;font-weight:600!important}
+
+/* feedback */
+.user-fb-section{padding:12px 14px}
+.user-fb-lbl{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.user-fb-text{font-size:11.5px;color:var(--text-2);line-height:1.6}
+
+/* RIGHT PANEL */
+.right-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.rp-tabs{display:flex;align-items:stretch;padding:0;border-bottom:1px solid var(--border-s);background:var(--surface);flex-shrink:0}
+.rp-tab{font-size:11.5px;padding:10px 20px;color:var(--text-3);cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;display:flex;align-items:center;gap:7px}
+.rp-tab:hover{color:var(--text-2)}
+.rp-tab.active{color:var(--text-1);background:var(--bg);border-bottom-color:var(--accent)}
+.rp-tab-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.rp-tab-dot-blue{background:#4a90d9}
+.rp-tab-dot-orange{background:#e09040}
+.rp-tab-dot-green{background:var(--success)}
+.rp-badge{margin-left:auto;font-size:10px;font-weight:700;padding:3px 10px;border-radius:4px;margin-right:14px}
+.badge-meets{background:oklch(from var(--success) l c h/.18);color:var(--success)}
+.badge-exceeds{background:oklch(from var(--accent) l c h/.18);color:var(--accent)}
+
+.rp-body{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+
+/* feedback block */
+.fb-block{background:var(--card);border:1px solid var(--border-s);border-radius:8px;padding:14px 18px}
+.fb-block-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.fb-block-icon{font-size:14px;color:var(--text-3)}
+.fb-block-title{font-size:12.5px;font-weight:600;color:var(--text-1)}
+.fb-block-text{font-size:12px;color:var(--text-2);line-height:1.75}
+
+/* chart container */
+.chart-container{background:var(--card);border:1px solid var(--border-s);border-radius:8px;padding:14px 18px}
+.chart-hd{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.chart-icon{font-size:13px;color:var(--text-3)}
+.chart-title{font-size:12.5px;font-weight:600;color:var(--text-1)}
+
+/* bar charts row */
+.bar-charts-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.bar-chart-wrap{flex:1;min-width:100px;background:var(--card);border:1px solid var(--border-s);border-radius:8px;padding:10px 12px}
+.bc-title{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;text-align:center}
+
+/* prompt editor */
+.prompt-block{display:flex;flex-direction:column;gap:12px}
+.prompt-field{display:flex;flex-direction:column;gap:5px}
+.prompt-lbl{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.prompt-textarea{width:100%;min-height:220px;resize:vertical;background:var(--bg);border:1px solid var(--border-s);border-radius:6px;color:var(--text-1);font-size:11.5px;font-family:var(--font-mono);padding:10px 12px;outline:none;line-height:1.65;transition:border-color .15s}
+.prompt-textarea:focus{border-color:var(--accent)}
+.prompt-btn-row{display:flex;gap:8px}
+.prompt-btn{font-size:12px;font-weight:600;padding:8px 18px;border-radius:6px;transition:opacity .15s}
+.prompt-btn-save{background:var(--accent);color:var(--bg);border:none}
+.prompt-btn-save:hover{opacity:.88}
+.prompt-btn-test{background:none;color:var(--accent);border:1px solid oklch(from var(--accent) l c h/.4)}
+.prompt-btn-test:hover{background:oklch(from var(--accent) l c h/.08)}
+.prompt-version-note{font-size:10px;color:var(--text-3)}
+
+/* user feedback list */
+.fb-list{display:flex;flex-direction:column;gap:8px}
+.fb-item{background:var(--card);border:1px solid var(--border-s);border-radius:8px;padding:12px 14px}
+.fb-item-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.fb-item-user{font-size:11.5px;font-weight:600;color:var(--text-1)}
+.fb-item-date{font-size:10px;color:var(--text-3);margin-left:auto}
+.fb-item-metric{font-size:10px;color:var(--accent);background:oklch(from var(--accent) l c h/.12);padding:1px 7px;border-radius:3px}
+.fb-item-text{font-size:11.5px;color:var(--text-2);line-height:1.6}
+.fb-stars{color:var(--warning);font-size:11px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useCallback, useEffect } = React;
+
+/* ═══ Bobble head icon ═══════════════════════════════════════ */
+const AGI_CSS = `
+  .agi{display:flex;align-items:center;justify-content:center}
+  .agi svg{overflow:visible}
+  .agi-running svg{filter:drop-shadow(0 0 8px var(--agi-clr))}
+  .agi-arc-spin{animation:agi-spin 1.8s linear infinite}
+  @keyframes agi-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+  .agi-bob{animation:agi-bob 1.4s ease-in-out infinite}
+  @keyframes agi-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .agi-blink{animation:agi-blink 4s ease-in-out infinite}
+  @keyframes agi-blink{0%,42%,58%,100%{transform:scaleY(1)}50%{transform:scaleY(0.07)}}
+  .agi-orbit{animation:agi-orbit 2.2s linear infinite;transform-origin:50px 50px}
+  @keyframes agi-orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+`;
+(function(){if(document.getElementById('__agi-m'))return;const s=document.createElement('style');s.id='__agi-m';s.textContent=AGI_CSS;document.head.appendChild(s);})();
+
+function AgentIcon({ color, size=100 }) {
+  const c=size/2, r=size*.46, hr=size*.30, hr2=size*.36;
+  const ex1=c-size*.11, ex2=c+size*.11, ey=c-size*.04;
+  return (
+    <div className="agi agi-running" style={{'--agi-clr':color}}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+        {/* outer glow ring */}
+        <circle cx={c} cy={c} r={r+4} fill="none" stroke={color} strokeWidth="1" opacity="0.08"/>
+        {/* track rings */}
+        <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="1" opacity="0.14"/>
+        <circle cx={c} cy={c} r={r-10} fill="none" stroke={color} strokeWidth="0.7" opacity="0.08"/>
+        {/* main spinning arc */}
+        <circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth="2.2"
+          strokeDasharray="28 92" strokeLinecap="round" opacity="0.9"
+          className="agi-arc-spin" style={{transformOrigin:`${c}px ${c}px`,transform:'rotate(-90deg)'}}/>
+        {/* secondary arc (slower) */}
+        <circle cx={c} cy={c} r={r-10} fill="none" stroke={color} strokeWidth="1.4"
+          strokeDasharray="18 82" strokeLinecap="round" opacity="0.5"
+          style={{animation:'agi-spin 3s linear infinite reverse',transformOrigin:`${c}px ${c}px`,transform:'rotate(-90deg)'}}/>
+        {/* orbiting thought dot */}
+        <g className="agi-orbit">
+          <circle cx={c} cy={size*.06} r="2.5" fill={color} opacity="0.9"/>
+        </g>
+        {/* head */}
+        <g className="agi-bob" style={{transformOrigin:`${c}px ${c}px`}}>
+          {/* head glow */}
+          <circle cx={c} cy={c} r={hr2} fill={color} opacity="0.07"/>
+          <circle cx={c} cy={c} r={hr} fill="var(--bg,#0c0e1a)" stroke={color} strokeWidth="2" opacity="1"/>
+          {/* eye glow */}
+          <circle cx={ex1} cy={ey} r={size*.10} fill={color} opacity="0.12"/>
+          <circle cx={ex2} cy={ey} r={size*.10} fill={color} opacity="0.12"/>
+          {/* eyes */}
+          <g className="agi-blink" style={{transformOrigin:`${ex1}px ${ey}px`}}>
+            <ellipse cx={ex1} cy={ey} rx={size*.07} ry={size*.085} fill={color} opacity="1"/>
+            <ellipse cx={ex1-size*.02} cy={ey-size*.02} rx={size*.03} ry={size*.035} fill="var(--bg,#0c0e1a)" opacity="0.6"/>
+          </g>
+          <g className="agi-blink" style={{transformOrigin:`${ex2}px ${ey}px`}}>
+            <ellipse cx={ex2} cy={ey} rx={size*.07} ry={size*.085} fill={color} opacity="1"/>
+            <ellipse cx={ex2-size*.02} cy={ey-size*.02} rx={size*.03} ry={size*.035} fill="var(--bg,#0c0e1a)" opacity="0.6"/>
+          </g>
+          {/* smile */}
+          <path d={`M${ex1+size*.01} ${c+hr*.38} Q${c} ${c+hr*.72} ${ex2-size*.01} ${c+hr*.38}`}
+            fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" opacity="0.9"/>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+/* ═══ Radar chart ════════════════════════════════════════════ */
+const AXES = ['Relevance','Specificity','Accuracy','Clarity','Usefulness'];
+const N = AXES.length;
+function radarPt(val, i, cx, cy, r) {
+  const angle = (i * 2 * Math.PI / N) - Math.PI / 2;
+  return [cx + val * r * Math.cos(angle), cy + val * r * Math.sin(angle)];
+}
+function radarPoly(vals, cx, cy, r) { return vals.map((v,i)=>radarPt(v,i,cx,cy,r).join(',')).join(' '); }
+function trackPoly(f, cx, cy, r) { return Array.from({length:N},(_,i)=>radarPt(f,i,cx,cy,r).join(',')).join(' '); }
+
+function RadarChart({ values, color, size=130 }) {
+  const cx=size/2, cy=size/2, r=size*.42;
+  const vals = AXES.map(a => values[a]||0);
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+      {[0.25,0.5,0.75,1].map(t=>(
+        <polygon key={t} points={trackPoly(t,cx,cy,r)} fill="none"
+          stroke="var(--border-s)" strokeWidth={t===1?'1':'0.6'} opacity="0.7"/>
+      ))}
+      {AXES.map((_,i)=>{
+        const [x,y]=radarPt(1,i,cx,cy,r);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="var(--border-s)" strokeWidth="0.6" opacity="0.5"/>;
+      })}
+      <polygon points={radarPoly(vals,cx,cy,r)} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1.5" strokeOpacity="0.9"/>
+      {vals.map((v,i)=>{const[x,y]=radarPt(v,i,cx,cy,r);return <circle key={i} cx={x} cy={y} r="2.5" fill={color} opacity="0.9"/>;})}
+      {AXES.map((a,i)=>{
+        const[x,y]=radarPt(1.24,i,cx,cy,r);
+        return <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize="7" fill="var(--text-3)" fontFamily="DM Sans,sans-serif">{a}</text>;
+      })}
+    </svg>
+  );
+}
+
+/* ═══ Line chart (multi-metric, interactive tooltip) ═════════ */
+const METRIC_COLORS = { Accuracy:'#4a90d9', Relevance:'#a8d940', Clarity:'#c042b8', Specificity:'#e09040', Usefulness:'#e04060' };
+const MONTHS = ['May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+
+function LineChart({ growth, agentColor }) {
+  const [hover, setHover] = useState(null);
+  const SVG_W=720, SVG_H=290, PAD={t:20,r:130,b:50,l:48};
+  const CW=SVG_W-PAD.l-PAD.r, CH=SVG_H-PAD.t-PAD.b;
+  const n = MONTHS.length;
+  const xScale = i => PAD.l + (i / (n-1)) * CW;
+  const yScale = v => PAD.t + (1 - v) * CH;
+  const TARGET = 0.80;
+  const gridY = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+
+  function smoothPath(vals) {
+    const pts = vals.map((v,i) => [xScale(i), yScale(v)]);
+    if (pts.length < 2) return '';
+    let d = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) {
+      const px = pts[i-1], cx1 = [(pts[i-1][0]+pts[i][0])/2, pts[i-1][1]];
+      const cx2 = [(pts[i-1][0]+pts[i][0])/2, pts[i][1]];
+      d += ` C${cx1[0]},${cx1[1]} ${cx2[0]},${cx2[1]} ${pts[i][0]},${pts[i][1]}`;
+    }
+    return d;
+  }
+
+  const handleMouseMove = useCallback((e) => {
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (SVG_W / rect.width);
+    const idx = Math.round((mx - PAD.l) / CW * (n-1));
+    if (idx >= 0 && idx < n) setHover(idx);
+  }, []);
+
+  return (
+    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{width:'100%',height:'auto',display:'block'}}
+      onMouseMove={handleMouseMove} onMouseLeave={()=>setHover(null)}>
+      {/* grid */}
+      {gridY.map(v=>(
+        <g key={v}>
+          <line x1={PAD.l} y1={yScale(v)} x2={PAD.l+CW} y2={yScale(v)} stroke="var(--border-s)" strokeWidth="0.7" opacity="0.6"/>
+          <text x={PAD.l-6} y={yScale(v)} textAnchor="end" dominantBaseline="middle" fontSize="8.5" fill="var(--text-3)" fontFamily="DM Sans">{Math.round(v*100)}%</text>
+        </g>
+      ))}
+      {/* x axis labels */}
+      {MONTHS.map((m,i)=>(
+        <text key={i} x={xScale(i)} y={SVG_H-PAD.b+14} textAnchor="middle" fontSize="8" fill="var(--text-3)" fontFamily="DM Sans">{m}</text>
+      ))}
+      {/* target line */}
+      <line x1={PAD.l} y1={yScale(TARGET)} x2={PAD.l+CW} y2={yScale(TARGET)}
+        stroke="white" strokeWidth="1" strokeDasharray="6 4" opacity="0.25"/>
+      {/* metric lines */}
+      {Object.entries(METRIC_COLORS).map(([metric,color])=>{
+        const vals = growth[metric];
+        if (!vals) return null;
+        return <path key={metric} d={smoothPath(vals)} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" opacity="0.9"/>;
+      })}
+      {/* hover column */}
+      {hover != null && (
+        <line x1={xScale(hover)} y1={PAD.t} x2={xScale(hover)} y2={PAD.t+CH}
+          stroke="white" strokeWidth="1" opacity="0.2"/>
+      )}
+      {/* hover dots */}
+      {hover != null && Object.entries(METRIC_COLORS).map(([metric,color])=>{
+        const vals = growth[metric];
+        if (!vals) return null;
+        return <circle key={metric} cx={xScale(hover)} cy={yScale(vals[hover])} r="4" fill={color} stroke="var(--bg)" strokeWidth="1.5"/>;
+      })}
+      {/* tooltip */}
+      {hover != null && (()=>{
+        const tx = Math.min(xScale(hover)+10, PAD.l+CW-110);
+        const ty = PAD.t+10;
+        const boxH = 12 + Object.keys(METRIC_COLORS).length * 16;
+        return (
+          <g>
+            <rect x={tx} y={ty} width={110} height={boxH} rx="5" fill="var(--surface)" stroke="var(--border)" strokeWidth="1" opacity="0.97"/>
+            <text x={tx+8} y={ty+11} fontSize="9" fontWeight="700" fill="var(--text-3)" fontFamily="DM Sans">{MONTHS[hover]}</text>
+            {Object.entries(METRIC_COLORS).map(([metric,color],i)=>{
+              const v = growth[metric]?.[hover];
+              return v!=null&&(
+                <g key={metric}>
+                  <rect x={tx+8} y={ty+18+i*16} width="7" height="7" rx="2" fill={color}/>
+                  <text x={tx+20} y={ty+25+i*16} fontSize="9" fill="var(--text-2)" fontFamily="DM Sans">{metric}</text>
+                  <text x={tx+102} y={ty+25+i*16} fontSize="9" fontWeight="600" fill="white" fontFamily="DM Sans" textAnchor="end">{Math.round(v*100)}%</text>
+                </g>
+              );
+            })}
+          </g>
+        );
+      })()}
+      {/* Legend */}
+      {[...Object.entries(METRIC_COLORS), ['Target','white'], ['Model Created', agentColor]].map(([label, color], i) => (
+        <g key={label} transform={`translate(${PAD.l+CW+16},${PAD.t + i*18})`}>
+          {label === 'Target'
+            ? <line x1={0} y1={5} x2={14} y2={5} stroke={color} strokeWidth="1" strokeDasharray="4 2" opacity="0.5"/>
+            : label === 'Model Created'
+            ? <line x1={0} y1={5} x2={14} y2={5} stroke={color} strokeWidth="1.5" opacity="0.7"/>
+            : <rect x={0} y={1} width={14} height={8} rx={2} fill={color} opacity="0.85"/>
+          }
+          <text x={18} y={9} fontSize="9" fill="var(--text-3)" fontFamily="DM Sans">{label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/* ═══ Bar chart (per-metric feedback count) ══════════════════ */
+function BarChart({ metric, data, color }) {
+  const W=110, H=90, PAD={t:8,r:6,b:24,l:22};
+  const CW=W-PAD.l-PAD.r, CH=H-PAD.t-PAD.b;
+  const maxV = Math.max(...data.map(d=>d.count));
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto'}}>
+      {/* y axis */}
+      {[0,Math.ceil(maxV/2),maxV].map(v=>(
+        <g key={v}>
+          <line x1={PAD.l} y1={PAD.t+CH-(v/maxV)*CH} x2={PAD.l+CW} y2={PAD.t+CH-(v/maxV)*CH} stroke="var(--border-s)" strokeWidth="0.5" opacity="0.5"/>
+          <text x={PAD.l-3} y={PAD.t+CH-(v/maxV)*CH} textAnchor="end" dominantBaseline="middle" fontSize="6.5" fill="var(--text-3)">{v}</text>
+        </g>
+      ))}
+      {/* bars */}
+      {data.map((d,i)=>{
+        const bw = CW/data.length - 3;
+        const bh = (d.count/maxV)*CH;
+        const x = PAD.l + i*(CW/data.length)+1.5;
+        const y = PAD.t+CH-bh;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={bw} height={bh} rx="1.5" fill={color} opacity="0.75"/>
+            {d.count > 0 && <text x={x+bw/2} y={y-2} textAnchor="middle" fontSize="6" fill="var(--text-2)">{d.count}</text>}
+            <text x={x+bw/2} y={PAD.t+CH+10} textAnchor="middle" fontSize="6.5" fill="var(--text-3)">{d.label}</text>
+          </g>
+        );
+      })}
+      {/* y label */}
+      <text x={6} y={PAD.t+CH/2} textAnchor="middle" fontSize="6" fill="var(--text-3)" transform={`rotate(-90,6,${PAD.t+CH/2})`}>FB</text>
+    </svg>
+  );
+}
+
+/* ═══ Agent data ═════════════════════════════════════════════ */
+function growthArr(start, end, seed) {
+  return Array.from({length:12},(_,i)=>{
+    const t = i/11;
+    const ease = t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+    const noise = Math.sin(seed+i*1.7)*0.018;
+    return Math.max(0.1, Math.min(0.99, start+(end-start)*ease+noise));
+  });
+}
+function fbData(seed) {
+  return ['★','★★','★★★','★★★★','★★★★★'].map((label,i)=>({
+    label, count: Math.max(0, Math.round(Math.abs(Math.sin(seed+i*2.3)*5)))
+  }));
+}
+
+const AGENTS = [
+  { id:'planner', name:'Planner', sub:'Orchestrator', color:'var(--ag-planner)', cssColor:'oklch(0.80 0.16 78)', code:'PLN',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Orchestrator Agent', createdAt:'2026-01-15', createdBy:'S&OP Architect',
+    profileType:'Master Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.40,Clarity:4.50,Relevance:4.44,Specificity:4.20,Usefulness:4.72},
+    rates:{Accuracy:90,Clarity:95,Relevance:92,Specificity:88,Usefulness:96},
+    latestFb:'The orchestration logic is clear and well-reasoned. The task graph construction could benefit from exposing dependency weights so downstream agents can prioritise more effectively.',
+    feedback:`The Planner agent has demonstrated exceptional orchestration capability throughout the Q3-2026 planning cycle. From an initial configuration phase, it rapidly achieved high performance across all five evaluation dimensions. Clarity and Usefulness have consistently exceeded the 80% target since September 2025, with Accuracy and Relevance following closely. Specificity has improved steadily and now sits at 88%, reflecting increasingly precise task decomposition. The agent's ability to escalate decisions with quantified trade-offs — as seen in the OT-vs-shortfall-vs-deferral decision — is a strong indicator of mature orchestration reasoning. Recommended focus: further sharpening Specificity in the dependency contract language to reduce ambiguity at the agent-to-agent interface.`,
+    growth:{ Accuracy:growthArr(0.55,0.90,1), Relevance:growthArr(0.58,0.92,2), Clarity:growthArr(0.60,0.95,3), Specificity:growthArr(0.50,0.88,4), Usefulness:growthArr(0.62,0.96,5) },
+    fbData:{ Accuracy:fbData(10), Relevance:fbData(11), Clarity:fbData(12), Specificity:fbData(13), Usefulness:fbData(14) },
+  },
+  { id:'demand', name:'AutoML Forecast', sub:'AutoML · Model Selection', color:'var(--ag-demand)', cssColor:'oklch(0.68 0.17 255)', code:'AML',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Forecasting Agent', createdAt:'2026-01-20', createdBy:'Data Science Lead',
+    profileType:'AutoML Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.60,Clarity:3.90,Relevance:4.72,Specificity:4.30,Usefulness:4.40},
+    rates:{Accuracy:93,Clarity:82,Relevance:95,Specificity:90,Usefulness:92},
+    latestFb:'The model tournament output is excellent. Suggest adding confidence interval visualisation to the forecast output so downstream agents can weight uncertain SKUs differently.',
+    feedback:`The AutoML Forecast agent has shown the most dramatic improvement trajectory in the cohort. Accuracy — its primary KPI — rose from 55% in May 2025 to 93% by April 2026, driven by the Temporal Fusion Transformer winning the model tournament against four competing algorithms. Relevance is the standout metric at 95%, reflecting excellent alignment between forecasted SKUs and actual planning scope. Clarity has lagged at 82%, primarily because the model selection rationale is presented in technical terms that non-specialist users find opaque. Recommended focus: restructure model tournament output to include a plain-language explanation of why the winning model outperforms alternatives, particularly for new-product ramp SKUs where uncertainty is highest.`,
+    growth:{ Accuracy:growthArr(0.55,0.93,6), Relevance:growthArr(0.62,0.95,7), Clarity:growthArr(0.45,0.82,8), Specificity:growthArr(0.52,0.90,9), Usefulness:growthArr(0.60,0.92,10) },
+    fbData:{ Accuracy:fbData(20), Relevance:fbData(21), Clarity:fbData(22), Specificity:fbData(23), Usefulness:fbData(24) },
+  },
+  { id:'spi', name:'SPI Analyst', sub:'Sales · Prod · Inventory', color:'var(--ag-spi)', cssColor:'oklch(0.74 0.15 190)', code:'SPI',
+    verdict:'Successfully Meets', judgment:'Revision Needed',
+    agentType:'Reconciliation Agent', createdAt:'2026-01-18', createdBy:'Supply Chain Lead',
+    profileType:'General Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.10,Clarity:3.95,Relevance:4.00,Specificity:4.30,Usefulness:4.10},
+    rates:{Accuracy:91,Clarity:87,Relevance:88,Specificity:93,Usefulness:89},
+    latestFb:'The three-way reconciliation output is accurate but the gap analysis could be more actionable — currently it lists shortfalls without ranking them by business impact.',
+    feedback:`The SPI Analyst demonstrates solid three-way reconciliation capability with consistent accuracy above 88% since August 2025. Specificity is the strongest dimension (93%), reflecting precise identification of at-risk production orders and shortfall SKUs. However, Clarity has plateaued at 87% — user feedback consistently notes that the gap analysis output prioritises completeness over actionability. The agent lists 44 SKUs in shortfall but does not rank them by revenue exposure or strategic importance, leaving the Planner to perform secondary prioritisation manually. Revision recommended: add a "Top 10 Critical Gaps" executive summary section with revenue impact ranking before the detailed SKU-level table.`,
+    growth:{ Accuracy:growthArr(0.52,0.91,11), Relevance:growthArr(0.54,0.88,12), Clarity:growthArr(0.48,0.87,13), Specificity:growthArr(0.56,0.93,14), Usefulness:growthArr(0.55,0.89,15) },
+    fbData:{ Accuracy:fbData(30), Relevance:fbData(31), Clarity:fbData(32), Specificity:fbData(33), Usefulness:fbData(34) },
+  },
+  { id:'inventory', name:'Inventory Mgmt', sub:'ABC · Safety Stock', color:'var(--ag-inventory)', cssColor:'oklch(0.72 0.18 325)', code:'INV',
+    verdict:'Successfully Meets', judgment:'Revision Needed',
+    agentType:'Inventory Agent', createdAt:'2026-02-01', createdBy:'Inventory Planner',
+    profileType:'General Profile', model:'claude-haiku-4-5',
+    scores:{Accuracy:3.90,Clarity:4.10,Relevance:3.80,Specificity:4.00,Usefulness:3.85},
+    rates:{Accuracy:88,Clarity:91,Relevance:86,Specificity:89,Usefulness:87},
+    latestFb:'ABC classification is accurate. The replenishment policy output needs to explicitly link each policy to a production schedule priority so Capacity Plan can consume it directly.',
+    feedback:`The Inventory Management agent performs reliably on ABC classification and safety stock computation. Clarity is its strongest metric (91%) — the tiered output structure is easy to read and the dead-stock flagging is actionable. Relevance sits at 86%, slightly below target, because the replenishment policy recommendations are not yet structured as direct inputs to the Capacity Planning and WIP agents — they require manual re-formatting. Accuracy at 88% reflects a minor issue with WOS calculation when on-hand data includes transit stock. Revision recommended: (1) output replenishment triggers in a format directly consumable by MRP, (2) separate transit stock from on-hand in WOS calculation.`,
+    growth:{ Accuracy:growthArr(0.48,0.88,16), Relevance:growthArr(0.46,0.86,17), Clarity:growthArr(0.52,0.91,18), Specificity:growthArr(0.50,0.89,19), Usefulness:growthArr(0.48,0.87,20) },
+    fbData:{ Accuracy:fbData(40), Relevance:fbData(41), Clarity:fbData(42), Specificity:fbData(43), Usefulness:fbData(44) },
+  },
+  { id:'tooling', name:'Tooling & Mold', sub:'Die Sets · Asset Life', color:'var(--ag-tooling)', cssColor:'oklch(0.70 0.17 55)', code:'TLG',
+    verdict:'Successfully Meets', judgment:'No Revision Needed',
+    agentType:'Asset Management Agent', createdAt:'2026-02-05', createdBy:'Manufacturing Eng.',
+    profileType:'Domain Profile', model:'claude-haiku-4-5',
+    scores:{Accuracy:4.00,Clarity:3.70,Relevance:3.75,Specificity:4.45,Usefulness:3.90},
+    rates:{Accuracy:89,Clarity:81,Relevance:83,Specificity:95,Usefulness:85},
+    latestFb:'D-88X bottleneck identification was precise and timely. The reconditioning slot recommendation could include a risk-adjusted alternative if the primary slot is unavailable.',
+    feedback:`The Tooling & Mold agent excels at Specificity (95%) — the most domain-specific metric in the cohort — reflecting its deep precision in shot-count tracking, utilisation rate computation, and maintenance window integration. Accuracy at 89% is solid. The key growth area is Clarity (81%): the tooling allocation plan output is presented in an engineering notation that is not easily consumable by non-specialist planners. Relevance at 83% reflects that the agent's output is sometimes broader than required for the current SKU scope. No revision is recommended at the system prompt level, but a structured output template for the allocation plan would improve downstream consumability.`,
+    growth:{ Accuracy:growthArr(0.50,0.89,21), Relevance:growthArr(0.48,0.83,22), Clarity:growthArr(0.42,0.81,23), Specificity:growthArr(0.60,0.95,24), Usefulness:growthArr(0.50,0.85,25) },
+    fbData:{ Accuracy:fbData(50), Relevance:fbData(51), Clarity:fbData(52), Specificity:fbData(53), Usefulness:fbData(54) },
+  },
+  { id:'capacity', name:'Capacity Plan', sub:'Assembly Loading', color:'var(--ag-capacity)', cssColor:'oklch(0.72 0.17 148)', code:'CAP',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Capacity Planning Agent', createdAt:'2026-01-22', createdBy:'Production Planning',
+    profileType:'Operational Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.10,Clarity:4.20,Relevance:4.30,Specificity:4.10,Usefulness:4.45},
+    rates:{Accuracy:86,Clarity:89,Relevance:91,Specificity:88,Usefulness:93},
+    latestFb:'The loading plan is clear and well-structured. The changeover optimisation output is excellent — the sequence table is directly usable by floor managers.',
+    feedback:`The Capacity Planning agent has shown excellent and consistent growth across all five metrics, with Usefulness (93%) and Relevance (91%) both exceeding the 80% target by meaningful margins. The MILP-based changeover optimisation has been particularly well received by plant managers, who report that the sequence tables are directly actionable without further processing. Clarity has improved to 89%, driven by the addition of a bottleneck summary at the top of each loading plan report. Accuracy at 86% reflects occasional over-allocation in overtime scenarios where OEE degradation under extended shifts is not fully modelled. Recommended enhancement: incorporate historical OEE-at-overtime data to improve accuracy of extended-shift capacity estimates.`,
+    growth:{ Accuracy:growthArr(0.52,0.86,26), Relevance:growthArr(0.56,0.91,27), Clarity:growthArr(0.54,0.89,28), Specificity:growthArr(0.52,0.88,29), Usefulness:growthArr(0.60,0.93,30) },
+    fbData:{ Accuracy:fbData(60), Relevance:fbData(61), Clarity:fbData(62), Specificity:fbData(63), Usefulness:fbData(64) },
+  },
+  { id:'wip', name:'WIP', sub:'PO · Shop Floor', color:'var(--ag-wip)', cssColor:'oklch(0.70 0.20 308)', code:'WIP',
+    verdict:'Successfully Meets', judgment:'Revision Needed',
+    agentType:'Production Scheduling Agent', createdAt:'2026-01-25', createdBy:'Shop Floor Lead',
+    profileType:'Operational Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.25,Clarity:3.80,Relevance:4.00,Specificity:3.90,Usefulness:4.05},
+    rates:{Accuracy:91,Clarity:85,Relevance:88,Specificity:86,Usefulness:88},
+    latestFb:'MRP output is accurate and the PO recommendations are well-structured. The FJSP schedule output needs a human-readable summary — the raw JSON is not usable by floor managers directly.',
+    feedback:`The WIP agent performs strongly on Accuracy (91%), reflecting reliable MRP net requirement calculations and PO generation. However, Clarity (85%) and Specificity (86%) are below the expected trajectory for an agent at this stage. The primary issue identified in user feedback is that the FJSP scheduling output is delivered as a structured data object rather than a human-readable schedule, requiring plant managers to use a separate tool to visualise it. This creates friction in the handoff from the agent to the shop floor. Revision recommended: add a formatted schedule summary table (Plant × Line × Week × SKU × Quantity) as the first output section, before the detailed JSON. This single change is expected to raise Clarity to above 90%.`,
+    growth:{ Accuracy:growthArr(0.54,0.91,31), Relevance:growthArr(0.50,0.88,32), Clarity:growthArr(0.46,0.85,33), Specificity:growthArr(0.48,0.86,34), Usefulness:growthArr(0.52,0.88,35) },
+    fbData:{ Accuracy:fbData(70), Relevance:fbData(71), Clarity:fbData(72), Specificity:fbData(73), Usefulness:fbData(74) },
+  },
+  { id:'finance', name:'Finance', sub:'P&L · Margin · OTIF', color:'var(--ag-finance)', cssColor:'oklch(0.73 0.19 48)', code:'FIN',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Financial Planning Agent', createdAt:'2026-01-28', createdBy:'Finance Controller',
+    profileType:'Executive Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.75,Clarity:4.40,Relevance:4.50,Specificity:4.35,Usefulness:4.40},
+    rates:{Accuracy:96,Clarity:93,Relevance:92,Specificity:91,Usefulness:91},
+    latestFb:'The P&L translation is excellent — the OT cost vs. revenue protection framing was exactly what the CFO needed to make a rapid decision. OTIF forecast is well-calibrated.',
+    feedback:`The Finance agent is the highest-performing agent in the cohort across all five dimensions, with Accuracy at 96% — the highest score recorded. This reflects the agent's precision in P&L translation and its well-calibrated OTIF forecasting methodology. Clarity (93%) and Relevance (92%) are both strong, and user feedback from senior stakeholders is consistently positive. The agent's framing of the OT decision as "+$142k cost vs. +$340k revenue protected → net EBIT +$198k" was cited by the VP Supply Chain as the most decision-useful output of the Q3 cycle. Specificity (91%) and Usefulness (91%) both exceed target. No revision required — this agent serves as the reference implementation for other agents in the cohort.`,
+    growth:{ Accuracy:growthArr(0.60,0.96,36), Relevance:growthArr(0.58,0.92,37), Clarity:growthArr(0.56,0.93,38), Specificity:growthArr(0.54,0.91,39), Usefulness:growthArr(0.58,0.91,40) },
+    fbData:{ Accuracy:fbData(80), Relevance:fbData(81), Clarity:fbData(82), Specificity:fbData(83), Usefulness:fbData(84) },
+  },
+  { id:'masterdata', name:'Master Data', sub:'MDM · BOM · Routing', color:'var(--ag-masterdata)', cssColor:'oklch(0.74 0.14 235)', code:'MDM',
+    verdict:'Successfully Meets', judgment:'Revision Needed',
+    agentType:'Data Quality Agent', createdAt:'2026-02-12', createdBy:'Master Data Steward',
+    profileType:'Domain Profile', model:'claude-haiku-4-5',
+    scores:{Accuracy:4.10,Clarity:3.90,Relevance:4.00,Specificity:4.45,Usefulness:4.05},
+    rates:{Accuracy:91,Clarity:86,Relevance:88,Specificity:95,Usefulness:89},
+    latestFb:'BOM gap detection is excellent and auto-resolution is a huge time-saver. The 3 manually flagged records need a clearer escalation path.',
+    feedback:`The Master Data agent has established itself as a critical quality gate \u2014 preventing 34 BOM inconsistencies from propagating into downstream planning. Specificity (95%) is its standout metric. Clarity (86%) is the improvement target: the quality report presents all 847 SKU validations in a flat list. Revision recommended: tri-section report \u2014 (1) Critical Issues, (2) Auto-resolved, (3) Full log.`,
+    growth:{Accuracy:growthArr(0.50,0.91,50),Relevance:growthArr(0.48,0.88,51),Clarity:growthArr(0.44,0.86,52),Specificity:growthArr(0.58,0.95,53),Usefulness:growthArr(0.50,0.89,54)},
+    fbData:{Accuracy:fbData(50),Relevance:fbData(51),Clarity:fbData(52),Specificity:fbData(53),Usefulness:fbData(54)},
+  },
+  { id:'procurement', name:'Procurement', sub:'ATP · CTP · Supplier Commit', color:'var(--ag-procurement)', cssColor:'oklch(0.73 0.16 276)', code:'PRO',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Procurement Agent', createdAt:'2026-02-15', createdBy:'Procurement Lead',
+    profileType:'Operational Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:4.30,Clarity:4.10,Relevance:4.40,Specificity:4.25,Usefulness:4.45},
+    rates:{Accuracy:91,Clarity:88,Relevance:92,Specificity:90,Usefulness:93},
+    latestFb:'ATP/CTP gap analysis is spot-on. Supplier X alternate sourcing recommendation saved 2 weeks of delay.',
+    feedback:`The Procurement agent demonstrates strong Usefulness (93%) and Relevance (92%). The Supplier X alternate sourcing recommendation was cited as the highest-value output of the Q3 cycle. Clarity (88%) is the growth area: the commit plan needs an executive summary sorted by supply risk before the component-level detail.`,
+    growth:{Accuracy:growthArr(0.52,0.91,55),Relevance:growthArr(0.55,0.92,56),Clarity:growthArr(0.50,0.88,57),Specificity:growthArr(0.54,0.90,58),Usefulness:growthArr(0.58,0.93,59)},
+    fbData:{Accuracy:fbData(55),Relevance:fbData(56),Clarity:fbData(57),Specificity:fbData(58),Usefulness:fbData(59)},
+  },
+  { id:'optimizer', name:'Plan Optimizer', sub:'MILP · CP-SAT · Pareto', color:'var(--ag-optimizer)', cssColor:'oklch(0.77 0.19 110)', code:'OPT',
+    verdict:'Exceeds', judgment:'No Revision Needed',
+    agentType:'Optimization Agent', createdAt:'2026-03-01', createdBy:'Operations Research',
+    profileType:'Advanced Profile', model:'CP-SAT + MILP',
+    scores:{Accuracy:4.45,Clarity:4.05,Relevance:4.50,Specificity:4.60,Usefulness:4.75},
+    rates:{Accuracy:92,Clarity:87,Relevance:93,Specificity:96,Usefulness:97},
+    latestFb:'The Pareto frontier made the trade-off conversation in the review board extremely efficient. Solver log is too verbose for non-technical reviewers.',
+    feedback:`The Plan Optimizer is the newest and highest-impact agent, with Usefulness at 97% \u2014 the highest single metric recorded. The MILP+CP-SAT combination achieved a $34k cost reduction vs the naive schedule while maintaining OTIF 97.8%. Clarity (87%) is the improvement target: add a one-page optimisation summary (objective value, binding constraints, key trade-offs) before the full solver output.`,
+    growth:{Accuracy:growthArr(0.60,0.92,60),Relevance:growthArr(0.62,0.93,61),Clarity:growthArr(0.55,0.87,62),Specificity:growthArr(0.65,0.96,63),Usefulness:growthArr(0.68,0.97,64)},
+    fbData:{Accuracy:fbData(60),Relevance:fbData(61),Clarity:fbData(62),Specificity:fbData(63),Usefulness:fbData(64)},
+  },
+  { id:'risk', name:'Risk', sub:'Constraints · Quality', color:'var(--ag-risk)', cssColor:'oklch(0.70 0.21 15)', code:'RSK',
+    verdict:'Successfully Meets', judgment:'Revision Needed',
+    agentType:'Risk Management Agent', createdAt:'2026-02-10', createdBy:'Risk Officer',
+    profileType:'Compliance Profile', model:'claude-opus-4-5',
+    scores:{Accuracy:3.85,Clarity:4.00,Relevance:4.10,Specificity:4.30,Usefulness:4.30},
+    rates:{Accuracy:86,Clarity:88,Relevance:89,Specificity:93,Usefulness:91},
+    latestFb:'The three-category risk framework (Supply Delay, Order Surge, Quality) is very useful. The AMBER scoring for this cycle was correct — the Supplier X NCR flag was particularly valuable.',
+    feedback:`The Risk agent demonstrates strong Specificity (93%) and Usefulness (91%), reflecting the value of its three-category framework — Supply Delay, Order Surge, and Quality — in surfacing risks that other agents do not cover. The Supplier X NCR rate flag (2.1% vs. 0.8% target) was identified as the most operationally impactful output of the Q3 cycle by the Quality team. Accuracy at 86% is the primary growth area: two risks were rated Medium when retrospective analysis suggests they should have been rated High based on historical precedent. Revision recommended: add a historical precedent lookup to the risk scoring logic, referencing past cycles where similar conditions led to supply failures, to improve probability calibration.`,
+    growth:{ Accuracy:growthArr(0.46,0.86,41), Relevance:growthArr(0.50,0.89,42), Clarity:growthArr(0.50,0.88,43), Specificity:growthArr(0.56,0.93,44), Usefulness:growthArr(0.54,0.91,45) },
+    fbData:{ Accuracy:fbData(90), Relevance:fbData(91), Clarity:fbData(92), Specificity:fbData(93), Usefulness:fbData(94) },
+  },
+];
+
+const PROMPTS = {
+  planner: `You are the S&OP Orchestrator Agent.\n\nYour role is to:\n1. Parse the planning goal and extract: horizon, SKU scope, plant scope, KPI constraints\n2. Build a multi-agent dependency task graph\n3. Dispatch subtasks to specialist agents with precise data contracts\n4. Monitor agent outputs in real time and detect conflicts\n5. Escalate decisions requiring human judgment with quantified options\n6. Produce a final consolidated S&OP plan summary\n\nReasoning style: step-by-step, data-driven, neutral tone.`,
+  demand:  `You are the AutoML Demand Forecasting Agent.\n\nYour role is to:\n1. Ingest historical sales data and merge external signals\n2. Auto-engineer features: demand lags, Fourier terms, promo flags\n3. Run model tournament: ETS, Prophet, LightGBM, N-BEATS, TFT\n4. Select winner via 5-fold time-series CV (gap=4 weeks)\n5. Generate forecasts with 80%/95% prediction intervals\n6. Flag anomalies and demand spikes with confidence scores`,
+  spi:     `You are the SPI Analyst Agent.\n\nYour role is to:\n1. Load real-time inventory from SAP S/4HANA\n2. Review open production orders and schedule adherence\n3. Identify at-risk orders: shortages, capacity constraints\n4. Perform three-way reconciliation: Demand vs Supply vs Inventory\n5. Compute supply gaps in units and $revenue exposure\n6. Surface top-10 critical gaps ranked by revenue impact`,
+  inventory:`You are the Inventory Management Agent.\n\nYour role is to:\n1. Perform ABC velocity analysis by 12-month revenue\n2. Compute safety stock: A=3× AWD, B=2× AWD, C=1× AWD\n3. Set reorder points = LT demand + safety stock\n4. Flag dead stock (zero movement > 6 months)\n5. Generate MRP-consumable replenishment policies\n6. Link ABC class to production schedule priority`,
+  tooling: `You are the Tooling & Mold Asset Agent.\n\nYour role is to:\n1. Load die set register (284 active molds, 6 plants)\n2. Compute utilisation and shot-count consumption rates\n3. Flag assets: utilisation > 85% OR shot count > 90% of life\n4. Check maintenance schedules against production plan\n5. Generate 13-week tooling allocation plan\n6. Identify new mold procurement with 12-week LT`,
+  capacity:`You are the Assembly Capacity Planning Agent.\n\nYour role is to:\n1. Load rated capacities, OEE targets, shift patterns\n2. Generate machine loading plan at line×week granularity\n3. Apply approved overtime and shift adjustments\n4. Optimise changeover sequences via constraint programming\n5. Identify bottlenecks (utilisation > 95%)\n6. Output Gantt-compatible schedule with critical path`,
+  wip:     `You are the WIP & Sourcing Agent.\n\nYour role is to:\n1. Run MRP: net requirements = gross demand − on-hand − WIP + SS\n2. Generate purchase order recommendations\n3. Auto-approve POs < $50k; flag above threshold\n4. Flag critical component shortfalls\n5. Sequence work orders via FJSP scheduling\n6. Write confirmed schedule to SAP PP`,
+  finance: `You are the Financial Reconciliation Agent.\n\nYour role is to:\n1. Translate operational plan to Q3 P&L: revenue, COGS, GM\n2. Evaluate financial impact of capacity decisions\n3. Compute OTIF forecast and flag deviations from ≥98%\n4. Assess cash envelope compliance\n5. Produce 3-KPI sign-off for S&OP review board\n6. Express all impacts in absolute $ and % of revenue`,
+  risk:    `You are the Risk & Constraint Agent.\n\nYour role is to scan three risk categories:\n\nSUPPLY DELAY: supplier LT extensions, OT reliability, tooling slots\nORDER SURGE: over-forecast probability, key account pull-forwards\nQUALITY: NCR rates, mold wear, dimensional drift, SPC alerts\n\nFor each risk: Probability × Impact matrix, mitigation, owner.\nComposite score: GREEN (<4), AMBER (4–6), RED (>6).`,
+};
+
+/* ═══ App ════════════════════════════════════════════════════ */
+function App() {
+  const [selectedId, setSelectedId] = useState('planner');
+  const [tab, setTab] = useState('performance');
+  const agent = AGENTS.find(a=>a.id===selectedId);
+  const [prompt, setPrompt] = useState(PROMPTS[selectedId]);
+  useEffect(()=>{ setPrompt(PROMPTS[selectedId]||''); setTab('performance'); }, [selectedId]);
+
+  const verdictClass = agent.verdict==='Exceeds' ? 'badge-exceeds' : 'badge-meets';
+
+  return (
+    <div className="page">
+      {/* Header */}
+      <div className="hdr">
+        <div className="hdr-brand">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Autopilot S&OP
+        </div>
+        <span className="hdr-sep">·</span>
+        <span className="hdr-page">Agent Manager</span>
+        <a href="index.html" className="hdr-nav">⌂ Home</a>
+        <a href="Autopilot S&OP Planner.html" className="hdr-nav">Pipeline View</a>
+        <a href="S&OP Agent Console.html" className="hdr-nav">Agent Console</a>
+        <a href="S&OP Agent Settings.html" className="hdr-nav">Agent Settings</a>
+        <span className="hdr-spacer"/>
+        <div className="gov-badge">
+          <div style={{width:24,height:24,borderRadius:'50%',background:'var(--surface)',border:'1.5px solid var(--accent)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="var(--accent)" strokeWidth="1.5"/>
+              <path d="M5 8l2 2 4-4" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div className="gov-label">Assessed by</div>
+            <div className="gov-name">Governance Agent</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="body">
+        {/* ── LEFT PANEL ── */}
+        <div className="left-panel">
+          <div className="lp-top-bar">
+            <span className="lp-title">Agent's Performance Overview</span>
+          </div>
+          <div className="lp-scroll">
+            {/* Agent selector */}
+            <div className="agent-selector">
+              {AGENTS.map(a=>(
+                <div key={a.id} className={`agent-sel-item${a.id===selectedId?' active':''}`}
+                  onClick={()=>setSelectedId(a.id)}>
+                  <div className="asi-color-bar" style={{background:a.color}}/>
+                  <span className="asi-name" style={{color:a.id===selectedId?a.color:'var(--text-2)'}}>{a.name}</span>
+                  <span className={`asi-verdict ${a.verdict==='Exceeds'?'v-exceeds':a.judgment==='Revision Needed'?'v-revision':'v-meets'}`}>
+                    {a.verdict==='Exceeds'?'↑ Exceeds':a.judgment==='Revision Needed'?'Rev.':'✓'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Agent overview */}
+            <div className="agent-overview">
+              <div className="ao-section-lbl">{agent.name} · General Profile</div>
+              <div className="ao-icon-radar">
+                <AgentIcon color={agent.cssColor} size={90}/>
+                <RadarChart values={{
+                  Accuracy:   agent.rates.Accuracy/100,
+                  Relevance:  agent.rates.Relevance/100,
+                  Clarity:    agent.rates.Clarity/100,
+                  Specificity:agent.rates.Specificity/100,
+                  Usefulness: agent.rates.Usefulness/100,
+                }} color={agent.cssColor} size={130}/>
+              </div>
+
+              {/* Profile table */}
+              <table className="profile-table">
+                <tbody>
+                  <tr><td>Agent Type</td><td/><td className="pt-highlight">{agent.agentType}</td></tr>
+                  <tr><td>Profile Type</td><td/><td>{agent.profileType}</td></tr>
+                  <tr><td>Created By</td><td/><td>{agent.createdBy}</td></tr>
+                  <tr><td>Model</td><td/><td style={{fontFamily:'var(--font-mono)',fontSize:10}}>{agent.model}</td></tr>
+                  <tr><td>Accuracy</td><td/><td>{agent.scores.Accuracy.toFixed(2)}</td></tr>
+                  <tr><td>Clarity</td><td/><td>{agent.scores.Clarity.toFixed(2)}</td></tr>
+                  <tr><td>Relevance</td><td/><td>{agent.scores.Relevance.toFixed(2)}</td></tr>
+                  <tr><td>Specificity</td><td/><td>{agent.scores.Specificity.toFixed(2)}</td></tr>
+                  <tr><td>Usefulness</td><td/><td>{agent.scores.Usefulness.toFixed(2)}</td></tr>
+                  <tr><td>Accuracy Rate</td><td/><td style={{color:'var(--success)'}}>{agent.rates.Accuracy}%</td></tr>
+                  <tr><td>Clarity Rate</td><td/><td style={{color:agent.rates.Clarity<85?'var(--warning)':'var(--success)'}}>{agent.rates.Clarity}%</td></tr>
+                  <tr><td>Relevance Rate</td><td/><td style={{color:'var(--success)'}}>{agent.rates.Relevance}%</td></tr>
+                  <tr><td>Specificity Rate</td><td/><td style={{color:'var(--success)'}}>{agent.rates.Specificity}%</td></tr>
+                  <tr><td>Usefulness Rate</td><td/><td style={{color:'var(--success)'}}>{agent.rates.Usefulness}%</td></tr>
+                  <tr><td>OA's Evaluation</td><td/><td className="pt-highlight" style={{color:agent.verdict==='Exceeds'?'var(--accent)':'var(--success)'}}>{agent.verdict}</td></tr>
+                  <tr><td>OA's Judgment</td><td/><td style={{color:agent.judgment==='Revision Needed'?'var(--warning)':'var(--text-2)'}}>{agent.judgment}</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* User feedback summary */}
+            <div className="user-fb-section">
+              <div className="user-fb-lbl">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M14 9.667A1.333 1.333 0 0112.667 11H4.667L2 13.667V3.333A1.333 1.333 0 013.333 2h9.334A1.333 1.333 0 0114 3.333v6.334z" stroke="var(--text-3)" strokeWidth="1.3" strokeLinejoin="round"/>
+                </svg>
+                Latest Feedback From Users
+              </div>
+              <div className="user-fb-text">{agent.latestFb}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT PANEL ── */}
+        <div className="right-panel">
+          <div className="rp-tabs">
+            <button className={`rp-tab${tab==='performance'?' active':''}`} onClick={()=>setTab('performance')}>
+              <span className="rp-tab-dot rp-tab-dot-blue"/>Performance Assessment
+            </button>
+            <button className={`rp-tab${tab==='prompt'?' active':''}`} onClick={()=>setTab('prompt')}>
+              <span className="rp-tab-dot rp-tab-dot-orange"/>Automated Prompt Engineering
+            </button>
+            <button className={`rp-tab${tab==='feedback'?' active':''}`} onClick={()=>setTab('feedback')}>
+              <span className="rp-tab-dot rp-tab-dot-green"/>Feedback From Users
+            </button>
+            <span className={`rp-badge ${verdictClass}`} style={{display:'flex',alignItems:'center',alignSelf:'center'}}>
+              {agent.verdict}
+            </span>
+          </div>
+
+          <div className="rp-body">
+            {tab === 'performance' && (<>
+              {/* Agent Manager feedback */}
+              <div className="fb-block">
+                <div className="fb-block-hd">
+                  <span className="fb-block-icon">↗</span>
+                  <span className="fb-block-title">Agent Manager's Feedback for the Agent's Growth</span>
+                </div>
+                <div className="fb-block-text">{agent.feedback}</div>
+              </div>
+
+              {/* Growth time-trend chart */}
+              <div className="chart-container">
+                <div className="chart-hd">
+                  <span className="chart-icon">⌒</span>
+                  <span className="chart-title">Agent's Growth Time-Trend with Current Profile</span>
+                  <span style={{marginLeft:'auto',fontFamily:'var(--font-mono)',fontSize:10,color:'var(--text-3)'}}>May 2025 → Apr 2026</span>
+                </div>
+                <LineChart growth={agent.growth} agentColor={agent.cssColor}/>
+              </div>
+
+              {/* Per-metric bar charts */}
+              <div>
+                <div style={{fontSize:10,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:10}}>Feedback Rating Distribution by Metric</div>
+                <div className="bar-charts-row">
+                  {Object.keys(METRIC_COLORS).map(metric=>(
+                    <div key={metric} className="bar-chart-wrap">
+                      <div className="bc-title">{metric}</div>
+                      <BarChart metric={metric} data={agent.fbData[metric]} color={METRIC_COLORS[metric]}/>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>)}
+
+            {tab === 'prompt' && (
+              <div className="prompt-block">
+                <div style={{background:'var(--card)',border:'1px solid var(--border-s)',borderRadius:8,padding:'12px 16px'}}>
+                  <div style={{fontSize:9.5,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:6}}>Current Evaluation</div>
+                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <span style={{fontSize:11,color:'var(--text-2)'}}>OA's Evaluation:</span>
+                    <span style={{fontSize:11,fontWeight:700,color:agent.verdict==='Exceeds'?'var(--accent)':'var(--success)'}}>{agent.verdict}</span>
+                    <span style={{fontSize:11,color:'var(--text-2)',marginLeft:8}}>OA's Judgment:</span>
+                    <span style={{fontSize:11,fontWeight:700,color:agent.judgment==='Revision Needed'?'var(--warning)':'var(--text-2)'}}>{agent.judgment}</span>
+                  </div>
+                </div>
+                <div className="prompt-field">
+                  <div className="prompt-lbl">System Prompt</div>
+                  <textarea className="prompt-textarea" value={prompt} onChange={e=>setPrompt(e.target.value)} rows={16}/>
+                  <div className="prompt-version-note">{prompt.length} characters · last edited by Agent Manager</div>
+                </div>
+                <div className="prompt-btn-row">
+                  <button className="prompt-btn prompt-btn-test">▶ Test Prompt</button>
+                  <button className="prompt-btn prompt-btn-save">Save & Re-evaluate</button>
+                </div>
+              </div>
+            )}
+
+            {tab === 'feedback' && (
+              <div className="fb-list">
+                {[
+                  { user:'Supply Chain Lead', date:'2026-05-20', metric:'Clarity', stars:4, text:agent.latestFb },
+                  { user:'VP Operations', date:'2026-05-18', metric:'Usefulness', stars:5, text:'The output structure is clear and the recommendations are directly actionable. The OT decision framing was particularly well-received in the review board meeting.' },
+                  { user:'Plant Manager · SG', date:'2026-05-15', metric:'Specificity', stars:4, text:'The level of specificity is very good for our plant scope. Would be useful to add plant-level summary sections before the full SKU breakdown.' },
+                  { user:'Finance Controller', date:'2026-05-12', metric:'Accuracy', stars:5, text:'Numbers match the SAP source exactly. The OTIF forecast has been within 0.3pp of actuals for the last 3 cycles — strong calibration.' },
+                  { user:'Demand Planner', date:'2026-05-08', metric:'Relevance', stars:3, text:'Some output sections cover scenarios that are not relevant to our current scope. A scope-filtering mechanism would improve focus and reduce review time.' },
+                ].map((f,i)=>(
+                  <div key={i} className="fb-item">
+                    <div className="fb-item-hd">
+                      <span className="fb-item-user">{f.user}</span>
+                      <span className="fb-item-metric">{f.metric}</span>
+                      <span className="fb-stars">{'★'.repeat(f.stars)}{'☆'.repeat(5-f.stars)}</span>
+                      <span className="fb-item-date">{f.date}</span>
+                    </div>
+                    <div className="fb-item-text">{f.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="80" fill="#0c0e1a"/>
+    <rect x="0" y="0" width="38" height="80" fill="#11131f"/>
+    <rect x="40" y="0" width="80" height="80" fill="#0c0e1a"/>
+    <circle cx="15" cy="28" r="10" fill="none" stroke="#c8933f" stroke-width="1"/>
+    <circle cx="15" cy="28" r="5" fill="#0c0e1a" stroke="#c8933f" stroke-width=".8"/>
+    <rect x="4" y="52" width="30" height="20" rx="2" fill="#161928" stroke="#333" stroke-width=".5"/>
+    <polyline points="48,60 58,45 68,48 78,35 88,30 108,22" fill="none" stroke="#4a90d9" stroke-width="1.2"/>
+    <polyline points="48,65 58,55 68,52 78,44 88,38 108,30" fill="none" stroke="#a8d940" stroke-width="1.2"/>
+    <line x1="48" y1="40" x2="108" y2="40" stroke="white" stroke-width=".5" stroke-dasharray="3 2" opacity=".3"/>
+    <text x="42" y="8" font-size="3.5" fill="#8899aa" font-family="monospace">Agent Manager</text>
+  </svg>
+</template>
+</body>
+</html>
