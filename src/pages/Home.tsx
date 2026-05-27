@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 
@@ -35,6 +36,16 @@ const SESSIONS = [
 ];
 
 export default function Home() {
+  const [demoMode, setDemoMode] = useState(
+    () => localStorage.getItem('sop-demo-mode') !== 'false'
+  );
+
+  const toggleMode = () => {
+    const next = !demoMode;
+    setDemoMode(next);
+    localStorage.setItem('sop-demo-mode', String(next));
+  };
+
   return (
     <div className="home-page">
       <div className="home-content">
@@ -53,7 +64,43 @@ export default function Home() {
             <span className="home-brand-badge">beta</span>
           </div>
           <p className="home-tagline">AI-driven Sales &amp; Operations Planning — from demand signal to approved plan</p>
-          <p className="home-sub-tagline">9 specialised agents · parallel orchestration · human-in-the-loop decisions</p>
+          <p className="home-sub-tagline">12 specialised agents · parallel orchestration · human-in-the-loop decisions</p>
+
+          {/* Demo / Live mode toggle */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 12, marginTop: 12,
+            padding: '8px 14px', borderRadius: 8,
+            background: demoMode
+              ? 'oklch(0.45 0.12 145 / 0.08)'
+              : 'oklch(0.55 0.18 260 / 0.10)',
+            border: `1px solid ${demoMode
+              ? 'oklch(0.45 0.12 145 / 0.3)'
+              : 'oklch(0.55 0.18 260 / 0.35)'}`,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>
+                {demoMode ? '🎭 Demo Mode' : '⚡ Live Mode'}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                {demoMode
+                  ? 'Scripted simulation — no backend required'
+                  : 'Real Azure OpenAI agents — backend must be running'}
+              </span>
+            </div>
+            <button
+              onClick={toggleMode}
+              style={{
+                fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 5,
+                border: 'none', cursor: 'pointer', letterSpacing: '0.03em',
+                background: demoMode
+                  ? 'oklch(0.55 0.18 260)'
+                  : 'oklch(0.45 0.12 145)',
+                color: '#fff',
+              }}
+            >
+              Switch to {demoMode ? 'Live' : 'Demo'}
+            </button>
+          </div>
         </div>
 
         <div className="agent-strip">

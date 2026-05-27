@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardContext } from '../context/DashboardContext';
 import { useSimulation } from '../hooks/useSimulation';
+import { useLiveSession } from '../hooks/useLiveSession';
 import Sidebar from '../components/Sidebar';
 import Swimlane from '../components/Swimlane';
 import Timeline from '../components/Timeline';
@@ -43,7 +44,12 @@ export default function PipelineView() {
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
 
-  const { S, answerQuestion, terminateSession, setManualPause } = useSimulation(0.5);
+  const demoMode = localStorage.getItem('sop-demo-mode') !== 'false';
+
+  // Both hooks always called (Rules of Hooks). Live session gates on !demoMode.
+  const simResult  = useSimulation(demoMode ? 0.5 : 0);
+  const liveResult = useLiveSession(!demoMode);
+  const { S, answerQuestion, terminateSession, setManualPause } = demoMode ? simResult : liveResult;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -98,6 +104,19 @@ export default function PipelineView() {
               <em className="goal-text">Q3-2026 S&amp;OP · APAC Manufacturing · OTIF ≥ 98% · Margin ≥ 22% · 847 SKUs</em>
             </div>
             <div className="toolbar-right">
+              <Link
+                to="/"
+                title="Toggle demo/live mode on the Home page"
+                style={{
+                  fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 4,
+                  background: demoMode ? 'oklch(0.45 0.12 145 / 0.2)' : 'oklch(0.55 0.18 260 / 0.2)',
+                  color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
+                  border: `1px solid ${demoMode ? 'oklch(0.45 0.12 145 / 0.4)' : 'oklch(0.55 0.18 260 / 0.4)'}`,
+                  textDecoration: 'none', letterSpacing: '0.04em',
+                }}
+              >
+                {demoMode ? 'DEMO' : 'LIVE'}
+              </Link>
               <button
                 className={`view-btn${viewMode === 'swimlane' ? ' is-active' : ''}`}
                 onClick={() => setViewMode('swimlane')}
