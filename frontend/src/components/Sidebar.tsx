@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 
 const SOP_PROJECTS = [
@@ -46,7 +47,10 @@ export default function Sidebar() {
       </section>
 
       <section className="sb-section">
-        <div className="sb-label">DATA SOURCE</div>
+        <div className="sb-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>DATA SOURCES</span>
+          <Link to="/datasources" style={{ fontSize: 9.5, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>View all →</Link>
+        </div>
         <div
           className={`drop-zone${dragOver ? ' drag-over' : ''}`}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}

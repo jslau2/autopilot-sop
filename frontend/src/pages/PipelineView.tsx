@@ -134,6 +134,7 @@ export default function PipelineView() {
                   {S.manualPause ? '▶ Resume' : '⏸ Pause'}
                 </button>
               )}
+              <Link to="/datasources" className="cfg-toolbar-btn">⬡ Data Sources</Link>
               <Link to="/console" className="cfg-toolbar-btn">⊞ Agent Console</Link>
               <Link to="/settings" className="cfg-toolbar-btn">⚙ Agent Settings</Link>
               <Link to="/manager" className="cfg-toolbar-btn">📊 Agent Manager</Link>
