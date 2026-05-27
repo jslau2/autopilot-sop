@@ -35,6 +35,7 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 from session import SessionState, sessions
 from orchestrator import run_orchestrator
+import mock_data
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -107,6 +108,30 @@ async def event_generator(session: SessionState):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+_DATASOURCE_PREVIEW = {
+    "sap-mdg":         lambda: mock_data.get_bom_data(),
+    "sap-mm":          lambda: mock_data.get_supplier_atp(),
+    "sap-ibp":         lambda: mock_data.get_demand_history(),
+    "sap-pp":          lambda: mock_data.get_production_orders(),
+    "sap-ppcds":       lambda: mock_data.get_capacity_config(),
+    "sap-wm":          lambda: {**mock_data.get_inventory_snapshot(), "abc": mock_data.get_abc_classification()},
+    "sap-fico":        lambda: mock_data.run_milp_optimization({}),
+    "sap-pm":          lambda: mock_data.get_tooling_data(),
+    "supplier-portal": lambda: mock_data.get_supplier_atp(),
+    "mes":             lambda: mock_data.get_production_orders(),
+    "tooling-register":lambda: mock_data.get_tooling_data(),
+    "erm":             lambda: mock_data.generate_risk_register(),
+}
+
+
+@app.get("/api/datasources/{source_id}/preview")
+async def datasource_preview(source_id: str):
+    fn = _DATASOURCE_PREVIEW.get(source_id)
+    if fn is None:
+        raise HTTPException(status_code=404, detail=f"No preview for '{source_id}'")
+    return fn()
+
 
 @app.get("/api/health")
 async def health_check():
