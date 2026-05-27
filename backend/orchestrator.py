@@ -12,9 +12,9 @@ from uuid import uuid4
 
 from openai import AzureOpenAI
 
-from .session import SessionState
-from .agent_defs import AGENT_DEFS
-from .workers import run_worker_agent
+from session import SessionState
+from agent_defs import AGENT_DEFS
+from workers import run_worker_agent
 
 # ---------------------------------------------------------------------------
 # Azure OpenAI client — lazy init so missing creds don't break imports

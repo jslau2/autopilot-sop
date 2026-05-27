@@ -21,8 +21,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from .session import SessionState, sessions
-from .orchestrator import run_orchestrator
+from session import SessionState, sessions
+from orchestrator import run_orchestrator
 
 # ---------------------------------------------------------------------------
 # App setup

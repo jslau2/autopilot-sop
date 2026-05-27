@@ -11,9 +11,9 @@ import os
 
 from openai import AzureOpenAI
 
-from .session import SessionState
-from .agent_defs import AGENT_DEFS
-from . import mock_data
+from session import SessionState
+from agent_defs import AGENT_DEFS
+import mock_data
 
 # ---------------------------------------------------------------------------
 # Azure OpenAI client — lazy init so missing creds don't break imports
