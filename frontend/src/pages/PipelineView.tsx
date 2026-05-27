@@ -125,7 +125,7 @@ export default function PipelineView() {
                 className={`view-btn${viewMode === 'timeline' ? ' is-active' : ''}`}
                 onClick={() => setViewMode('timeline')}
               >Timeline <span className="key-hint">T</span></button>
-              {!S.done && !S.paused && (
+              {demoMode && !S.done && !S.paused && (
                 <button
                   className="view-btn"
                   onClick={() => setManualPause(!S.manualPause)}

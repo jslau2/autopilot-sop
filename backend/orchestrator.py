@@ -226,7 +226,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                         tools=PLANNER_TOOLS,
                         tool_choice="auto",
                         temperature=0.3,
-                        max_tokens=2048,
+                        max_completion_tokens=2048,
                     ),
                 )
             except Exception as exc:

@@ -284,7 +284,7 @@ async def run_worker_agent(
                     tools=tools if tools else None,
                     tool_choice="auto" if tools else None,
                     temperature=0.2,
-                    max_tokens=1024,
+                    max_completion_tokens=1024,
                 ),
             )
         except Exception as exc:
