@@ -3,9 +3,86 @@ import { useDashboard } from '../context/DashboardContext';
 import { AGENTS } from '../data/agents';
 import { REASONING } from '../data/reasoning';
 
+interface TraceMessage {
+  role: string;
+  content: string;
+  tool_calls?: { name: string; arguments: string; id: string }[];
+}
+
 interface DrawerProps {
   stepId: string;
   onClose: () => void;
+}
+
+function TraceView({ trace }: { trace: TraceMessage[] }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {trace.map((msg, i) => {
+        if (msg.role === 'system') return (
+          <div key={i} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-s)' }}>
+            <div style={{ padding: '4px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+              background: 'oklch(0.25 0.02 260)', color: 'var(--text-3)' }}>SYSTEM PROMPT</div>
+            <pre className="code-pre" style={{ margin: 0, borderRadius: 0, fontSize: 11, maxHeight: 160, overflow: 'auto' }}>
+              {msg.content}
+            </pre>
+          </div>
+        );
+
+        if (msg.role === 'user') return (
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', minWidth: 36, paddingTop: 2 }}>USER</span>
+            <pre className="code-pre" style={{ margin: 0, flex: 1, fontSize: 11 }}>{msg.content}</pre>
+          </div>
+        );
+
+        if (msg.role === 'assistant') {
+          const hasCalls = msg.tool_calls && msg.tool_calls.length > 0;
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {msg.content && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'oklch(0.75 0.18 260)', minWidth: 36, paddingTop: 2 }}>LLM</span>
+                  <pre className="code-pre" style={{ margin: 0, flex: 1, fontSize: 11 }}>{msg.content}</pre>
+                </div>
+              )}
+              {hasCalls && msg.tool_calls!.map((tc, j) => {
+                let args: Record<string, unknown> = {};
+                try { args = JSON.parse(tc.arguments || '{}'); } catch { /* ignore */ }
+                return (
+                  <div key={j} style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'oklch(0.75 0.15 145)', minWidth: 36, paddingTop: 2 }}>CALL</span>
+                    <div style={{ flex: 1, borderRadius: 5, border: '1px solid oklch(0.45 0.12 145 / 0.35)',
+                      background: 'oklch(0.45 0.12 145 / 0.06)', padding: '6px 10px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.75 0.15 145)', fontFamily: 'monospace' }}>
+                        {tc.name}
+                      </div>
+                      {Object.keys(args).length > 0 && (
+                        <pre style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-2)', whiteSpace: 'pre-wrap' }}>
+                          {JSON.stringify(args, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        if (msg.role === 'tool') return (
+          <div key={i} style={{ display: 'flex', gap: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'oklch(0.65 0.12 55)', minWidth: 36, paddingTop: 2 }}>DATA</span>
+            <pre className="code-pre" style={{ margin: 0, flex: 1, fontSize: 10, maxHeight: 120, overflow: 'auto',
+              borderColor: 'oklch(0.45 0.12 55 / 0.3)', background: 'oklch(0.45 0.12 55 / 0.06)' }}>
+              {(() => { try { return JSON.stringify(JSON.parse(msg.content), null, 2); } catch { return msg.content; } })()}
+            </pre>
+          </div>
+        );
+
+        return null;
+      })}
+    </div>
+  );
 }
 
 export default function Drawer({ stepId, onClose }: DrawerProps) {
@@ -19,6 +96,18 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
   const dur = step.endT != null && step.startT != null
     ? `${(step.endT - step.startT).toFixed(2)}s`
     : step.status === 'running' ? 'in progress' : '—';
+
+  // Live mode trace from backend
+  const trace = (step.output as Record<string, unknown> | null)?._trace as TraceMessage[] | undefined;
+  // Live mode final answer (last assistant message with no tool_calls)
+  const liveReasoning = trace
+    ? trace.filter(m => m.role === 'assistant' && (!m.tool_calls || m.tool_calls.length === 0)).map(m => m.content).filter(Boolean).join('\n\n')
+    : null;
+
+  // Output without internal _trace field
+  const cleanOutput = step.output
+    ? Object.fromEntries(Object.entries(step.output as Record<string, unknown>).filter(([k]) => k !== '_trace'))
+    : null;
 
   return (
     <div className="drawer-overlay" onClick={e => e.currentTarget === e.target && onClose()}>
@@ -41,14 +130,15 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
             step.dataSource ? ['Source', <span key="src" className="mono" style={{ fontSize: 11 }}>{step.dataSource}</span>] : null,
             step.records ? ['Records', <span key="r" className="mono">{step.records.toLocaleString()}</span>] : null,
             step.startT != null ? ['Cycle T', <span key="t" className="mono">+{step.startT.toFixed(1)}s</span>] : null,
+            trace ? ['Turns', <span key="tr" className="mono">{trace.filter(m => m.role === 'assistant').length}</span>] : null,
           ].filter(Boolean).map((item, i) => {
             const [label, val] = item as [string, React.ReactNode];
             return (
-            <div key={i} className="meta-cell">
-              <span className="meta-cell-label">{label}</span>
-              <span className="meta-cell-val">{val}</span>
-            </div>
-          );
+              <div key={i} className="meta-cell">
+                <span className="meta-cell-label">{label}</span>
+                <span className="meta-cell-val">{val}</span>
+              </div>
+            );
           })}
         </div>
 
@@ -81,15 +171,17 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
 
         <div className="drawer-tabs">
           {(['output', 'reasoning', 'raw'] as const).map(t => (
-            <button key={t} className={`dtab${tab === t ? ' dtab-active' : ''}`} onClick={() => setTab(t)}>{t}</button>
+            <button key={t} className={`dtab${tab === t ? ' dtab-active' : ''}`} onClick={() => setTab(t)}>
+              {t}{t === 'raw' && trace ? ` (${trace.length})` : ''}
+            </button>
           ))}
         </div>
 
         <div className="drawer-body">
           {tab === 'output' && (
             <div className="tab-body">
-              {step.output
-                ? <pre className="code-pre">{JSON.stringify(step.output, null, 2)}</pre>
+              {cleanOutput && Object.keys(cleanOutput).length > 0
+                ? <pre className="code-pre">{JSON.stringify(cleanOutput, null, 2)}</pre>
                 : <div className="tab-empty">{step.status === 'running' ? 'Computing…' : 'No output recorded.'}</div>
               }
             </div>
@@ -97,13 +189,16 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
           {tab === 'reasoning' && (
             <div className="tab-body">
               <p className="reasoning-text">
-                {REASONING[step.id] || (step.status === 'running' ? 'Analysis in progress…' : 'Reasoning not available for this step.')}
+                {liveReasoning || REASONING[step.id] || (step.status === 'running' ? 'Analysis in progress…' : 'Reasoning not available for this step.')}
               </p>
             </div>
           )}
           {tab === 'raw' && (
             <div className="tab-body">
-              <pre className="code-pre">{JSON.stringify(step, null, 2)}</pre>
+              {trace
+                ? <TraceView trace={trace} />
+                : <pre className="code-pre">{JSON.stringify(step, null, 2)}</pre>
+              }
             </div>
           )}
         </div>

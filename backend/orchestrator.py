@@ -7,10 +7,13 @@ The Planner agent autonomously runs the full S&OP cycle using Azure OpenAI funct
 
 import asyncio
 import json
+import logging
 import os
 from uuid import uuid4
 
 from openai import AzureOpenAI
+
+logger = logging.getLogger(__name__)
 
 from session import SessionState
 from agent_defs import AGENT_DEFS
@@ -215,6 +218,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                 "planner",
                 f"Planner iteration {iteration + 1}",
             )
+            logger.debug("[planner] iter %d — %d messages", iteration+1, len(messages))
 
             # Call the Planner LLM
             try:
@@ -243,6 +247,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
             if not msg.tool_calls:
                 # No more tool calls — planner is done with text response
+                logger.info("[planner] complete — %s", msg.content[:300] if msg.content else "(no content)")
                 await session.emit_log(
                     "planner",
                     f"Planner final message: {(msg.content or '')[:200]}",
@@ -285,6 +290,9 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
                 # Route to the appropriate handler
                 if tool_name == "dispatch_agent":
+                    agent_id = args.get("agent_id", "")
+                    task_text = args.get("task", "")
+                    logger.info("[planner] dispatch_agent → %s: %s", agent_id, task_text[:120])
                     tool_result = await _handle_dispatch_agent(session, args)
 
                     # Mark Phase 1 task graph step complete after first batch of dispatches
@@ -298,14 +306,18 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                         phase1_complete = True
 
                 elif tool_name == "wait_for_agents":
+                    logger.info("[planner] wait_for_agents: %s", args.get("task_ids", []))
                     tool_result = await _handle_wait_for_agents(session, args)
 
                 elif tool_name == "ask_human":
+                    question_text = args.get("question", "")
+                    logger.info("[planner] ask_human: %s", question_text[:200])
                     current_step = resume_step_id or planner_step_id
                     tool_result = await _handle_ask_human(session, args, current_step)
                     resume_step_id = tool_result.get("resume_step_id")
 
                 elif tool_name == "complete_session":
+                    logger.info("[planner] complete_session called")
                     # Complete the current planner step if still running
                     current_step = resume_step_id or planner_step_id
                     if session.steps.get(current_step, {}).get("status") == "running":

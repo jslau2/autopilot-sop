@@ -7,9 +7,12 @@ Each worker runs a specialist agent with tool-use loop against Azure OpenAI.
 
 import asyncio
 import json
+import logging
 import os
 
 from openai import AzureOpenAI
+
+logger = logging.getLogger(__name__)
 
 from session import SessionState
 from agent_defs import AGENT_DEFS
@@ -275,6 +278,7 @@ async def run_worker_agent(
 
     # Agentic tool-use loop (max 8 iterations)
     for iteration in range(8):
+        logger.debug("[%s/%s] iter %d — sending %d messages to LLM", agent_id, task_id, iteration+1, len(messages))
         try:
             response = await loop.run_in_executor(
                 None,
@@ -288,6 +292,7 @@ async def run_worker_agent(
                 ),
             )
         except Exception as exc:
+            logger.error("[%s] LLM call failed iter %d: %s", agent_id, iteration+1, exc)
             await session.emit_log(
                 agent_id,
                 f"LLM call failed (iteration {iteration + 1}): {exc}",
@@ -317,6 +322,7 @@ async def run_worker_agent(
                 except json.JSONDecodeError:
                     args = {}
 
+                logger.info("[%s] tool_call: %s(%s)", agent_id, tool_name, json.dumps(args)[:200])
                 await session.emit_log(
                     agent_id,
                     f"→ Calling tool: {tool_name}({json.dumps(args)[:120]})",
@@ -325,6 +331,7 @@ async def run_worker_agent(
 
                 tool_result = _execute_tool(tool_name, args)
 
+                logger.debug("[%s] tool_result: %s → %s", agent_id, tool_name, str(tool_result)[:300])
                 await session.emit_log(
                     agent_id,
                     f"← {tool_name} returned {len(str(tool_result))} chars",
@@ -341,6 +348,7 @@ async def run_worker_agent(
         else:
             # No tool calls — this is the final answer
             final_content = msg.content or ""
+            logger.info("[%s/%s] final answer (%d chars): %s", agent_id, task_id, len(final_content), final_content[:400])
             await session.emit_log(
                 agent_id,
                 f"Analysis complete — generating summary",
@@ -365,10 +373,28 @@ async def run_worker_agent(
         if not result:
             result = {"summary": "Agent completed after maximum iterations", "agent": agent_id}
 
+    # Store trace for UI inspection
+    session.traces[task_id] = [
+        {
+            "role": m.get("role") if isinstance(m, dict) else m.role,
+            "content": (m.get("content") if isinstance(m, dict) else m.content) or "",
+            "tool_calls": [
+                {
+                    "name": tc.get("function", {}).get("name") if isinstance(tc, dict) else tc.function.name,
+                    "arguments": tc.get("function", {}).get("arguments") if isinstance(tc, dict) else tc.function.arguments,
+                    "id": tc.get("id") if isinstance(tc, dict) else tc.id,
+                }
+                for tc in (m.get("tool_calls", []) if isinstance(m, dict) else (m.tool_calls or []))
+            ] if (m.get("tool_calls") if isinstance(m, dict) else m.tool_calls) else [],
+        }
+        for m in messages
+    ]
+
     # Extract metrics for the step complete event
     metrics = _extract_metrics(agent_id, result)
     summary_message = _build_summary(agent_id, task, result)
 
+    result["_trace"] = session.traces[task_id]
     await session.emit_step_complete(
         agent=agent_id,
         step_id=task_id,
