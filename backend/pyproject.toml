@@ -8,10 +8,3 @@ dependencies = [
     "openai>=1.30.0",
     "python-dotenv>=1.0.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.uv]
-dev-dependencies = []
