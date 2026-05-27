@@ -55,4 +55,5 @@ export interface Agent {
   sub: string;
   color: string;
   code: string;
+  llm?: boolean;
 }

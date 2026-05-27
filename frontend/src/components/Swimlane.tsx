@@ -51,7 +51,17 @@ function StepCard({ step, laneIndex, pxPerSec, elapsedT, onClick }: StepCardProp
       onClick={onClick}
     >
       <div className="sc-body">
-        <div className="sc-label">{step.label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div className="sc-label">{step.label}</div>
+          {agent?.llm && step.type !== 'question' && (
+            <span style={{
+              fontSize: 8, fontWeight: 700, letterSpacing: '0.06em',
+              padding: '1px 4px', borderRadius: 3,
+              background: `${color}22`, color, border: `1px solid ${color}55`,
+              flexShrink: 0, lineHeight: '14px',
+            }}>AI</span>
+          )}
+        </div>
         {step.metrics && step.status === 'done' && (
           <div className="sc-metrics">
             <span className="sc-chip">{Object.values(step.metrics)[0]}</span>

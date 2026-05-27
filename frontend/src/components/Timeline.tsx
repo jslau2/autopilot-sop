@@ -49,6 +49,14 @@ export default function Timeline() {
                     {agent?.name ?? step.agent}
                   </span>
                   <span className="tl-label">{step.label}</span>
+                  {agent?.llm && step.type !== 'question' && (
+                    <span style={{
+                      fontSize: 8, fontWeight: 700, letterSpacing: '0.06em',
+                      padding: '1px 4px', borderRadius: 3,
+                      background: color + '22', color, border: `1px solid ${color}55`,
+                      lineHeight: '14px',
+                    }}>AI</span>
+                  )}
                   <span className={`tl-status-badge ${badgeCls}`}>{step.status}</span>
                 </div>
                 <div className="tl-row2">
