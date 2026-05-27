@@ -27,6 +27,7 @@ class SessionState:
     answer_text: str | None = None
     agent_tasks: dict = field(default_factory=dict)   # task_id → asyncio.Task
     agent_results: dict = field(default_factory=dict) # task_id → result dict
+    traces: dict = field(default_factory=dict)        # task_id → message trace list
     created_at: float = field(default_factory=time.time)
     bg_task: Any = None
 
