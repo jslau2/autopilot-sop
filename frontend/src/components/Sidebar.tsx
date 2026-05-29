@@ -30,19 +30,37 @@ export default function Sidebar() {
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
 
   // Live mode: reflect real backend sessions. Re-fetch when the active session
-  // changes (e.g. after launching a new cycle or switching).
+  // changes, and poll so status dots stay fresh as runs progress.
+  useEffect(() => {
+    if (ctx.demoMode) return;
+    let alive = true;
+    const refresh = () => {
+      fetch('/api/sessions')
+        .then(r => (r.ok ? r.json() : { sessions: [] }))
+        .then(d => { if (alive) setSessions(d.sessions ?? []); })
+        .catch(() => { /* keep last known list */ });
+    };
+    refresh();
+    const id = setInterval(refresh, 4000);
+    return () => { alive = false; clearInterval(id); };
+  }, [ctx.demoMode, ctx.activeSessionId]);
+
+  // Refetch promptly when the active session's live status changes
+  // (e.g. running -> paused -> done), so the list doesn't lag behind.
   useEffect(() => {
     if (ctx.demoMode) return;
     fetch('/api/sessions')
       .then(r => (r.ok ? r.json() : { sessions: [] }))
       .then(d => setSessions(d.sessions ?? []))
-      .catch(() => setSessions([]));
-  }, [ctx.demoMode, ctx.activeSessionId]);
+      .catch(() => { /* ignore */ });
+  }, [ctx.demoMode, ctx.sessionStatus]);
 
-  // Demo mode is single-instance: show just the current cycle.
+  // Demo mode is single-instance: show just the current cycle. In live mode,
+  // override the active row with the live status from context so it updates
+  // on the fly without waiting for the next poll.
   const cycleList: SidebarSession[] = ctx.demoMode
     ? [{ session_id: ctx.activeSessionId, name: 'Q3-2026 S&OP Cycle', status: ctx.sessionStatus, created_at: Date.now() / 1000 }]
-    : sessions;
+    : sessions.map(s => s.session_id === ctx.activeSessionId ? { ...s, status: ctx.sessionStatus } : s);
 
   return (
     <aside className="sidebar">
