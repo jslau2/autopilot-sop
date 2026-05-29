@@ -183,7 +183,7 @@ export default function AgentManager({ embedded = false }: { embedded?: boolean 
   const cssColor = colorMap[agent?.color ?? ''] ?? '#888';
 
   return (
-    <div className="page">
+    <div className="manager-page" style={embedded ? { height: '100%' } : undefined}>
       {!embedded && (
       <div className="hdr">
         <div className="hdr-brand">
@@ -211,7 +211,7 @@ export default function AgentManager({ embedded = false }: { embedded?: boolean 
       </div>
       )}
 
-      <div className="body">
+      <div className="manager-body">
         <div className="left-panel">
           <div className="lp-top-bar">
             <span className="lp-title">Agents ({AGENT_MGRS.length})</span>

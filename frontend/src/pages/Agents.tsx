@@ -22,8 +22,9 @@ export default function Agents() {
 
   return (
     <AppShell active="agents">
+      <div style={{ height: 'calc(100vh - 53px)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
+        display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
         padding: '12px 22px 0', background: 'var(--bg-base)',
       }}>
         {TABS.map(t => {
@@ -46,8 +47,9 @@ export default function Agents() {
           );
         })}
       </div>
-      <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', borderTop: '1px solid var(--border-subtle)' }}>
         {active === 'configure' ? <AgentSettings embedded /> : <AgentManager embedded />}
+      </div>
       </div>
     </AppShell>
   );
