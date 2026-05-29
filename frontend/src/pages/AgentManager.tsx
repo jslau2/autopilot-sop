@@ -161,7 +161,7 @@ function LineChart({ growth, agentColor }: { growth: Record<string, number[]>; a
 
 type RpTab = 'performance' | 'feedback' | 'prompt';
 
-export default function AgentManager() {
+export default function AgentManager({ embedded = false }: { embedded?: boolean } = {}) {
   const [selectedId, setSelectedId] = useState(AGENT_MGRS[0].id);
   const [rpTab, setRpTab] = useState<RpTab>('performance');
 
@@ -184,6 +184,7 @@ export default function AgentManager() {
 
   return (
     <div className="page">
+      {!embedded && (
       <div className="hdr">
         <div className="hdr-brand">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -208,6 +209,7 @@ export default function AgentManager() {
           </div>
         </div>
       </div>
+      )}
 
       <div className="body">
         <div className="left-panel">
