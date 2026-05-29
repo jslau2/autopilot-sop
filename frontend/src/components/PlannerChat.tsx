@@ -13,6 +13,15 @@ const GAP = 14;
 const PANEL_W = 372;
 const PANEL_H = 520;
 const POS_KEY = 'sop-chat-pos';
+const HIST_KEY = 'sop-chat-history';
+
+function loadMessages(): Msg[] {
+  try {
+    const s = localStorage.getItem(HIST_KEY);
+    if (s) return JSON.parse(s);
+  } catch { /* ignore */ }
+  return [];
+}
 
 function defaultPos(): Pos {
   return { left: window.innerWidth - BTN - 20, top: window.innerHeight - BTN - 20 };
@@ -34,7 +43,7 @@ function loadPos(): Pos {
 export default function PlannerChat() {
   const [open, setOpen] = useState(false);
   const [demoMode, setDemoMode] = useState(true);
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(loadMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pos, setPos] = useState<Pos>(loadPos);
@@ -56,6 +65,16 @@ export default function PlannerChat() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
+
+  // Persist chat history so it survives refresh / navigation.
+  useEffect(() => {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(messages.slice(-50))); } catch { /* ignore */ }
+  }, [messages]);
+
+  const clearChat = () => {
+    setMessages([]);
+    try { localStorage.removeItem(HIST_KEY); } catch { /* ignore */ }
+  };
 
   // Keep the button on-screen when the viewport changes.
   useEffect(() => {
@@ -171,6 +190,17 @@ export default function PlannerChat() {
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Planner Agent</div>
               <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>S&amp;OP planning assistant</div>
             </div>
+            {!demoMode && messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                title="Clear chat history"
+                style={{
+                  background: 'none', border: '1px solid var(--border)', borderRadius: 5,
+                  color: 'var(--text-3)', fontSize: 10.5, fontWeight: 600, padding: '2px 7px',
+                  cursor: 'pointer',
+                }}
+              >Clear</button>
+            )}
             <span style={{
               fontSize: 9.5, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 7px', borderRadius: 4,
               color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
