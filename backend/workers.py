@@ -239,6 +239,7 @@ async def run_worker_agent(
     task: str,
     context: str,
     task_id: str,
+    deps: list[str] | None = None,
 ) -> dict:
     """
     Run a single worker agent with an agentic tool-use loop.
@@ -256,6 +257,7 @@ async def run_worker_agent(
         step_id=task_id,
         label=task[:60],
         data_source=agent_def.get("data_source", ""),
+        deps=deps or [],
     )
     await session.emit_log(
         agent_id,

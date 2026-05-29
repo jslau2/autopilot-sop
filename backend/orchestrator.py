@@ -52,9 +52,13 @@ async def _handle_dispatch_agent(session: SessionState, args: dict) -> dict:
 
     task_id = f"{agent_id}-{uuid4().hex[:6]}"
 
+    # Link each dispatched agent back to the planner's current orchestration
+    # step so the swimlane can draw connectors (planner → agents fan-out).
+    deps = [session.current_planner_step] if session.current_planner_step else []
+
     # Create and store the asyncio Task
     async_task = asyncio.create_task(
-        run_worker_agent(session, agent_id, task, context, task_id)
+        run_worker_agent(session, agent_id, task, context, task_id, deps)
     )
     session.agent_tasks[task_id] = async_task
 
@@ -148,7 +152,9 @@ async def _handle_ask_human(
         step_id=resume_step_id,
         label="Incorporating Human Decision",
         data_source="Human Input",
+        deps=[session.current_planner_step] if session.current_planner_step else [],
     )
+    session.current_planner_step = resume_step_id
 
     return {"answer": answer, "context": context, "resume_step_id": resume_step_id}
 
@@ -191,6 +197,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
         label="Parse Goal & Build Task Graph",
         data_source="All Systems",
     )
+    session.current_planner_step = planner_step_id
     await session.emit_log("planner", "Initializing S&OP orchestration cycle")
     await session.emit_log("planner", f"Goal: {goal[:120]}")
 

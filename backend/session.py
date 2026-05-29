@@ -32,6 +32,7 @@ class SessionState:
     traces: dict = field(default_factory=dict)        # task_id → message trace list
     created_at: float = field(default_factory=time.time)
     elapsed_final: float | None = None   # set when terminal; freezes elapsed()
+    current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
     bg_task: Any = None
 
     def now_ts(self) -> str:
