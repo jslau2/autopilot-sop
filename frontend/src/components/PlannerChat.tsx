@@ -165,7 +165,17 @@ export default function PlannerChat() {
           boxShadow: '0 6px 20px oklch(0.04 0.01 250 / 0.5)',
         }}
       >
-        {open ? '✕' : '💬'}
+        {open ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        ) : (
+          // Sparkles — a recognizable "AI" glyph
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11.6 3.2 13.2 8a2 2 0 0 0 1.3 1.3l4.8 1.6-4.8 1.6A2 2 0 0 0 13.2 16l-1.6 4.8L10 16a2 2 0 0 0-1.3-1.3L3.9 13l4.8-1.6A2 2 0 0 0 10 8z" />
+            <path d="M19 3v3.5M20.75 4.75h-3.5" />
+          </svg>
+        )}
       </button>
 
       {open && (
@@ -184,8 +194,13 @@ export default function PlannerChat() {
             <span style={{
               width: 26, height: 26, borderRadius: '50%', background: ACCENT,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, color: 'oklch(0.18 0.03 80)', flexShrink: 0,
-            }}>◆</span>
+              color: 'oklch(0.18 0.03 80)', flexShrink: 0,
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11.6 3.2 13.2 8a2 2 0 0 0 1.3 1.3l4.8 1.6-4.8 1.6A2 2 0 0 0 13.2 16l-1.6 4.8L10 16a2 2 0 0 0-1.3-1.3L3.9 13l4.8-1.6A2 2 0 0 0 10 8z" />
+                <path d="M19 3v3.5M20.75 4.75h-3.5" />
+              </svg>
+            </span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Planner Agent</div>
               <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>S&amp;OP planning assistant</div>
