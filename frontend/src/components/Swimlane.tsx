@@ -87,7 +87,7 @@ function Connectors({ stepsArr, steps, pxPerSec, elapsedT }: ConnectorsProps) {
     if (toLaneIdx < 0) continue;
     const toX = step.startT * pxPerSec;
     const toY = toLaneIdx * LANE_H + LANE_H / 2;
-    const color = AGENTS[step.agent]?.color ?? 'var(--text-3)';
+    const rawColor = AGENTS[step.agent]?.rawColor ?? 'oklch(0.6 0.1 250)';
 
     for (const depId of step.deps) {
       const dep = steps[depId];
@@ -105,9 +105,10 @@ function Connectors({ stepsArr, steps, pxPerSec, elapsedT }: ConnectorsProps) {
           key={`${depId}->${step.id}`}
           d={d}
           fill="none"
-          style={{ stroke: color, color }}
+          stroke={rawColor}
           strokeWidth={1.5}
-          strokeOpacity={0.4}
+          strokeOpacity={0.5}
+          color={rawColor}
           markerEnd="url(#sw-arrow)"
         />
       );
