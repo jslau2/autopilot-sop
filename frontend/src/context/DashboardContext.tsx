@@ -14,6 +14,8 @@ export interface DashboardContextValue {
   setViewMode: (v: 'swimlane' | 'timeline') => void;
   activeSessionId: string;
   setActiveSessionId: (id: string) => void;
+  demoMode: boolean;
+  onNewCycle: () => void;
   kpis: KPIs;
   paused: boolean;
   manualPause: boolean;
@@ -37,6 +39,8 @@ export const DashboardContext = createContext<DashboardContextValue>({
   setViewMode: () => {},
   activeSessionId: 'sess-001',
   setActiveSessionId: () => {},
+  demoMode: true,
+  onNewCycle: () => {},
   kpis: { otif: null, forecastAcc: null, capacityUtil: null, wos: null, planDelta: null },
   paused: false,
   manualPause: false,

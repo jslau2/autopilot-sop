@@ -316,6 +316,8 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     setViewMode,
     activeSessionId: sessionId,
     setActiveSessionId: () => {},
+    demoMode,
+    onNewCycle: () => setShowLaunch(true),
     kpis: S.kpis,
     paused: S.paused,
     manualPause: S.manualPause,

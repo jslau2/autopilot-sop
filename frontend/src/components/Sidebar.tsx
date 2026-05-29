@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 
 const SOP_PROJECTS = [
@@ -8,16 +8,41 @@ const SOP_PROJECTS = [
   { id: 'p3', name: 'Regional Consolidated', active: false },
 ];
 
-const SOP_SESSIONS = [
-  { id: 'sess-001', name: 'Q3-2026 S&OP Cycle', time: 'Now', status: 'running' },
-  { id: 'sess-002', name: 'July Spike Scenario', time: '3h ago', status: 'done' },
-  { id: 'sess-003', name: 'Q2-2026 Final Plan', time: '1mo ago', status: 'done' },
-  { id: 'sess-004', name: 'Baseline Demand Review', time: '2mo ago', status: 'done' },
-];
+type SidebarSession = {
+  session_id: string;
+  name: string;
+  status: string;
+  created_at: number;
+};
+
+function relTime(epochSec: number): string {
+  const secs = Math.max(0, Date.now() / 1000 - epochSec);
+  if (secs < 60) return 'Now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
 
 export default function Sidebar() {
   const ctx = useDashboard();
+  const navigate = useNavigate();
   const [dragOver, setDragOver] = useState(false);
+  const [sessions, setSessions] = useState<SidebarSession[]>([]);
+
+  // Live mode: reflect real backend sessions. Re-fetch when the active session
+  // changes (e.g. after launching a new cycle or switching).
+  useEffect(() => {
+    if (ctx.demoMode) return;
+    fetch('/api/sessions')
+      .then(r => (r.ok ? r.json() : { sessions: [] }))
+      .then(d => setSessions(d.sessions ?? []))
+      .catch(() => setSessions([]));
+  }, [ctx.demoMode, ctx.activeSessionId]);
+
+  // Demo mode is single-instance: show just the current cycle.
+  const cycleList: SidebarSession[] = ctx.demoMode
+    ? [{ session_id: ctx.activeSessionId, name: 'Q3-2026 S&OP Cycle', status: ctx.sessionStatus, created_at: Date.now() / 1000 }]
+    : sessions;
 
   return (
     <aside className="sidebar">
@@ -70,21 +95,28 @@ export default function Sidebar() {
       <section className="sb-section sb-sessions">
         <div className="sb-label">PLANNING CYCLES</div>
         <div className="session-list">
-          {SOP_SESSIONS.map(s => (
+          {cycleList.length === 0 && (
+            <div className="sess-time" style={{ padding: '6px 4px' }}>No cycles yet</div>
+          )}
+          {cycleList.map(s => (
             <div
-              key={s.id}
-              className={`session-item${s.id === ctx.activeSessionId ? ' is-active' : ''}`}
-              onClick={() => ctx.setActiveSessionId(s.id)}
+              key={s.session_id}
+              className={`session-item${s.session_id === ctx.activeSessionId ? ' is-active' : ''}`}
+              onClick={() => {
+                if (ctx.demoMode || s.session_id === ctx.activeSessionId) return;
+                navigate(`/pipeline/${s.session_id}`);
+              }}
+              style={{ cursor: ctx.demoMode ? 'default' : 'pointer' }}
             >
-              <span className={`sess-dot sess-${s.status}`} />
+              <span className={`sess-dot sess-${s.status === 'running' ? 'running' : s.status === 'paused' ? 'paused' : 'done'}`} />
               <div className="sess-body">
-                <div className="sess-name">{s.name}</div>
-                <div className="sess-time">{s.time}</div>
+                <div className="sess-name">{s.name || s.session_id.slice(0, 8)}</div>
+                <div className="sess-time">{relTime(s.created_at)}</div>
               </div>
             </div>
           ))}
         </div>
-        <button className="sb-ghost-btn">+ New cycle</button>
+        <button className="sb-ghost-btn" onClick={ctx.onNewCycle}>+ New cycle</button>
       </section>
 
       <div className="sidebar-footer">
