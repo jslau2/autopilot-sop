@@ -28,6 +28,15 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [dragOver, setDragOver] = useState(false);
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sop-sidebar-collapsed') === '1');
+
+  const toggleCollapsed = () => {
+    setCollapsed(c => {
+      const next = !c;
+      localStorage.setItem('sop-sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   // Live mode: reflect real backend sessions. Re-fetch when the active session
   // changes, and poll so status dots stay fresh as runs progress.
@@ -62,6 +71,36 @@ export default function Sidebar() {
     ? [{ session_id: ctx.activeSessionId, name: 'Q3-2026 S&OP Cycle', status: ctx.sessionStatus, created_at: Date.now() / 1000 }]
     : sessions.map(s => s.session_id === ctx.activeSessionId ? { ...s, status: ctx.sessionStatus } : s);
 
+  const activeStatus = ctx.sessionStatus;
+  const railDotClass = `sess-${activeStatus === 'running' ? 'running' : activeStatus === 'paused' ? 'paused' : 'done'}`;
+
+  // Collapsed: a slim rail with an expand button, brand mark, and the active
+  // run's status dot for at-a-glance awareness.
+  if (collapsed) {
+    return (
+      <aside className="sidebar" style={{ width: 48, alignItems: 'center' }}>
+        <div className="sidebar-brand" style={{ justifyContent: 'center', padding: '14px 0', width: '100%' }}>
+          <svg className="brand-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <button
+          onClick={toggleCollapsed}
+          title="Expand sidebar"
+          style={{
+            marginTop: 8, width: 30, height: 30, borderRadius: 7, cursor: 'pointer',
+            background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+          }}
+        >»</button>
+        <span className={`sess-dot ${railDotClass}`} style={{ marginTop: 16 }} title={`Active cycle: ${activeStatus}`} />
+      </aside>
+    );
+  }
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -73,6 +112,15 @@ export default function Sidebar() {
         </svg>
         <span className="brand-name">Autopilot S&amp;OP</span>
         <span className="brand-tag">beta</span>
+        <button
+          onClick={toggleCollapsed}
+          title="Collapse sidebar"
+          style={{
+            marginLeft: 'auto', width: 24, height: 24, borderRadius: 6, cursor: 'pointer',
+            background: 'none', border: '1px solid var(--border)', color: 'var(--text-3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0,
+          }}
+        >«</button>
       </div>
 
       <section className="sb-section">
