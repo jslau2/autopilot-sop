@@ -18,15 +18,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
 ## Deepen existing pieces
 
-- [ ] **Live Agent Console across sessions & users** (north-star for the
-  Console) — make it a real fleet monitor: every agent's activity streaming
-  live, aggregated across all active runs and (eventually) users. Approach:
-  backend exposes a global activity stream (e.g. `GET /api/activity` SSE that
-  multiplexes step_start/step_complete across sessions, tagged by session +
-  user), or the Console subscribes to `GET /api/sessions` + each session's
-  events. Frontend already has the "Live Agent Activity" shell with aggregate
-  counts; swap the scripted sim for real data and add session/user grouping &
-  filters. Needs auth/user identity for the multi-user dimension.
+- [x] **Live Agent Console across sessions** — the Agent Console now has a real
+  live mode (demo keeps the scripted view): `GET /api/activity` aggregates every
+  session's steps into per-agent status + the runs each agent is working in;
+  the console polls it and shows live agent tiles, aggregate counts, and an
+  Active Runs panel (click to open a run). Multi-USER grouping still needs
+  auth/user identity — remaining future work.
 
 - [x] **Actionable chat** — the planner chat now has write tools: `start_cycle`
   (launch a run) and `answer_decision` (submit a decision to a paused run),

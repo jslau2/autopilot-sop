@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import AgentIcon from '../components/AgentIcon';
+import { useDemoMode } from '../hooks/useDemoMode';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 
 function ConStat({ label, value, color, pulse }: { label: string; value: number; color: string; pulse?: boolean }) {
@@ -247,6 +249,11 @@ function AgentCard({ agentId, t, isPlanner }: { agentId: string; t: number; isPl
 }
 
 export default function AgentConsole() {
+  const [demoMode] = useDemoMode();
+  return demoMode ? <DemoConsole /> : <LiveConsole />;
+}
+
+function DemoConsole() {
   const [t, setT] = useState(0);
   const tRef = useRef(0);
   const lastRef = useRef(performance.now());
@@ -385,6 +392,120 @@ export default function AgentConsole() {
         </div>
       </div>
     </div>
+    </AppShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live console — real activity aggregated across all sessions (live mode).
+// ---------------------------------------------------------------------------
+type ActAgent = { agent_id: string; active_count: number; active_sessions: { session_id: string; name: string; label: string }[]; done_count: number };
+type ActRun = { session_id: string; name: string; status: string; entity: string; running_agents: string[] };
+
+function LiveConsole() {
+  const [data, setData] = useState<{ agents: ActAgent[]; runs: ActRun[]; totals: Record<string, number> }>({ agents: [], runs: [], totals: {} });
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetch('/api/activity')
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('http'))))
+      .then(d => { if (alive) { setData(d); setErr(false); } })
+      .catch(() => { if (alive) setErr(true); });
+    load();
+    const id = setInterval(load, 2500);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const byAgent: Record<string, ActAgent> = Object.fromEntries(data.agents.map(a => [a.agent_id, a]));
+  const t = data.totals;
+
+  return (
+    <AppShell active="console">
+      <div className="console" style={{ height: 'calc(100vh - 53px)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Live Agent Activity</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Real-time, aggregated across all active runs</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginLeft: 6, flexWrap: 'wrap' }}>
+            <ConStat label="Active agents" value={t.active_agents ?? 0} color="oklch(0.72 0.17 145)" pulse />
+            <ConStat label="Running runs" value={t.running_sessions ?? 0} color="oklch(0.70 0.17 145)" />
+            <ConStat label="Awaiting decision" value={t.paused_sessions ?? 0} color="oklch(0.78 0.15 75)" />
+            <ConStat label="Agents" value={AGENT_ORDER.length} color="var(--accent)" />
+          </div>
+          <span style={{ flex: 1 }} />
+          {err && <span style={{ fontSize: 11, color: 'var(--warning)' }}>⚠ backend offline</span>}
+          <span className="con-status-pill sp-running">● LIVE</span>
+        </div>
+
+        <div className="con-body">
+          <div className="con-left">
+            <div className="session-card">
+              <div className="sc-label">Active Runs ({data.runs.length})</div>
+              {data.runs.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
+                  No active runs. <Link to="/pipeline" style={{ color: 'var(--accent)' }}>Start a cycle →</Link>
+                </div>
+              )}
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {data.runs.map(r => (
+                <Link key={r.session_id} to={`/pipeline/${r.session_id}`} style={{ display: 'block', textDecoration: 'none', padding: '10px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: r.status === 'paused' ? 'oklch(0.78 0.15 75)' : 'oklch(0.70 0.17 145)' }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 3 }}>
+                    {r.entity ? r.entity + ' · ' : ''}{r.running_agents.length} agent{r.running_agents.length === 1 ? '' : 's'} active
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                    {r.running_agents.map(aid => (
+                      <span key={aid} className="mono" style={{ fontSize: 9.5, padding: '1px 5px', borderRadius: 3, background: (AGENTS[aid]?.color || '#888') + '22', color: AGENTS[aid]?.color }}>{AGENTS[aid]?.code ?? aid}</span>
+                    ))}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="con-right">
+            <div className="agent-grid">
+              {AGENT_ORDER.map(aid => {
+                const ag = AGENTS[aid];
+                const a = byAgent[aid];
+                const active = (a?.active_count ?? 0) > 0;
+                return (
+                  <div key={aid} className="agent-card" style={{ borderTopColor: ag.color, borderTopWidth: 2, opacity: active ? 1 : 0.6 }}>
+                    <div className="ac-header">
+                      <div className="ac-icon-wrap"><AgentIcon color={ag.color} status={active ? 'running' : 'idle'} size={34} /></div>
+                      <div>
+                        <div className="ac-name" style={{ color: ag.color }}>{ag.name}</div>
+                        <div className="ac-sub">{ag.sub}</div>
+                      </div>
+                      <div className={`ac-badge ${active ? 'ac-badge-running' : 'ac-badge-idle'}`}>{active ? `● Live ×${a.active_count}` : 'Idle'}</div>
+                    </div>
+                    <div className="ac-body">
+                      {active ? (
+                        <div className="ac-log">
+                          {a.active_sessions.slice(0, 4).map((s, i) => (
+                            <div key={i} className="ac-log-entry">
+                              <span className="ac-log-ts" style={{ color: ag.color }}>{s.name}</span>
+                              <span className="ac-log-msg">{s.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="ac-task-idle">Standing by{a?.done_count ? ` · ${a.done_count} done` : ''}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </AppShell>
   );
 }
