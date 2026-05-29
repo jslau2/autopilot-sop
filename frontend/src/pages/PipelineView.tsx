@@ -73,21 +73,8 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
   const accent = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px',
-        borderBottom: '1px solid var(--border-subtle)',
-      }}>
-        <Link to="/" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>⌂ Home</Link>
-        <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>Pipeline View</span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '2px 7px', borderRadius: 4,
-          color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
-          border: `1px solid ${accent.replace(')', ' / 0.4)')}`,
-          background: accent.replace(')', ' / 0.12)'),
-        }}>{demoMode ? 'DEMO' : 'LIVE'}</span>
-      </div>
-
+    <AppShell active="cycle">
+    <div style={{ minHeight: 'calc(100vh - 53px)', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 28 }}>
         <div style={{ textAlign: 'center', maxWidth: 460 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
@@ -164,6 +151,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
         />
       )}
     </div>
+    </AppShell>
   );
 }
 
@@ -452,5 +440,5 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     </DashboardContext.Provider>
   );
 
-  return focusMode ? inner : <AppShell active="home">{inner}</AppShell>;
+  return focusMode ? inner : <AppShell active="cycle">{inner}</AppShell>;
 }
