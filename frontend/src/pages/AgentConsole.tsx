@@ -1,7 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import AppShell from '../components/AppShell';
 import AgentIcon from '../components/AgentIcon';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
+
+function ConStat({ label, value, color, pulse }: { label: string; value: number; color: string; pulse?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+      borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+    }}>
+      <span style={{
+        width: 8, height: 8, borderRadius: '50%', background: color,
+        boxShadow: pulse ? `0 0 8px ${color}` : 'none',
+        animation: pulse && value > 0 ? 'sess-pulse 2s ease-in-out infinite' : 'none',
+      }} />
+      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{label}</span>
+    </div>
+  );
+}
 
 const SIM_DATA: Record<string, {
   tasks: { id: string; label: string; start: number; end: number | null; out: string }[];
@@ -260,25 +277,31 @@ export default function AgentConsole() {
   const statusLabel = t >= 11.4 ? '⏸ Decision Required' : '● Running';
   const statusCls = t >= 11.4 ? 'sp-paused' : 'sp-running';
 
+  // Aggregate live activity across all agents.
+  const states = AGENT_ORDER.map(id => getAgentState(id, t).status);
+  const nActive = states.filter(s => s === 'running').length;
+  const nDone = states.filter(s => s === 'done').length;
+  const nIdle = states.length - nActive - nDone;
+
   return (
-    <div className="console">
-      <div className="con-header">
-        <div className="con-brand">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="con-brand-name">Autopilot S&amp;OP</span>
-          <span className="con-brand-sep">/</span>
-          <span className="con-brand-page">Agent Console</span>
+    <AppShell active="console">
+    <div className="console" style={{ height: 'calc(100vh - 53px)' }}>
+      {/* Live-activity header strip */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface)',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Live Agent Activity</span>
+          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Real-time view of every agent across active runs</span>
         </div>
-        <Link to="/pipeline" className="con-nav-btn">← Pipeline View</Link>
-        <Link to="/settings" className="con-nav-btn">⚙ Settings</Link>
-        <Link to="/manager" className="con-nav-btn">📊 Manager</Link>
-        <Link to="/" className="con-nav-btn">⌂ Home</Link>
-        <span className="con-spacer" />
+        <div style={{ display: 'flex', gap: 8, marginLeft: 6, flexWrap: 'wrap' }}>
+          <ConStat label="Active" value={nActive} color="oklch(0.72 0.17 145)" pulse />
+          <ConStat label="Idle / Queued" value={nIdle} color="oklch(0.78 0.15 75)" />
+          <ConStat label="Done" value={nDone} color="var(--text-3)" />
+          <ConStat label="Agents" value={AGENT_ORDER.length} color="var(--accent)" />
+        </div>
+        <span style={{ flex: 1 }} />
         <div className={`con-status-pill ${statusCls}`}>{statusLabel}</div>
         <span className="con-elapsed mono">{t.toFixed(1)}s</span>
       </div>
@@ -362,5 +385,6 @@ export default function AgentConsole() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

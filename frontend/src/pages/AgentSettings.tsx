@@ -240,7 +240,7 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
   );
 }
 
-export default function AgentSettings() {
+export default function AgentSettings({ embedded = false }: { embedded?: boolean } = {}) {
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'flagged'>('all');
 
@@ -251,6 +251,7 @@ export default function AgentSettings() {
 
   return (
     <div className="page">
+      {!embedded && (
       <div className="hdr">
         <div className="hdr-brand">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -281,6 +282,7 @@ export default function AgentSettings() {
           </div>
         </div>
       </div>
+      )}
 
       <div className="subhdr">
         <button className={`tab-btn${activeTab === 'all' ? ' active' : ''}`} onClick={() => setActiveTab('all')}>

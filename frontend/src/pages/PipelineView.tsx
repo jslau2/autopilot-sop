@@ -14,6 +14,7 @@ import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import AppShell from '../components/AppShell';
 import type { KPIs } from '../types';
 
 type SessionMeta = {
@@ -72,21 +73,8 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
   const accent = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px',
-        borderBottom: '1px solid var(--border-subtle)',
-      }}>
-        <Link to="/" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>⌂ Home</Link>
-        <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>Pipeline View</span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '2px 7px', borderRadius: 4,
-          color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
-          border: `1px solid ${accent.replace(')', ' / 0.4)')}`,
-          background: accent.replace(')', ' / 0.12)'),
-        }}>{demoMode ? 'DEMO' : 'LIVE'}</span>
-      </div>
-
+    <AppShell active="cycle">
+    <div style={{ minHeight: 'calc(100vh - 53px)', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 28 }}>
         <div style={{ textAlign: 'center', maxWidth: 460 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
@@ -163,6 +151,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
         />
       )}
     </div>
+    </AppShell>
   );
 }
 
@@ -281,6 +270,22 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showLaunch, setShowLaunch] = useState(false);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
+  const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') === '1');
+  const toggleFocus = () => setFocusMode(f => { localStorage.setItem('sop-focus-mode', f ? '0' : '1'); return !f; });
+
+  // Resolve the cycle name for the breadcrumb (from nav state, then backend).
+  const [cycleName, setCycleName] = useState<string>(
+    () => (location.state as { name?: string } | null)?.name
+      ?? (demoMode ? 'Demo Cycle' : `Cycle ${sessionId.slice(0, 8)}`)
+  );
+  useEffect(() => {
+    if (demoMode) return;
+    if ((location.state as { name?: string } | null)?.name) return;
+    fetch(`/api/sessions/${sessionId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.name) setCycleName(d.name); })
+      .catch(() => { /* keep fallback */ });
+  }, [demoMode, sessionId, location.state]);
 
   // Both hooks always called (Rules of Hooks). Live connects only when not demo.
   const simResult  = useSimulation(demoMode ? 0.5 : 0);
@@ -342,14 +347,20 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     setShowTour,
   };
 
-  return (
+  const inner = (
     <DashboardContext.Provider value={ctxValue}>
-      <div className="app">
+      <div className="app" style={{ height: focusMode ? '100vh' : 'calc(100vh - 53px)' }}>
         <Sidebar />
         <div className="main-area">
           <div className="main-toolbar">
-            <div className="toolbar-goal">
-              <em className="goal-text">Q3-2026 S&amp;OP · APAC Manufacturing · OTIF ≥ 98% · Margin ≥ 22% · 847 SKUs</em>
+            <div className="toolbar-goal" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, minWidth: 0 }}>
+              <Link to="/" style={{ color: 'var(--text-3)', textDecoration: 'none' }}>Home</Link>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-3)' }}>Cycle</span>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-1)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{cycleName}</span>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-3)', textTransform: 'capitalize' }}>{viewMode}</span>
             </div>
             <div className="toolbar-right">
               <Link
@@ -383,12 +394,10 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   {S.manualPause ? '▶ Resume' : '⏸ Pause'}
                 </button>
               )}
-              <Link to="/datasources" className="cfg-toolbar-btn">⬡ Data Sources</Link>
-              <Link to="/console" className="cfg-toolbar-btn">⊞ Agent Console</Link>
-              <Link to="/settings" className="cfg-toolbar-btn">⚙ Agent Settings</Link>
-              <Link to="/manager" className="cfg-toolbar-btn">📊 Agent Manager</Link>
-              <Link to="/" className="cfg-toolbar-btn">⌂ Home</Link>
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
+              <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
+                {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
+              </button>
               <button
                 className="tour-help-btn"
                 onClick={() => setShowTour(true)}
@@ -430,4 +439,6 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
       </div>
     </DashboardContext.Provider>
   );
+
+  return focusMode ? inner : <AppShell active="cycle">{inner}</AppShell>;
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
+import { useDemoMode } from '../hooks/useDemoMode';
+import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
@@ -56,20 +58,12 @@ const SESSIONS = [
 ];
 
 export default function Home() {
-  const [demoMode, setDemoMode] = useState(
-    () => localStorage.getItem('sop-demo-mode') !== 'false'
-  );
+  const [demoMode] = useDemoMode();
   const [showLaunch, setShowLaunch] = useState(false);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
-
-  const toggleMode = () => {
-    const next = !demoMode;
-    setDemoMode(next);
-    localStorage.setItem('sop-demo-mode', String(next));
-  };
 
   // Pagination over the active cycle list (demo SESSIONS vs live sessions).
   const cycleCount = demoMode ? SESSIONS.length : liveSessions.length;
@@ -93,75 +87,17 @@ export default function Home() {
   }, [demoMode]);
 
   return (
+    <AppShell active="home">
     <div className="home-page">
       <div className="home-content">
 
         <div className="home-header">
-          <div className="home-brand-row">
-            <div className="home-brand-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="home-brand-name">Autopilot S&amp;OP</span>
-            <span className="home-brand-badge">beta</span>
-          </div>
           <p className="home-tagline">AI-driven Sales &amp; Operations Planning — from demand signal to approved plan</p>
-          <p className="home-sub-tagline">12 specialised agents · parallel orchestration · human-in-the-loop decisions</p>
-
-          {/* Demo / Live mode toggle */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 12, marginTop: 12,
-            padding: '8px 14px', borderRadius: 8,
-            background: demoMode
-              ? 'oklch(0.45 0.12 145 / 0.08)'
-              : 'oklch(0.55 0.18 260 / 0.10)',
-            border: `1px solid ${demoMode
-              ? 'oklch(0.45 0.12 145 / 0.3)'
-              : 'oklch(0.55 0.18 260 / 0.35)'}`,
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>
-                {demoMode ? '🎭 Demo Mode' : '⚡ Live Mode'}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                {demoMode
-                  ? 'Scripted simulation — no backend required'
-                  : 'Real Azure OpenAI agents — backend must be running'}
-              </span>
-            </div>
-            <button
-              onClick={toggleMode}
-              style={{
-                fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 5,
-                border: 'none', cursor: 'pointer', letterSpacing: '0.03em',
-                background: demoMode
-                  ? 'oklch(0.55 0.18 260)'
-                  : 'oklch(0.45 0.12 145)',
-                color: '#fff',
-              }}
-            >
-              Switch to {demoMode ? 'Live' : 'Demo'}
-            </button>
-          </div>
-        </div>
-
-        <div className="agent-strip">
-          {AGENT_ORDER.map(id => {
-            const ag = AGENTS[id];
-            return (
-              <span
-                key={id}
-                className="agent-chip"
-                style={{ color: ag.color, borderColor: ag.color }}
-              >
-                {ag.name}
-              </span>
-            );
-          })}
+          <p className="home-sub-tagline">
+            {demoMode
+              ? '🎭 Demo mode — scripted simulation, no backend'
+              : '⚡ Live mode — real Azure OpenAI agents'} · switch in the top bar
+          </p>
         </div>
 
         <div className="sessions-panel">
@@ -298,27 +234,7 @@ export default function Home() {
           )}
         </div>
 
-        <div className="nav-grid">
-          <Link to="/pipeline" className="nav-card" style={{ '--card-accent': 'var(--ag-planner)' } as React.CSSProperties}>
-            <div className="nc-icon" style={{ color: 'var(--ag-planner)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="3" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="3" y="9" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" opacity=".6" />
-                <rect x="3" y="15" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" opacity=".35" />
-                <circle cx="20" cy="4.5" r="2" fill="currentColor" opacity=".8" />
-              </svg>
-            </div>
-            <div className="nc-title">Pipeline View</div>
-            <div className="nc-desc">The main orchestration dashboard — agents on a swimlane timeline, live KPIs, step-by-step task cards, and the decision modal.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Swimlane &amp; timeline views</div>
-              <div className="nc-feat">Live KPI bar (OTIF · Forecast Acc · WOS)</div>
-              <div className="nc-feat">Click any step for full agent reasoning</div>
-              <div className="nc-feat">Capacity Config &amp; constraint register</div>
-            </div>
-            <div className="nc-cta">Open Pipeline View →</div>
-          </Link>
-
+        <div className="nav-grid nav-grid-3">
           <Link to="/console" className="nav-card" style={{ '--card-accent': 'var(--accent)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--accent)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -328,60 +244,56 @@ export default function Home() {
               </svg>
             </div>
             <div className="nc-title">Agent Console</div>
-            <div className="nc-desc">Deep orchestration detail — per-agent task IDs, live progress bars, reasoning logs, and the inter-agent message bus.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Task IDs &amp; live progress per agent</div>
-              <div className="nc-feat">Inter-agent message bus (BEGIN · ACK · ALERT)</div>
-              <div className="nc-feat">Bobble-head live status icons</div>
-              <div className="nc-feat">Session overview &amp; global event feed</div>
-            </div>
+            <div className="nc-desc">Live activity across all agents — per-agent progress, reasoning logs, and the inter-agent message bus. The real-time ops view.</div>
             <div className="nc-cta">Open Agent Console →</div>
           </Link>
 
-          <Link to="/settings" className="nav-card" style={{ '--card-accent': 'var(--ag-spi)' } as React.CSSProperties}>
+          <Link to="/agents" className="nav-card" style={{ '--card-accent': 'var(--ag-spi)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--ag-spi)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.636 5.636l2.121 2.121M16.243 16.243l2.121 2.121M5.636 18.364l2.121-2.121M16.243 7.757l2.121-2.121" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
-            <div className="nc-title">Agent Settings</div>
-            <div className="nc-desc">Configure system prompts, model selection, temperature, and tool access per agent. View governance evaluation status.</div>
-            <div className="nc-features">
-              <div className="nc-feat">System prompt editor per agent</div>
-              <div className="nc-feat">Model config (temperature, tokens)</div>
-              <div className="nc-feat">Tool access toggles</div>
-              <div className="nc-feat">Governance evaluation badges</div>
-            </div>
-            <div className="nc-cta">Open Agent Settings →</div>
+            <div className="nc-title">Agents</div>
+            <div className="nc-desc">Configure prompts, models &amp; tools per agent, and review performance &amp; governance. The 12-agent roster lives here.</div>
+            <div className="nc-cta">Open Agents →</div>
           </Link>
 
-          <Link to="/manager" className="nav-card" style={{ '--card-accent': 'var(--ag-finance)' } as React.CSSProperties}>
+          <Link to="/datasources" className="nav-card" style={{ '--card-accent': 'var(--ag-finance)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--ag-finance)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <ellipse cx="12" cy="5" rx="8" ry="3" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" strokeWidth="1.5" />
               </svg>
             </div>
-            <div className="nc-title">Agent Manager</div>
-            <div className="nc-desc">Per-agent analytics: growth time-trend charts, performance balance radar, feedback rating distribution, and Governance Agent assessment.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Multi-metric growth trend line chart</div>
-              <div className="nc-feat">Governance Agent written assessment</div>
-              <div className="nc-feat">User feedback log per agent</div>
-              <div className="nc-feat">Automated prompt engineering tab</div>
-            </div>
-            <div className="nc-cta">Open Agent Manager →</div>
+            <div className="nc-title">Data Sources</div>
+            <div className="nc-desc">The ERP &amp; external feeds powering the plan — SAP S/4HANA, Supplier Portal, Tooling Register — with live data preview.</div>
+            <div className="nc-cta">Open Data Sources →</div>
           </Link>
         </div>
 
+        <div className="agent-strip" style={{ marginBottom: 28 }}>
+          {AGENT_ORDER.map(id => {
+            const ag = AGENTS[id];
+            return (
+              <span
+                key={id}
+                className="agent-chip"
+                style={{ color: ag.color, borderColor: ag.color }}
+              >
+                {ag.name}
+              </span>
+            );
+          })}
+        </div>
+
         <div className="home-footer">
-          <Link to="/pipeline">Pipeline View</Link>
-          &nbsp;·&nbsp;
           <Link to="/console">Agent Console</Link>
           &nbsp;·&nbsp;
-          <Link to="/settings">Agent Settings</Link>
+          <Link to="/agents">Agents</Link>
           &nbsp;·&nbsp;
-          <Link to="/manager">Agent Manager</Link>
+          <Link to="/datasources">Data Sources</Link>
           &nbsp;·&nbsp;
           <span>Autopilot S&amp;OP · beta · APAC Manufacturing</span>
         </div>
@@ -396,5 +308,6 @@ export default function Home() {
         />
       )}
     </div>
+    </AppShell>
   );
 }
