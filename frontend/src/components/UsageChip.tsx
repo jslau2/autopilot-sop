@@ -19,6 +19,7 @@ function fmtCost(usd: number): string {
 export default function UsageChip({ usage, simulated }: { usage: Usage; simulated?: boolean }) {
   if (!usage || usage.totalTokens === 0) return null;
   const title =
+    (usage.model ? `Model: ${usage.model}\n` : '') +
     `${usage.promptTokens.toLocaleString()} input + ${usage.completionTokens.toLocaleString()} output ` +
     `= ${usage.totalTokens.toLocaleString()} tokens over ${usage.calls} call${usage.calls === 1 ? '' : 's'}\n` +
     `Est. cost ${fmtCost(usage.costUsd)}${simulated ? ' (simulated — demo mode)' : ''}`;

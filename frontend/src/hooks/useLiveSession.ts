@@ -157,6 +157,7 @@ export function useLiveSession(sessionId?: string) {
           totalTokens: (evt.total_tokens as number) ?? S.usage.totalTokens,
           calls: (evt.calls as number) ?? S.usage.calls,
           costUsd: (evt.cost_usd as number) ?? S.usage.costUsd,
+          model: (evt.model as string) ?? S.usage.model,
         };
         break;
       }

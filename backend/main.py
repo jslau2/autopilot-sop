@@ -338,10 +338,12 @@ async def planner_chat(body: ChatBody):
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
+    from orchestrator import DEPLOYMENT
     return {
         "status": "ok",
         "service": "Autopilot S&OP Backend",
         "active_sessions": len(sessions),
+        "model": DEPLOYMENT,
     }
 
 

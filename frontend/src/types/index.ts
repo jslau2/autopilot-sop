@@ -40,6 +40,7 @@ export interface Usage {
   totalTokens: number;
   calls: number;
   costUsd: number;
+  model?: string;
 }
 
 export interface SimState {

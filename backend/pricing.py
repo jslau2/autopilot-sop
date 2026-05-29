@@ -24,6 +24,11 @@ _PRICING: dict[str, tuple[float, float]] = {
     "o1-mini":       (1.10, 4.40),
     "o1":            (15.00, 60.00),
     "o3-mini":       (1.10, 4.40),
+    # Generic tier fallbacks (matched by substring when an exact model isn't
+    # listed) so e.g. "5.4-nano" lands on cheap nano rates, not gpt-4o.
+    # Confirm exact rates via AZURE_OPENAI_PRICE_IN/_OUT for billing accuracy.
+    "nano":          (0.10, 0.40),
+    "mini":          (0.15, 0.60),
 }
 
 _DEFAULT = (2.50, 10.00)  # fall back to gpt-4o-class pricing
