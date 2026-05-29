@@ -31,6 +31,7 @@ class SessionState:
     agent_results: dict = field(default_factory=dict) # task_id → result dict
     traces: dict = field(default_factory=dict)        # task_id → message trace list
     created_at: float = field(default_factory=time.time)
+    elapsed_final: float | None = None   # set when terminal; freezes elapsed()
     bg_task: Any = None
 
     def now_ts(self) -> str:
@@ -40,7 +41,9 @@ class SessionState:
         return f"{t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}.{ms:03d}"
 
     def elapsed(self) -> float:
-        """Returns seconds elapsed since session start."""
+        """Seconds elapsed since session start (frozen once the session ends)."""
+        if self.elapsed_final is not None:
+            return self.elapsed_final
         return time.time() - self.elapsed_start
 
     async def emit(self, event: dict) -> None:
@@ -166,14 +169,21 @@ class SessionState:
         })
 
     async def done(self, summary: str = "") -> None:
-        """Mark session complete and emit session_complete event."""
+        """Mark session complete, emit session_complete, and persist to disk."""
         self.status = "done"
+        self.elapsed_final = time.time() - self.elapsed_start
         await self.emit({
             "type": "session_complete",
             "summary": summary,
             "elapsed": self.elapsed(),
             "kpis": self.kpis,
         })
+        # Archive terminal session so it survives a backend restart.
+        try:
+            from persistence import save_session
+            save_session(self)
+        except Exception:
+            pass
 
 
 # Global session registry

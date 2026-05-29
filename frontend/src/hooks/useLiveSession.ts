@@ -236,7 +236,8 @@ export function useLiveSession(sessionId?: string) {
     setTick(t => t + 1);
     esRef.current?.close();
     if (sessionIdRef.current) {
-      fetch(`/api/sessions/${sessionIdRef.current}`, { method: 'DELETE' }).catch(() => {});
+      // Terminate keeps the session (archived to disk) for later review.
+      fetch(`/api/sessions/${sessionIdRef.current}/terminate`, { method: 'POST' }).catch(() => {});
     }
   }, []);
 

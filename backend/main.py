@@ -35,7 +35,11 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 from session import SessionState, sessions
 from orchestrator import run_orchestrator
+from persistence import save_session, delete_session_file, load_sessions
 import mock_data
+
+# Restore archived (completed / terminated) sessions so they survive restarts.
+sessions.update(load_sessions())
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -287,24 +291,47 @@ async def submit_answer(session_id: str, body: AnswerBody):
     }
 
 
-@app.delete("/api/sessions/{session_id}")
-async def delete_session(session_id: str):
-    """Cancel and remove a session."""
-    session = sessions.pop(session_id, None)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-
-    # Cancel the background orchestrator task if still running
+async def _stop_session_tasks(session: SessionState) -> None:
+    """Cancel the orchestrator and any outstanding agent tasks for a session."""
     if session.bg_task and not session.bg_task.done():
         session.bg_task.cancel()
         try:
             await session.bg_task
         except asyncio.CancelledError:
             pass
-
-    # Cancel any outstanding agent tasks
-    for task_id, task in session.agent_tasks.items():
+    for task in session.agent_tasks.values():
         if not task.done():
             task.cancel()
+
+
+@app.post("/api/sessions/{session_id}/terminate")
+async def terminate_session(session_id: str):
+    """
+    Stop a running session but KEEP it: the orchestrator is cancelled and the
+    session is marked done and archived so it can be reviewed later.
+    """
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    await _stop_session_tasks(session)
+
+    if session.status not in ("done", "error"):
+        await session.done(summary="Session terminated by user")  # persists
+    else:
+        save_session(session)
+
+    return {"session_id": session_id, "status": session.status, "terminated": True}
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Permanently remove a session from memory and disk (hard delete)."""
+    session = sessions.pop(session_id, None)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    await _stop_session_tasks(session)
+    delete_session_file(session_id)
 
     return {"session_id": session_id, "deleted": True}

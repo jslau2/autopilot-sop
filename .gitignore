@@ -9,6 +9,7 @@ backend/.venv/
 backend/__pycache__/
 backend/*.pyc
 backend/.env
+backend/sessions/
 
 # Misc
 .DS_Store
