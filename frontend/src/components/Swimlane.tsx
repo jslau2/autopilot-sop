@@ -2,9 +2,10 @@ import { useDashboard } from '../context/DashboardContext';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 import AgentIcon from './AgentIcon';
 import type { Step } from '../types';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
+const DEFAULT_PX_PER_SEC = 80;
 const LANE_H = 60;
-const PX_PER_SEC = 80;
 const LABEL_W = 140;
 
 function getAgentStatus(steps: Record<string, Step>, agentId: string): 'running' | 'paused' | 'done' | 'idle' {
@@ -74,80 +75,135 @@ function StepCard({ step, laneIndex, pxPerSec, elapsedT, onClick }: StepCardProp
 
 export default function Swimlane() {
   const { steps, stepsArr, elapsedT, setSelectedStepId } = useDashboard();
+  const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const cursorX = elapsedT * PX_PER_SEC;
+  const maxT = Math.max(...stepsArr.map(s => s.endT ?? elapsedT), elapsedT, 1);
+  const cursorX = elapsedT * pxPerSec;
   const totalWidth = Math.max(cursorX + 200, 800);
+  const zoomPct = Math.round((pxPerSec / DEFAULT_PX_PER_SEC) * 100);
+
+  const zoom = useCallback((factor: number) => {
+    setPxPerSec(prev => Math.max(8, Math.min(400, prev * factor)));
+  }, []);
+
+  const fitToScreen = useCallback(() => {
+    const containerW = scrollRef.current?.clientWidth ?? 800;
+    setPxPerSec(Math.max(8, (containerW - 40) / maxT));
+  }, [maxT]);
+
+  // Ctrl+scroll to zoom
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoom(e.deltaY < 0 ? 1.12 : 1 / 1.12);
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [zoom]);
+
+  // Keyboard: + - = 0
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      if (e.key === '+' || e.key === '=') zoom(1.25);
+      if (e.key === '-') zoom(1 / 1.25);
+      if (e.key === '0') fitToScreen();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [zoom, fitToScreen]);
 
   return (
-    <div className="swim-outer" style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-      {/* Agent labels */}
-      <div className="swim-labels" style={{ width: LABEL_W, flexShrink: 0, overflowY: 'auto' }}>
-        {AGENT_ORDER.map((agentId) => {
-          const agent = AGENTS[agentId];
-          const status = getAgentStatus(steps, agentId);
-          return (
-            <div key={agentId} className="agent-label-row" style={{ height: LANE_H, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px' }}>
-              <AgentIcon color={agent.color} status={status} size={28} />
-              <div className="agent-label-text">
-                <span className="agent-label-name" style={{ color: status === 'idle' ? 'var(--text-3)' : 'var(--text-1)' }}>
-                  {agent.name}
-                </span>
-                <span className="agent-label-sub">{agent.code}</span>
-              </div>
-            </div>
-          );
-        })}
+    <div className="swim-outer" style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0, flexDirection: 'column' }}>
+      {/* Zoom controls */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        gap: 4, padding: '4px 10px 4px 0', borderBottom: '1px solid var(--border-subtle)',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 10, color: 'var(--text-3)', marginRight: 4 }}>
+          <kbd style={{ fontSize: 9, padding: '0 3px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 3 }}>+</kbd>
+          <kbd style={{ fontSize: 9, padding: '0 3px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 3, marginLeft: 2 }}>−</kbd>
+          <kbd style={{ fontSize: 9, padding: '0 3px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 3, marginLeft: 2 }}>0</kbd>
+          <span style={{ marginLeft: 4 }}>zoom</span>
+        </span>
+        <button onClick={() => zoom(1 / 1.25)} style={zoomBtnStyle}>−</button>
+        <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-2)', minWidth: 38, textAlign: 'center' }}>{zoomPct}%</span>
+        <button onClick={() => zoom(1.25)} style={zoomBtnStyle}>+</button>
+        <button onClick={fitToScreen} style={{ ...zoomBtnStyle, padding: '2px 8px', fontSize: 10 }}>⊡ Fit</button>
       </div>
 
-      {/* Scrollable graph area */}
-      <div className="swim-scroll" style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
-        <div style={{ position: 'relative', width: totalWidth, height: AGENT_ORDER.length * LANE_H }}>
-          {/* Lane backgrounds + time ruler lines */}
-          {AGENT_ORDER.map((agentId, i) => (
-            <div
-              key={agentId}
-              style={{
-                position: 'absolute',
-                left: 0, right: 0,
-                top: i * LANE_H,
-                height: LANE_H,
-                background: i % 2 === 0 ? 'transparent' : 'oklch(0 0 0 / 0.03)',
-                borderBottom: '1px solid var(--border-s)',
-              }}
-            />
-          ))}
-
-          {/* Time cursor */}
-          <div
-            style={{
-              position: 'absolute',
-              left: cursorX,
-              top: 0,
-              bottom: 0,
-              width: 1.5,
-              background: 'var(--accent)',
-              opacity: 0.6,
-              pointerEvents: 'none',
-            }}
-          />
-
-          {/* Step cards */}
-          {stepsArr.map(step => {
-            const laneIdx = AGENT_ORDER.indexOf(step.agent);
-            if (laneIdx < 0) return null;
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+        {/* Agent labels */}
+        <div className="swim-labels" style={{ width: LABEL_W, flexShrink: 0, overflowY: 'auto' }}>
+          {AGENT_ORDER.map((agentId) => {
+            const agent = AGENTS[agentId];
+            const status = getAgentStatus(steps, agentId);
             return (
-              <StepCard
-                key={step.id}
-                step={step}
-                laneIndex={laneIdx}
-                pxPerSec={PX_PER_SEC}
-                elapsedT={elapsedT}
-                onClick={() => setSelectedStepId(step.id)}
-              />
+              <div key={agentId} className="agent-label-row" style={{ height: LANE_H, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px' }}>
+                <AgentIcon color={agent.color} status={status} size={28} />
+                <div className="agent-label-text">
+                  <span className="agent-label-name" style={{ color: status === 'idle' ? 'var(--text-3)' : 'var(--text-1)' }}>
+                    {agent.name}
+                  </span>
+                  <span className="agent-label-sub">{agent.code}</span>
+                </div>
+              </div>
             );
           })}
+        </div>
+
+        {/* Scrollable graph area */}
+        <div ref={scrollRef} className="swim-scroll" style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
+          <div style={{ position: 'relative', width: totalWidth, height: AGENT_ORDER.length * LANE_H }}>
+            {/* Lane backgrounds */}
+            {AGENT_ORDER.map((agentId, i) => (
+              <div
+                key={agentId}
+                style={{
+                  position: 'absolute', left: 0, right: 0,
+                  top: i * LANE_H, height: LANE_H,
+                  background: i % 2 === 0 ? 'transparent' : 'oklch(0 0 0 / 0.03)',
+                  borderBottom: '1px solid var(--border-s)',
+                }}
+              />
+            ))}
+
+            {/* Time cursor */}
+            <div style={{
+              position: 'absolute', left: cursorX, top: 0, bottom: 0,
+              width: 1.5, background: 'var(--accent)', opacity: 0.6, pointerEvents: 'none',
+            }} />
+
+            {/* Step cards */}
+            {stepsArr.map(step => {
+              const laneIdx = AGENT_ORDER.indexOf(step.agent);
+              if (laneIdx < 0) return null;
+              return (
+                <StepCard
+                  key={step.id}
+                  step={step}
+                  laneIndex={laneIdx}
+                  pxPerSec={pxPerSec}
+                  elapsedT={elapsedT}
+                  onClick={() => setSelectedStepId(step.id)}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+const zoomBtnStyle: React.CSSProperties = {
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  color: 'var(--text-2)', borderRadius: 4, cursor: 'pointer',
+  fontSize: 13, padding: '2px 7px', lineHeight: 1.4,
+  transition: 'border-color 0.1s, color 0.1s',
+};
