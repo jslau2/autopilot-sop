@@ -9,6 +9,9 @@ function nowTs(): string {
 
 export function useSimulation(speed: number = 0.5) {
   const [tick, setTick] = useState(0);
+  const [started, setStarted] = useState(false);
+  const startedRef = useRef(false);
+
   const S = useRef<SimState & {
     postOffset: number;
     processedPre: Set<number>;
@@ -36,7 +39,7 @@ export function useSimulation(speed: number = 0.5) {
       const dt = Math.min((now - last) / 1000, 0.1) * speedRef.current;
       last = now;
 
-      if (!S.done && !S.paused && !S.manualPause) {
+      if (startedRef.current && !S.done && !S.paused && !S.manualPause) {
         S.elapsedT += dt;
 
         if (S.phase === 'pre') {
@@ -103,9 +106,16 @@ export function useSimulation(speed: number = 0.5) {
     setTick(t => t + 1);
   }, []);
 
+  const startSession = useCallback((_goal: string) => {
+    startedRef.current = true;
+    setStarted(true);
+  }, []);
+
   return {
     tick,
     S,
+    started,
+    startSession,
     answerQuestion,
     terminateSession,
     setManualPause,

@@ -14,6 +14,8 @@ type LiveState = SimState & {
 
 export function useLiveSession(enabled: boolean = true) {
   const [tick, setTick] = useState(0);
+  const [started, setStarted] = useState(false);
+
   const S = useRef<LiveState>({
     ...createInitialState(),
     done: false,
@@ -123,61 +125,57 @@ export function useLiveSession(enabled: boolean = true) {
     }
   }
 
-  useEffect(() => {
+  const startSession = useCallback(async (goal: string) => {
     if (!enabled) return;
+    setStarted(true);
+    startTimeRef.current = performance.now();
 
-    let cancelled = false;
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { session_id } = await res.json();
 
-    (async () => {
-      try {
-        const res = await fetch('/api/sessions', { method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const { session_id } = await res.json();
-        if (cancelled) return;
+      sessionIdRef.current = session_id;
 
-        sessionIdRef.current = session_id;
-        startTimeRef.current = performance.now();
+      const es = new EventSource(`/api/sessions/${session_id}/events`);
+      esRef.current = es;
 
-        const es = new EventSource(`/api/sessions/${session_id}/events`);
-        esRef.current = es;
+      es.onmessage = (e) => {
+        try {
+          const evt = JSON.parse(e.data);
+          applyEvent(evt);
+        } catch { /* malformed event — skip */ }
+        S.elapsedT = (performance.now() - startTimeRef.current) / 1000;
+        setTick(t => t + 1);
+      };
 
-        es.onmessage = (e) => {
-          try {
-            const evt = JSON.parse(e.data);
-            applyEvent(evt);
-          } catch { /* malformed event — skip */ }
-          S.elapsedT = (performance.now() - startTimeRef.current) / 1000;
-          setTick(t => t + 1);
-        };
-
-        es.onerror = () => {
-          if (!S.done) {
-            S.events.push({ ts: nowTs(), type: 'log', agent: 'system',
-              message: '⚠ Connection error — backend may not be running', stepId: null });
-            setTick(t => t + 1);
-          }
-        };
-      } catch (err) {
-        if (!cancelled) {
+      es.onerror = () => {
+        if (!S.done) {
           S.events.push({ ts: nowTs(), type: 'log', agent: 'system',
-            message: `⚠ Failed to start session: ${err instanceof Error ? err.message : String(err)}`,
-            stepId: null });
+            message: '⚠ Connection error — backend may not be running', stepId: null });
           setTick(t => t + 1);
         }
-      }
-    })();
+      };
+    } catch (err) {
+      S.events.push({ ts: nowTs(), type: 'log', agent: 'system',
+        message: `⚠ Failed to start session: ${err instanceof Error ? err.message : String(err)}`,
+        stepId: null });
+      setTick(t => t + 1);
+    }
+  }, [enabled]);
 
+  useEffect(() => {
     return () => {
-      cancelled = true;
       esRef.current?.close();
       if (sessionIdRef.current) {
         fetch(`/api/sessions/${sessionIdRef.current}`, { method: 'DELETE' }).catch(() => {});
       }
     };
-  }, [enabled]);
+  }, []);
 
   const answerQuestion = useCallback((answer: string) => {
     const q = S.pendingQuestion;
@@ -226,5 +224,5 @@ export function useLiveSession(enabled: boolean = true) {
     // Full pause/resume of backend would require additional endpoints
   }, []);
 
-  return { tick, S, answerQuestion, terminateSession, setManualPause };
+  return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause };
 }
