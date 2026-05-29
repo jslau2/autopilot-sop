@@ -61,6 +61,8 @@ export default function Home() {
   );
   const [showLaunch, setShowLaunch] = useState(false);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const [pageSize, setPageSize] = useState(5);
+  const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
 
   const toggleMode = () => {
@@ -68,6 +70,18 @@ export default function Home() {
     setDemoMode(next);
     localStorage.setItem('sop-demo-mode', String(next));
   };
+
+  // Pagination over the active cycle list (demo SESSIONS vs live sessions).
+  const cycleCount = demoMode ? SESSIONS.length : liveSessions.length;
+  const pageCount = Math.max(1, Math.ceil(cycleCount / pageSize));
+  const start = page * pageSize;
+  const pagedDemo = SESSIONS.slice(start, start + pageSize);
+  const pagedLive = liveSessions.slice(start, start + pageSize);
+
+  // Keep the page in range as the list / page size changes.
+  useEffect(() => {
+    if (page > pageCount - 1) setPage(pageCount - 1);
+  }, [pageCount, page]);
 
   // In live mode, the cycle list reflects real backend sessions.
   useEffect(() => {
@@ -150,6 +164,140 @@ export default function Home() {
           })}
         </div>
 
+        <div className="sessions-panel">
+          <div className="sp-header">
+            <span className="sp-title">Planning Cycles</span>
+            <span className="sp-count">
+              {demoMode ? `${SESSIONS.length} sessions` : `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'}`}
+            </span>
+            <button className="sp-new-btn" onClick={() => setShowLaunch(true)}>+ New cycle</button>
+          </div>
+
+          {demoMode && pagedDemo.map(s => (
+            <Link key={s.id} to="/pipeline/demo" className={`home-session-item${s.status === 'running' ? ' is-active' : ''}`}>
+              {s.status === 'running' ? (
+                <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
+                  <div className="si-orb-ring" />
+                  <div className="si-orb-arc" />
+                  <div className="si-orb-dot" />
+                </div>
+              ) : (
+                <div className="si-dot si-dot-done" style={{ flexShrink: 0, marginLeft: 12, marginRight: 2 }} />
+              )}
+              <div className="si-body">
+                <div className="si-name">{s.name}</div>
+                <div className="si-meta">{s.meta}</div>
+              </div>
+              <div className="si-kpis">
+                {s.kpis.map(([val, lbl]) => (
+                  <div key={lbl} className="si-kpi">
+                    <div className="si-kpi-val">{val}</div>
+                    <div className="si-kpi-lbl">{lbl}</div>
+                  </div>
+                ))}
+              </div>
+              <span className={`si-status si-status-${s.status}`}>
+                {s.status === 'running' ? '● Running' : '✓ Done'}
+              </span>
+              <span className="si-open-btn">→</span>
+            </Link>
+          ))}
+
+          {!demoMode && liveSessions.length === 0 && (
+            <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text-3)' }}>
+              No cycles yet — click <strong>+ New cycle</strong> to launch your first live run.
+            </div>
+          )}
+
+          {!demoMode && pagedLive.map(s => {
+            const running = s.status === 'running';
+            const kpiCells: [string, string][] = [];
+            if (s.kpis.otif != null) kpiCells.push([String(s.kpis.otif), 'OTIF']);
+            if (s.kpis.forecastAcc != null) kpiCells.push([String(s.kpis.forecastAcc), 'Fcst Acc']);
+            if (s.kpis.capacityUtil != null) kpiCells.push([String(s.kpis.capacityUtil), 'Cap Util']);
+            return (
+              <Link key={s.session_id} to={`/pipeline/${s.session_id}`} className={`home-session-item${running ? ' is-active' : ''}`}>
+                {running ? (
+                  <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
+                    <div className="si-orb-ring" />
+                    <div className="si-orb-arc" />
+                    <div className="si-orb-dot" />
+                  </div>
+                ) : (
+                  <div className="si-dot si-dot-done" style={{ flexShrink: 0, marginLeft: 12, marginRight: 2 }} />
+                )}
+                <div className="si-body">
+                  <div className="si-name">{s.name || s.session_id.slice(0, 8)}</div>
+                  <div className="si-meta">{s.step_count} steps · {relTime(s.created_at)}</div>
+                </div>
+                <div className="si-kpis">
+                  {kpiCells.map(([val, lbl]) => (
+                    <div key={lbl} className="si-kpi">
+                      <div className="si-kpi-val">{val}</div>
+                      <div className="si-kpi-lbl">{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+                <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
+                  {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
+                </span>
+                <DeleteCycleControl
+                  sessionId={s.session_id}
+                  name={s.name}
+                  onDeleted={() => setLiveSessions(prev => prev.filter(x => x.session_id !== s.session_id))}
+                />
+                <span className="si-open-btn">→</span>
+              </Link>
+            );
+          })}
+
+          {cycleCount > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+              borderTop: '1px solid var(--border-subtle)',
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Rows</span>
+              {[5, 10, 20].map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setPageSize(n); setPage(0); }}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 5, cursor: 'pointer',
+                    background: pageSize === n ? 'var(--accent)' : 'transparent',
+                    color: pageSize === n ? '#fff' : 'var(--text-2)',
+                    border: `1px solid ${pageSize === n ? 'var(--accent)' : 'var(--border)'}`,
+                  }}
+                >{n}</button>
+              ))}
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                {start + 1}–{Math.min(start + pageSize, cycleCount)} of {cycleCount}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                style={{
+                  width: 26, height: 26, borderRadius: 6, cursor: page === 0 ? 'default' : 'pointer',
+                  background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-2)',
+                  opacity: page === 0 ? 0.4 : 1,
+                }}
+              >‹</button>
+              <span style={{ fontSize: 11, color: 'var(--text-2)', minWidth: 34, textAlign: 'center' }}>
+                {page + 1}/{pageCount}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+                disabled={page >= pageCount - 1}
+                style={{
+                  width: 26, height: 26, borderRadius: 6, cursor: page >= pageCount - 1 ? 'default' : 'pointer',
+                  background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-2)',
+                  opacity: page >= pageCount - 1 ? 0.4 : 1,
+                }}
+              >›</button>
+            </div>
+          )}
+        </div>
+
         <div className="nav-grid">
           <Link to="/pipeline" className="nav-card" style={{ '--card-accent': 'var(--ag-planner)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--ag-planner)' }}>
@@ -224,94 +372,6 @@ export default function Home() {
             </div>
             <div className="nc-cta">Open Agent Manager →</div>
           </Link>
-        </div>
-
-        <div className="sessions-panel">
-          <div className="sp-header">
-            <span className="sp-title">Planning Cycles</span>
-            <span className="sp-count">
-              {demoMode ? `${SESSIONS.length} sessions` : `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'}`}
-            </span>
-            <button className="sp-new-btn" onClick={() => setShowLaunch(true)}>+ New cycle</button>
-          </div>
-
-          {demoMode && SESSIONS.map(s => (
-            <Link key={s.id} to="/pipeline/demo" className={`home-session-item${s.status === 'running' ? ' is-active' : ''}`}>
-              {s.status === 'running' ? (
-                <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
-                  <div className="si-orb-ring" />
-                  <div className="si-orb-arc" />
-                  <div className="si-orb-dot" />
-                </div>
-              ) : (
-                <div className="si-dot si-dot-done" style={{ flexShrink: 0, marginLeft: 12, marginRight: 2 }} />
-              )}
-              <div className="si-body">
-                <div className="si-name">{s.name}</div>
-                <div className="si-meta">{s.meta}</div>
-              </div>
-              <div className="si-kpis">
-                {s.kpis.map(([val, lbl]) => (
-                  <div key={lbl} className="si-kpi">
-                    <div className="si-kpi-val">{val}</div>
-                    <div className="si-kpi-lbl">{lbl}</div>
-                  </div>
-                ))}
-              </div>
-              <span className={`si-status si-status-${s.status}`}>
-                {s.status === 'running' ? '● Running' : '✓ Done'}
-              </span>
-              <span className="si-open-btn">→</span>
-            </Link>
-          ))}
-
-          {!demoMode && liveSessions.length === 0 && (
-            <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text-3)' }}>
-              No cycles yet — click <strong>+ New cycle</strong> to launch your first live run.
-            </div>
-          )}
-
-          {!demoMode && liveSessions.map(s => {
-            const running = s.status === 'running';
-            const kpiCells: [string, string][] = [];
-            if (s.kpis.otif != null) kpiCells.push([String(s.kpis.otif), 'OTIF']);
-            if (s.kpis.forecastAcc != null) kpiCells.push([String(s.kpis.forecastAcc), 'Fcst Acc']);
-            if (s.kpis.capacityUtil != null) kpiCells.push([String(s.kpis.capacityUtil), 'Cap Util']);
-            return (
-              <Link key={s.session_id} to={`/pipeline/${s.session_id}`} className={`home-session-item${running ? ' is-active' : ''}`}>
-                {running ? (
-                  <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
-                    <div className="si-orb-ring" />
-                    <div className="si-orb-arc" />
-                    <div className="si-orb-dot" />
-                  </div>
-                ) : (
-                  <div className="si-dot si-dot-done" style={{ flexShrink: 0, marginLeft: 12, marginRight: 2 }} />
-                )}
-                <div className="si-body">
-                  <div className="si-name">{s.name || s.session_id.slice(0, 8)}</div>
-                  <div className="si-meta">{s.step_count} steps · {relTime(s.created_at)}</div>
-                </div>
-                <div className="si-kpis">
-                  {kpiCells.map(([val, lbl]) => (
-                    <div key={lbl} className="si-kpi">
-                      <div className="si-kpi-val">{val}</div>
-                      <div className="si-kpi-lbl">{lbl}</div>
-                    </div>
-                  ))}
-                </div>
-                <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
-                  {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
-                </span>
-                <DeleteCycleControl
-                  sessionId={s.session_id}
-                  name={s.name}
-                  onDeleted={() => setLiveSessions(prev => prev.filter(x => x.session_id !== s.session_id))}
-                />
-                <span className="si-open-btn">→</span>
-              </Link>
-            );
-          })}
         </div>
 
         <div className="home-footer">
