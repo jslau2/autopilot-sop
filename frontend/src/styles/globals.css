@@ -689,7 +689,7 @@ input, textarea, select { font-family: inherit; }
 .nc-feat { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-3); }
 .nc-feat::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--card-accent, var(--accent)); flex-shrink: 0; }
 .nc-cta { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--card-accent, var(--accent)); padding-top: 8px; border-top: 1px solid var(--border-subtle); }
-.sessions-panel { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; }
+.sessions-panel { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; margin-bottom: 40px; }
 .sp-header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); }
 .sp-title { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
 .sp-count { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
