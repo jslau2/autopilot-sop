@@ -13,6 +13,7 @@ import TourOverlay from '../components/TourOverlay';
 import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
+import DeleteCycleControl from '../components/DeleteCycleControl';
 import type { KPIs } from '../types';
 
 type SessionMeta = {
@@ -141,6 +142,11 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
                     color: s.status === 'running' ? 'oklch(0.75 0.17 145)' : 'var(--text-3)',
                     background: 'var(--bg-base)', border: '1px solid var(--border)',
                   }}>{s.status}</span>
+                  <DeleteCycleControl
+                    sessionId={s.session_id}
+                    name={s.name}
+                    onDeleted={() => setSessions(prev => prev.filter(x => x.session_id !== s.session_id))}
+                  />
                   <span style={{ color: 'var(--text-3)' }}>→</span>
                 </button>
               ))}
@@ -223,6 +229,14 @@ function SessionSwitcher({ current }: { current: string }) {
                   <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{relativeTime(s.created_at)}</div>
                 </div>
                 {s.session_id === current && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>current</span>}
+                <DeleteCycleControl
+                  sessionId={s.session_id}
+                  name={s.name}
+                  onDeleted={() => {
+                    setSessions(prev => prev.filter(x => x.session_id !== s.session_id));
+                    if (s.session_id === current) { setOpen(false); navigate('/pipeline'); }
+                  }}
+                />
               </button>
             ))}
           </div>

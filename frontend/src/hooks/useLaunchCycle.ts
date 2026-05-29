@@ -18,6 +18,23 @@ export function suggestName(goal: string): string {
 }
 
 /**
+ * Permanently delete a cycle (memory + disk). Prompts for confirmation since
+ * this is irreversible. Returns true if the user confirmed and it was deleted.
+ */
+export async function deleteCycle(sessionId: string, name?: string): Promise<boolean> {
+  const label = name || sessionId.slice(0, 8);
+  if (!window.confirm(`Delete cycle "${label}"? This permanently removes its record and cannot be undone.`)) {
+    return false;
+  }
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Creates a cycle and navigates to its run view.
  * - Demo mode: single instance at /pipeline/demo (no backend call).
  * - Live mode: POST /api/sessions, then navigate to /pipeline/:id.

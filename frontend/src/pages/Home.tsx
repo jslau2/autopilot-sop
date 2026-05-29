@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
+import DeleteCycleControl from '../components/DeleteCycleControl';
 
 type LiveSession = {
   session_id: string;
@@ -302,6 +303,11 @@ export default function Home() {
                 <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
                   {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
                 </span>
+                <DeleteCycleControl
+                  sessionId={s.session_id}
+                  name={s.name}
+                  onDeleted={() => setLiveSessions(prev => prev.filter(x => x.session_id !== s.session_id))}
+                />
                 <span className="si-open-btn">→</span>
               </Link>
             );
