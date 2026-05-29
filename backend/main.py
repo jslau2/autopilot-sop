@@ -87,6 +87,11 @@ class ChatBody(BaseModel):
     messages: list[ChatMessage] = []
 
 
+class AgentConfigBody(BaseModel):
+    system_prompt: str | None = None
+    temperature: float | None = None
+
+
 def _derive_session_name(goal: str, session_id: str) -> str:
     """
     Heuristic fallback name from the goal text: prefer the first non-empty line,
@@ -391,6 +396,42 @@ async def planner_chat(body: ChatBody):
         return {"reply": "I wasn't able to complete that — could you rephrase or be more specific?"}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Agent runtime config (Agent Settings → live runs)
+# ---------------------------------------------------------------------------
+@app.get("/api/agents")
+async def list_agent_configs():
+    import agent_config
+    return {"agents": agent_config.list_configs()}
+
+
+@app.get("/api/agents/{agent_id}")
+async def get_agent_config(agent_id: str):
+    import agent_config
+    cfg = agent_config.get_config(agent_id)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
+    return cfg
+
+
+@app.put("/api/agents/{agent_id}")
+async def update_agent_config(agent_id: str, body: AgentConfigBody):
+    import agent_config
+    cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
+    return cfg
+
+
+@app.post("/api/agents/{agent_id}/reset")
+async def reset_agent_config(agent_id: str):
+    import agent_config
+    cfg = agent_config.reset_config(agent_id)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
+    return cfg
 
 
 @app.get("/api/health")

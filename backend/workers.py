@@ -265,14 +265,16 @@ async def run_worker_agent(
         step_id=task_id,
     )
 
-    # Build initial messages
+    # Build initial messages — system prompt honors any runtime override.
+    from agent_config import effective_system_prompt, effective_temperature
     messages: list[dict] = [
-        {"role": "system", "content": agent_def["system_prompt"]},
+        {"role": "system", "content": effective_system_prompt(agent_id)},
         {
             "role": "user",
             "content": f"Task: {task}\n\nContext from prior phases:\n{context}",
         },
     ]
+    temperature = effective_temperature(agent_id)
 
     tools = agent_def.get("tools", [])
     result: dict = {}
@@ -289,7 +291,7 @@ async def run_worker_agent(
                     messages=messages,
                     tools=tools if tools else None,
                     tool_choice="auto" if tools else None,
-                    temperature=0.2,
+                    temperature=temperature,
                     max_completion_tokens=1024,
                 ),
             )
