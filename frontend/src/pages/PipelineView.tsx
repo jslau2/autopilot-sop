@@ -367,11 +367,6 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               </Link>
               {!demoMode && <SessionSwitcher current={sessionId} />}
               <button
-                className="cfg-toolbar-btn"
-                onClick={() => setShowLaunch(true)}
-                style={{ fontWeight: 700 }}
-              >+ New Cycle</button>
-              <button
                 className={`view-btn${viewMode === 'swimlane' ? ' is-active' : ''}`}
                 onClick={() => setViewMode('swimlane')}
               >Swimlane</button>
