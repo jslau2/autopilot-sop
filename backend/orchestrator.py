@@ -248,7 +248,10 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                     "message": str(exc),
                 })
                 session.status = "error"
+                # (usage capture below is skipped on failure)
                 return
+
+            await session.add_usage("planner", DEPLOYMENT, getattr(response, "usage", None))
 
             msg = response.choices[0].message
 

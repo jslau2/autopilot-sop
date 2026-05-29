@@ -34,10 +34,19 @@ export interface KPIs {
   planDelta: number | null;
 }
 
+export interface Usage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  calls: number;
+  costUsd: number;
+}
+
 export interface SimState {
   steps: Record<string, Step>;
   events: SimEvent[];
   kpis: KPIs;
+  usage: Usage;
   pendingQuestion: { stepId: string; text: string } | null;
   paused: boolean;
   manualPause: boolean;

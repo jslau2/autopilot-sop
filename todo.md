@@ -43,8 +43,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
 ## Smaller polish / nice-to-haves
 
-- [ ] **Token / cost tracking** — show Azure OpenAI token usage and est. cost
-  per run (live mode).
+- [x] **Token / cost tracking** — per-run Azure OpenAI token usage + estimated
+  cost. Backend accumulates `usage` (total/prompt/completion/calls/cost) per
+  session and per agent, emits `usage_update` events, persists it, and exposes
+  it in session APIs (pricing in `backend/pricing.py`). Frontend shows a
+  `UsageChip` in the pipeline toolbar (real in live, simulated estimate in demo).
 - [ ] **Streaming chat** — token-by-token responses in the planner chat for a
   more "live" feel.
 - [ ] **Per-session chat threads** — store chat history server-side, tied to a

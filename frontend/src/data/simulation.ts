@@ -159,6 +159,7 @@ export function createInitialState(): SimState {
     steps: {},
     events: [],
     kpis: { otif: null, forecastAcc: null, capacityUtil: null, wos: null, planDelta: null },
+    usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, calls: 0, costUsd: 0 },
     pendingQuestion: null,
     paused: false,
     manualPause: false,

@@ -150,6 +150,17 @@ export function useLiveSession(sessionId?: string) {
         break;
       }
 
+      case 'usage_update': {
+        S.usage = {
+          promptTokens: (evt.prompt_tokens as number) ?? S.usage.promptTokens,
+          completionTokens: (evt.completion_tokens as number) ?? S.usage.completionTokens,
+          totalTokens: (evt.total_tokens as number) ?? S.usage.totalTokens,
+          calls: (evt.calls as number) ?? S.usage.calls,
+          costUsd: (evt.cost_usd as number) ?? S.usage.costUsd,
+        };
+        break;
+      }
+
       case 'session_complete': {
         S.sessionStatus = 'done';
         S.done = true;

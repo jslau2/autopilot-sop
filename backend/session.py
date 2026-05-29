@@ -33,6 +33,11 @@ class SessionState:
     created_at: float = field(default_factory=time.time)
     elapsed_final: float | None = None   # set when terminal; freezes elapsed()
     current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
+    usage: dict = field(default_factory=lambda: {
+        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+        "calls": 0, "cost_usd": 0.0,
+    })
+    usage_by_agent: dict = field(default_factory=dict)
     bg_task: Any = None
 
     def now_ts(self) -> str:
@@ -167,6 +172,42 @@ class SessionState:
             "type": "answer",
             "agent": "human",
             "message": f"Human answered: {answer}",
+        })
+
+    async def add_usage(self, agent: str, model: str, usage: Any) -> None:
+        """Accumulate token usage from an LLM response and emit a usage_update."""
+        if usage is None:
+            return
+        from pricing import estimate_cost
+        pt = int(getattr(usage, "prompt_tokens", 0) or 0)
+        ct = int(getattr(usage, "completion_tokens", 0) or 0)
+        tt = int(getattr(usage, "total_tokens", 0) or (pt + ct))
+        cost = estimate_cost(model, pt, ct)
+
+        self.usage["prompt_tokens"] += pt
+        self.usage["completion_tokens"] += ct
+        self.usage["total_tokens"] += tt
+        self.usage["calls"] += 1
+        self.usage["cost_usd"] = round(self.usage["cost_usd"] + cost, 6)
+
+        a = self.usage_by_agent.setdefault(agent, {
+            "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0, "cost_usd": 0.0,
+        })
+        a["prompt_tokens"] += pt
+        a["completion_tokens"] += ct
+        a["total_tokens"] += tt
+        a["calls"] += 1
+        a["cost_usd"] = round(a["cost_usd"] + cost, 6)
+
+        await self.emit({
+            "type": "usage_update",
+            "agent": agent,
+            "model": model,
+            "prompt_tokens": self.usage["prompt_tokens"],
+            "completion_tokens": self.usage["completion_tokens"],
+            "total_tokens": self.usage["total_tokens"],
+            "calls": self.usage["calls"],
+            "cost_usd": self.usage["cost_usd"],
         })
 
     async def done(self, summary: str = "") -> None:

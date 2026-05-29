@@ -15,7 +15,8 @@ import CapacityConfigModal from '../components/CapacityConfigModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import AppShell from '../components/AppShell';
-import type { KPIs } from '../types';
+import UsageChip from '../components/UsageChip';
+import type { KPIs, Usage } from '../types';
 
 type SessionMeta = {
   session_id: string;
@@ -322,6 +323,23 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
 
   const stepsArr = Object.values(S.steps);
 
+  // Token usage: real in live mode; a plausible estimate in demo so the
+  // indicator is visible while showcasing.
+  const displayUsage: Usage = demoMode
+    ? (() => {
+        const done = stepsArr.filter(s => s.status === 'done').length;
+        const running = stepsArr.filter(s => s.status === 'running').length;
+        const totalTokens = done * 1850 + running * 700;
+        return {
+          promptTokens: Math.round(totalTokens * 0.7),
+          completionTokens: Math.round(totalTokens * 0.3),
+          totalTokens,
+          calls: done + running,
+          costUsd: totalTokens * 0.000005,
+        };
+      })()
+    : S.usage;
+
   const ctxValue = {
     steps: S.steps,
     stepsArr,
@@ -403,6 +421,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                 onClick={() => setShowTour(true)}
                 style={{ width: 'auto', padding: '4px 10px', borderRadius: 5, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
               >↺ Tour</button>
+              <UsageChip usage={displayUsage} simulated={demoMode} />
               <div className={`status-pill ${statusClass}`}>{statusLabel}</div>
               <span className="elapsed-time mono">{S.elapsedT.toFixed(1)}s</span>
             </div>

@@ -359,6 +359,7 @@ def _session_summary(s: SessionState) -> dict:
         "elapsed": s.elapsed(),
         "kpis": s.kpis,
         "step_count": len(s.steps),
+        "usage": s.usage,
     }
 
 
@@ -441,6 +442,8 @@ async def get_session(session_id: str):
         "steps": session.steps,
         "pending_question": session.pending_question,
         "event_count": len(session.events),
+        "usage": session.usage,
+        "usage_by_agent": session.usage_by_agent,
     }
 
 
