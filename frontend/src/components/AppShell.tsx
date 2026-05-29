@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useDemoMode } from '../hooks/useDemoMode';
+import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
 
 type NavKey = 'home' | 'cycle' | 'console' | 'agents' | 'data';
 
@@ -19,6 +20,7 @@ const NAV: { key: NavKey; label: string; to: string }[] = [
  */
 export default function AppShell({ active, children }: { active: NavKey; children: ReactNode }) {
   const [demoMode, setDemoMode] = useDemoMode();
+  const { active: entity, entities, setActive: setEntity } = useEntity();
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
@@ -58,6 +60,21 @@ export default function AppShell({ active, children }: { active: NavKey; childre
         </nav>
 
         <span style={{ flex: 1 }} />
+
+        {/* Planning entity scope */}
+        <select
+          value={entity}
+          onChange={e => setEntity(e.target.value)}
+          title="Scope to a planning entity"
+          style={{
+            fontSize: 11, padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+            background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-2)',
+            maxWidth: 180,
+          }}
+        >
+          <option value={ALL_ENTITIES}>All entities</option>
+          {entities.map(en => <option key={en} value={en}>{en}</option>)}
+        </select>
 
         {/* Demo / Live toggle — single source of truth, works from any page */}
         <div

@@ -41,12 +41,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   persisted JSON); the orchestrator/workers read the effective values, so edits
   affect new live runs. Includes GET/PUT/reset `/api/agents` endpoints and a
   'Reset to default' action. Demo mode stays illustrative.
-- [ ] **Planning Entity scoping** — the sidebar "Planning Entity" section
-  (SPL & SBMB Plan / China Region / Regional Consolidated) and its "+ New
-  entity" button are currently dummy/static. Make it real: an entity scopes
-  sessions and data to a plant grouping/region. Needs backend support — tag
-  new cycles with an entity, filter the session list by the selected entity,
-  and switch the active entity. Closer to a multi-tenant/scoping concept.
+- [x] **Planning Entity scoping** — planning entities are now real. A scope
+  selector in the top bar (and the functional sidebar list with "+ New entity")
+  switches the active entity; new cycles are tagged with it (LaunchConfig
+  dropdown); Home and the sidebar cycle list filter by it. Backend: sessions
+  carry `entity`, accepted on create, returned in summary/get, `?entity=` list
+  filter, persisted.
 
 ## Smaller polish / nice-to-haves
 

@@ -148,7 +148,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
         <LaunchConfig
           demoMode={demoMode}
           onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+          onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { entity }); }}
         />
       )}
     </div>
@@ -459,7 +459,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             initialName={launchSeed?.name}
             scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId }); }}
+            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}

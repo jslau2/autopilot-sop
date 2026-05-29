@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 import { useDemoMode } from '../hooks/useDemoMode';
+import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
 import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
@@ -12,6 +13,7 @@ type LiveSession = {
   name: string;
   goal: string;
   status: string;
+  entity?: string;
   created_at: number;
   kpis: Record<string, string | number | null>;
   step_count: number;
@@ -65,6 +67,7 @@ export default function Home() {
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchSeed, setLaunchSeed] = useState<LaunchSeed | null>(null);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const { active: activeEntity } = useEntity();
   const newCycle = () => { setLaunchSeed(null); setShowLaunch(true); };
   const branchCycle = (s: LiveSession) => {
     setLaunchSeed({ goal: s.goal, name: `${s.name} (what-if)`, parentId: s.session_id, scenarioOf: s.name });
@@ -74,12 +77,14 @@ export default function Home() {
   const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
 
+  const filteredLive = activeEntity === ALL_ENTITIES ? liveSessions : liveSessions.filter(s => (s.entity || '') === activeEntity);
+
   // Pagination over the active cycle list (demo SESSIONS vs live sessions).
-  const cycleCount = demoMode ? SESSIONS.length : liveSessions.length;
+  const cycleCount = demoMode ? SESSIONS.length : filteredLive.length;
   const pageCount = Math.max(1, Math.ceil(cycleCount / pageSize));
   const start = page * pageSize;
   const pagedDemo = SESSIONS.slice(start, start + pageSize);
-  const pagedLive = liveSessions.slice(start, start + pageSize);
+  const pagedLive = filteredLive.slice(start, start + pageSize);
 
   // Keep the page in range as the list / page size changes.
   useEffect(() => {
@@ -113,7 +118,7 @@ export default function Home() {
           <div className="sp-header">
             <span className="sp-title">Planning Cycles</span>
             <span className="sp-count">
-              {demoMode ? `${SESSIONS.length} sessions` : `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'}`}
+              {demoMode ? `${SESSIONS.length} sessions` : `${filteredLive.length} session${filteredLive.length === 1 ? '' : 's'}${activeEntity !== ALL_ENTITIES ? ' · ' + activeEntity : ''}`}
             </span>
             <button className="sp-new-btn" onClick={newCycle}>+ New cycle</button>
           </div>
@@ -148,7 +153,7 @@ export default function Home() {
             </Link>
           ))}
 
-          {!demoMode && liveSessions.length === 0 && (
+          {!demoMode && filteredLive.length === 0 && (
             <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text-3)' }}>
               No cycles yet — click <strong>+ New cycle</strong> to launch your first live run.
             </div>
@@ -329,7 +334,7 @@ export default function Home() {
           initialName={launchSeed?.name}
           scenarioOf={launchSeed?.scenarioOf}
           onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId }); }}
+          onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity }); }}
         />
       )}
     </div>

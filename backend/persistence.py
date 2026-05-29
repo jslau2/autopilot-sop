@@ -40,6 +40,7 @@ def save_session(session: SessionState) -> None:
             "events": session.events,
             "pending_question": session.pending_question,
             "parent_id": session.parent_id,
+            "entity": session.entity,
         }
         tmp = SESSIONS_DIR / f".{session.session_id}.tmp"
         tmp.write_text(json.dumps(data))
@@ -82,6 +83,7 @@ def load_sessions() -> dict[str, SessionState]:
         s.events = data.get("events", [])
         s.pending_question = data.get("pending_question")
         s.parent_id = data.get("parent_id", "")
+        s.entity = data.get("entity", "")
         # Archived snapshots are terminal so the SSE replay exits cleanly.
         if s.status not in ("done", "error"):
             s.status = "done"

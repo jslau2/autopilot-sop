@@ -42,7 +42,7 @@ export async function deleteCycle(sessionId: string, name?: string): Promise<boo
 export function useLaunchCycle() {
   const navigate = useNavigate();
 
-  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string }) => {
+  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string; entity?: string }) => {
     if (demoMode) {
       navigate('/pipeline/demo', { state: { goal, name } });
       return;
@@ -51,7 +51,7 @@ export function useLaunchCycle() {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, name, parent_id: opts?.parentId ?? '' }),
+        body: JSON.stringify({ goal, name, parent_id: opts?.parentId ?? '', entity: opts?.entity ?? '' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { session_id } = await res.json();
