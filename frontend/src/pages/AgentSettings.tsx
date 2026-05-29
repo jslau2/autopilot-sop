@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AgentIcon from '../components/AgentIcon';
+import { useDemoMode } from '../hooks/useDemoMode';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 
 interface AgentData {
@@ -148,13 +149,49 @@ interface DrawerState { agentId: string; tab: 'prompt' | 'model' | 'tools' }
 function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => void }) {
   const [tab, setTab] = useState<'prompt' | 'model' | 'tools'>('prompt');
   const [saved, setSaved] = useState(false);
+  const [demoMode] = useDemoMode();
   const agent = AGENTS[agentId];
   const data = AGENT_DATA[agentId];
+  const [prompt, setPrompt] = useState(data?.prompt ?? '');
+  const [temperature, setTemperature] = useState<number>(data?.temperature ?? 0.2);
+
+  // Live mode: load the real runtime config (and reflect any saved overrides).
+  useEffect(() => {
+    if (demoMode) return;
+    fetch(`/api/agents/${agentId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(cfg => {
+        if (!cfg) return;
+        if (typeof cfg.system_prompt === 'string') setPrompt(cfg.system_prompt);
+        if (typeof cfg.temperature === 'number') setTemperature(cfg.temperature);
+      })
+      .catch(() => { /* keep static defaults */ });
+  }, [demoMode, agentId]);
+
   if (!data) return null;
 
   const handleSave = () => {
+    if (!demoMode) {
+      fetch(`/api/agents/${agentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system_prompt: prompt, temperature }),
+      }).catch(() => { /* surfaced as a no-op; UI still confirms */ });
+    }
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 800);
+  };
+
+  const resetDefaults = () => {
+    if (demoMode) return;
+    fetch(`/api/agents/${agentId}/reset`, { method: 'POST' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(cfg => {
+        if (!cfg) return;
+        setPrompt(cfg.system_prompt ?? '');
+        setTemperature(cfg.temperature ?? 0.2);
+      })
+      .catch(() => {});
   };
 
   return (
@@ -179,9 +216,9 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
             <div className="dr-field">
               <div className="dr-label-row">
                 <span className="dr-label">System Prompt</span>
-                <span className="dr-hint">~{data.prompt.length} chars</span>
+                <span className="dr-hint">~{prompt.length} chars · {demoMode ? 'demo (not saved)' : 'applies to new runs'}</span>
               </div>
-              <textarea className="dr-textarea" defaultValue={data.prompt} rows={12} />
+              <textarea className="dr-textarea" value={prompt} onChange={e => setPrompt(e.target.value)} rows={12} />
             </div>
           )}
           {tab === 'model' && (
@@ -198,11 +235,11 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
               <div className="dr-field">
                 <div className="dr-label-row">
                   <span className="dr-label">Temperature</span>
-                  <span className="dr-hint">{data.temperature}</span>
+                  <span className="dr-hint">{temperature.toFixed(2)}</span>
                 </div>
                 <div className="dr-slider-row">
-                  <input type="range" className="dr-slider" min="0" max="1" step="0.05" defaultValue={data.temperature} />
-                  <span className="dr-slider-val">{data.temperature}</span>
+                  <input type="range" className="dr-slider" min="0" max="1" step="0.05" value={temperature} onChange={e => setTemperature(parseFloat(e.target.value))} />
+                  <span className="dr-slider-val">{temperature.toFixed(2)}</span>
                 </div>
               </div>
               <div className="dr-field">
@@ -232,7 +269,7 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
 
         <div className="dr-footer">
           <button className="dr-btn-cancel" onClick={onClose}>Cancel</button>
-          <button className="dr-btn-test">Test Prompt</button>
+          {!demoMode && <button className="dr-btn-test" onClick={resetDefaults}>Reset to default</button>}
           <button className="dr-btn-save" onClick={handleSave}>{saved ? '✓ Saved' : 'Save Changes'}</button>
         </div>
       </div>

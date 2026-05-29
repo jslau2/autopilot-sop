@@ -39,6 +39,7 @@ DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 PLANNER_DEF = AGENT_DEFS["planner"]
 PLANNER_TOOLS = PLANNER_DEF["tools"]
 PLANNER_SYSTEM_PROMPT = PLANNER_DEF["system_prompt"]
+from agent_config import effective_system_prompt, effective_temperature
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +204,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
     # Initial planner message
     messages: list[dict] = [
-        {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
+        {"role": "system", "content": effective_system_prompt("planner")},
         {
             "role": "user",
             "content": (
@@ -236,7 +237,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                         messages=messages,
                         tools=PLANNER_TOOLS,
                         tool_choice="auto",
-                        temperature=0.3,
+                        temperature=effective_temperature("planner"),
                         max_completion_tokens=2048,
                     ),
                 )

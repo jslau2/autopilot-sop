@@ -34,9 +34,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 - [ ] **What-if scenario branching** — clone an existing run with tweaked
   constraints (e.g. Supplier X lead time, SPL-L3 capacity) to compare outcomes.
   Pairs with Run comparison.
-- [ ] **Wire Agent Settings to runtime** — make the prompt/model edits on the
-  Agent Settings page actually affect live runs (turn the mockup into a real
-  control panel).
+- [x] **Wire Agent Settings to runtime** — Agent Settings now saves per-agent
+  system-prompt + temperature overrides to the backend (`agent_config.py`,
+  persisted JSON); the orchestrator/workers read the effective values, so edits
+  affect new live runs. Includes GET/PUT/reset `/api/agents` endpoints and a
+  'Reset to default' action. Demo mode stays illustrative.
 - [ ] **Planning Entity scoping** — the sidebar "Planning Entity" section
   (SPL & SBMB Plan / China Region / Regional Consolidated) and its "+ New
   entity" button are currently dummy/static. Make it real: an entity scopes
