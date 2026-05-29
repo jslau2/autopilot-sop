@@ -77,6 +77,18 @@ rebuilds state) → terminate (`POST /api/sessions/{id}/terminate`, keeps +
 archives) → delete (`DELETE`, hard remove). Completed/terminated sessions
 persist to disk and survive restarts; in-flight sessions are memory-only.
 
+## Model & cost
+- The **real model is the Azure deployment** — `AZURE_OPENAI_DEPLOYMENT`
+  (default `gpt-4o`), used by planner + all workers + chat. Check it via
+  `GET /api/health` (returns `model`) or the UsageChip tooltip.
+- ⚠️ The model labels in the UI (e.g. "claude-opus-4-5" in Agent
+  Settings/Manager/Console) are **cosmetic prototype text**, NOT the real model.
+- **Token/cost tracking** is implemented: `SessionState.add_usage()` accumulates
+  per session + per agent and emits `usage_update`; cost via `backend/pricing.py`
+  (USD/1M as input/output/cached_input, longest-substring match; override with
+  `AZURE_OPENAI_PRICE_IN/_OUT`). Frontend shows `UsageChip` (real in live,
+  simulated `~` estimate in demo).
+
 ## Conventions & gotchas
 - Use `rawColor` (not CSS vars) for any color in SVG attributes.
 - Many UI prefs persist in `localStorage`: `sop-demo-mode`, `sop-focus-mode`,

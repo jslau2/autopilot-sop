@@ -182,7 +182,9 @@ class SessionState:
         pt = int(getattr(usage, "prompt_tokens", 0) or 0)
         ct = int(getattr(usage, "completion_tokens", 0) or 0)
         tt = int(getattr(usage, "total_tokens", 0) or (pt + ct))
-        cost = estimate_cost(model, pt, ct)
+        details = getattr(usage, "prompt_tokens_details", None)
+        cached = int(getattr(details, "cached_tokens", 0) or 0) if details is not None else 0
+        cost = estimate_cost(model, pt, ct, cached)
 
         self.usage["prompt_tokens"] += pt
         self.usage["completion_tokens"] += ct
