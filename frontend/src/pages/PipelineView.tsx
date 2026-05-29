@@ -270,6 +270,8 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showConfig, setShowConfig] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
+  const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string } | null>(null);
+  const [parentName, setParentName] = useState('');
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
   const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') === '1');
@@ -291,6 +293,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         if (!d) return;
         if (d.name && !(location.state as { name?: string } | null)?.name) setCycleName(d.name);
         if (d.goal) setCycleGoal(d.goal);
+        if (typeof d.parent_name === 'string') setParentName(d.parent_name);
       })
       .catch(() => { /* keep fallback */ });
   }, [demoMode, sessionId, location.state]);
@@ -344,7 +347,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     activeSessionId: sessionId,
     setActiveSessionId: () => {},
     demoMode,
-    onNewCycle: () => setShowLaunch(true),
+    onNewCycle: () => { setLaunchSeed(null); setShowLaunch(true); },
     kpis: S.kpis,
     paused: S.paused,
     manualPause: S.manualPause,
@@ -367,6 +370,9 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               <span style={{ color: 'var(--text-3)' }}>Cycle</span>
               <span style={{ color: 'var(--border)' }}>›</span>
               <span style={{ color: 'var(--text-1)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{cycleName}</span>
+              {parentName && (
+                <span title={`What-if branch of ${parentName}`} style={{ color: 'var(--accent)', whiteSpace: 'nowrap' }}>⎇ of {parentName}</span>
+              )}
               <span style={{ color: 'var(--border)' }}>›</span>
               <span style={{ color: 'var(--text-3)', textTransform: 'capitalize' }}>{viewMode}</span>
             </div>
@@ -404,6 +410,14 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               )}
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
               <button className="cfg-toolbar-btn" onClick={() => setShowReport(true)} title="Export an executive report (Markdown / PDF)">⤓ Report</button>
+              <button
+                className="cfg-toolbar-btn"
+                title="What-if — branch this cycle with tweaked constraints"
+                onClick={() => {
+                  setLaunchSeed({ goal: cycleGoal, name: `${cycleName} (what-if)`, parentId: demoMode ? undefined : sessionId, scenarioOf: cycleName });
+                  setShowLaunch(true);
+                }}
+              >⎇ What-if</button>
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
               </button>
@@ -441,8 +455,11 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}
+            initialGoal={launchSeed?.goal}
+            initialName={launchSeed?.name}
+            scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+            onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}

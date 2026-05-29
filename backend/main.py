@@ -68,6 +68,7 @@ Constraints: Line 4 bottleneck (SPL-L3 at 92%), Supplier X lead-time extension (
 class StartSession(BaseModel):
     goal: str = DEFAULT_GOAL
     name: str = ""
+    parent_id: str = ""
 
 
 class AnswerBody(BaseModel):
@@ -458,6 +459,8 @@ def _session_summary(s: SessionState) -> dict:
         "elapsed": s.elapsed(),
         "kpis": s.kpis,
         "step_count": len(s.steps),
+        "parent_id": s.parent_id,
+        "parent_name": sessions[s.parent_id].name if s.parent_id in sessions else "",
     }
 
 
@@ -488,6 +491,8 @@ async def create_session(body: StartSession):
     session_id = str(uuid.uuid4())
     name = (body.name or "").strip() or _derive_session_name(body.goal, session_id)
     session = SessionState(session_id=session_id, name=name, goal=body.goal)
+    if body.parent_id and body.parent_id in sessions:
+        session.parent_id = body.parent_id
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
@@ -539,6 +544,8 @@ async def get_session(session_id: str):
         "kpis": session.kpis,
         "steps": session.steps,
         "pending_question": session.pending_question,
+        "parent_id": session.parent_id,
+        "parent_name": sessions[session.parent_id].name if session.parent_id in sessions else "",
         "event_count": len(session.events),
     }
 

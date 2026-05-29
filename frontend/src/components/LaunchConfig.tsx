@@ -12,13 +12,19 @@ export default function LaunchConfig({
   demoMode,
   onClose,
   onLaunch,
+  initialGoal,
+  initialName,
+  scenarioOf,
 }: {
   demoMode: boolean;
   onClose: () => void;
   onLaunch: (goal: string, name: string) => void;
+  initialGoal?: string;
+  initialName?: string;
+  scenarioOf?: string;
 }) {
-  const [goal, setGoal] = useState(DEFAULT_GOAL);
-  const [name, setName] = useState(() => suggestName(DEFAULT_GOAL));
+  const [goal, setGoal] = useState(initialGoal ?? DEFAULT_GOAL);
+  const [name, setName] = useState(() => initialName ?? suggestName(initialGoal ?? DEFAULT_GOAL));
   const [nameTouched, setNameTouched] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
@@ -98,8 +104,13 @@ export default function LaunchConfig({
             >×</button>
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0, lineHeight: 1.2 }}>
-            New Planning Cycle
+            {scenarioOf ? 'What-if Scenario' : 'New Planning Cycle'}
           </h2>
+          {scenarioOf && (
+            <div style={{ fontSize: 12, color: accentColor, marginTop: 4, fontWeight: 600 }}>
+              ⎇ Branched from “{scenarioOf}” — tweak the constraints below
+            </div>
+          )}
           <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>
             {demoMode
               ? 'Runs a scripted simulation — no backend required.'

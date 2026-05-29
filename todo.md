@@ -31,9 +31,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 - [x] **Actionable chat** — the planner chat now has write tools: `start_cycle`
   (launch a run) and `answer_decision` (submit a decision to a paused run),
   alongside the read tools. Prompt-gated to act only on clear user intent.
-- [ ] **What-if scenario branching** — clone an existing run with tweaked
-  constraints (e.g. Supplier X lead time, SPL-L3 capacity) to compare outcomes.
-  Pairs with Run comparison.
+- [x] **What-if scenario branching** — a ⎇ What-if action (Home cycle rows +
+  pipeline toolbar) opens the launch config pre-filled with the source cycle's
+  goal so you can tweak constraints and launch a linked branch. Backend stores
+  `parent_id`; the pipeline breadcrumb shows '⎇ of <parent>'. Pairs with the
+  (future) Run comparison item.
 - [x] **Wire Agent Settings to runtime** — Agent Settings now saves per-agent
   system-prompt + temperature overrides to the backend (`agent_config.py`,
   persisted JSON); the orchestrator/workers read the effective values, so edits

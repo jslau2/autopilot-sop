@@ -10,11 +10,14 @@ import DeleteCycleControl from '../components/DeleteCycleControl';
 type LiveSession = {
   session_id: string;
   name: string;
+  goal: string;
   status: string;
   created_at: number;
   kpis: Record<string, string | number | null>;
   step_count: number;
 };
+
+type LaunchSeed = { goal?: string; name?: string; parentId?: string; scenarioOf?: string };
 
 function relTime(epochSec: number): string {
   const secs = Math.max(0, Date.now() / 1000 - epochSec);
@@ -60,7 +63,13 @@ const SESSIONS = [
 export default function Home() {
   const [demoMode] = useDemoMode();
   const [showLaunch, setShowLaunch] = useState(false);
+  const [launchSeed, setLaunchSeed] = useState<LaunchSeed | null>(null);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const newCycle = () => { setLaunchSeed(null); setShowLaunch(true); };
+  const branchCycle = (s: LiveSession) => {
+    setLaunchSeed({ goal: s.goal, name: `${s.name} (what-if)`, parentId: s.session_id, scenarioOf: s.name });
+    setShowLaunch(true);
+  };
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
@@ -106,7 +115,7 @@ export default function Home() {
             <span className="sp-count">
               {demoMode ? `${SESSIONS.length} sessions` : `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'}`}
             </span>
-            <button className="sp-new-btn" onClick={() => setShowLaunch(true)}>+ New cycle</button>
+            <button className="sp-new-btn" onClick={newCycle}>+ New cycle</button>
           </div>
 
           {demoMode && pagedDemo.map(s => (
@@ -177,6 +186,19 @@ export default function Home() {
                 <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
                   {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
                 </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="What-if — branch this cycle with tweaked constraints"
+                  onClick={e => { e.preventDefault(); e.stopPropagation(); branchCycle(s); }}
+                  style={{
+                    flexShrink: 0, width: 22, height: 22, display: 'inline-flex',
+                    alignItems: 'center', justifyContent: 'center', borderRadius: 5,
+                    color: 'var(--text-3)', fontSize: 13, cursor: 'pointer', lineHeight: 1,
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-base)'; }}
+                  onMouseOut={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
+                >⎇</span>
                 <DeleteCycleControl
                   sessionId={s.session_id}
                   name={s.name}
@@ -303,8 +325,11 @@ export default function Home() {
       {showLaunch && (
         <LaunchConfig
           demoMode={demoMode}
+          initialGoal={launchSeed?.goal}
+          initialName={launchSeed?.name}
+          scenarioOf={launchSeed?.scenarioOf}
           onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId }); }}
         />
       )}
     </div>
