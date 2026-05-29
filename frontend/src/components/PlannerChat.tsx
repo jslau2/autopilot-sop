@@ -1,12 +1,35 @@
 import { useState, useRef, useEffect } from 'react';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+type Pos = { left: number; top: number };
 
 const GREETING =
   "Hi — I'm the Planner agent. Ask me about S&OP planning in general, or about a specific run " +
   "(its status, KPIs, or decisions) and I'll pull it up.";
 
 const ACCENT = 'oklch(0.80 0.16 78)'; // planner agent color
+const BTN = 52;
+const GAP = 14;
+const PANEL_W = 372;
+const PANEL_H = 520;
+const POS_KEY = 'sop-chat-pos';
+
+function defaultPos(): Pos {
+  return { left: window.innerWidth - BTN - 20, top: window.innerHeight - BTN - 20 };
+}
+function clampPos(p: Pos): Pos {
+  return {
+    left: Math.max(8, Math.min(p.left, window.innerWidth - BTN - 8)),
+    top: Math.max(8, Math.min(p.top, window.innerHeight - BTN - 8)),
+  };
+}
+function loadPos(): Pos {
+  try {
+    const s = localStorage.getItem(POS_KEY);
+    if (s) return clampPos(JSON.parse(s));
+  } catch { /* ignore */ }
+  return defaultPos();
+}
 
 export default function PlannerChat() {
   const [open, setOpen] = useState(false);
@@ -14,7 +37,15 @@ export default function PlannerChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pos, setPos] = useState<Pos>(loadPos);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Drag bookkeeping
+  const posRef = useRef(pos);
+  const dragRef = useRef<{ startX: number; startY: number; baseLeft: number; baseTop: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const setPosBoth = (p: Pos) => { posRef.current = p; setPos(p); };
 
   // Refresh demo/live each time the panel opens (it can be toggled on Home).
   const toggleOpen = () => {
@@ -25,6 +56,39 @@ export default function PlannerChat() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
+
+  // Keep the button on-screen when the viewport changes.
+  useEffect(() => {
+    const onResize = () => setPosBoth(clampPos(posRef.current));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseLeft: pos.left, baseTop: pos.top, moved: false };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
+    if (d.moved) setPosBoth(clampPos({ left: d.baseLeft + dx, top: d.baseTop + dy }));
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (d?.moved) {
+      suppressClickRef.current = true; // don't let the trailing click toggle
+      localStorage.setItem(POS_KEY, JSON.stringify(posRef.current));
+    }
+  };
+  const onClick = () => {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+    toggleOpen();
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -52,30 +116,43 @@ export default function PlannerChat() {
     }
   };
 
+  // Anchor the panel to whichever side/corner the button sits in.
+  const onRight = pos.left + BTN / 2 > window.innerWidth / 2;
+  const onBottom = pos.top + BTN / 2 > window.innerHeight / 2;
+  const panelLeft = Math.max(8, Math.min(
+    onRight ? pos.left + BTN - PANEL_W : pos.left,
+    window.innerWidth - PANEL_W - 8,
+  ));
+  const panelTop = Math.max(8, Math.min(
+    onBottom ? pos.top - GAP - PANEL_H : pos.top + BTN + GAP,
+    window.innerHeight - 60,
+  ));
+
   return (
     <>
-      {/* Floating button — bottom-left */}
+      {/* Floating, draggable button */}
       <button
-        onClick={toggleOpen}
-        title="Chat with the Planner agent"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onClick={onClick}
+        title="Chat with the Planner agent — drag to move"
         style={{
-          position: 'fixed', left: 20, bottom: 20, zIndex: 150,
-          width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          position: 'fixed', left: pos.left, top: pos.top, zIndex: 150,
+          width: BTN, height: BTN, borderRadius: '50%', border: 'none', cursor: 'grab',
+          touchAction: 'none', userSelect: 'none',
           background: ACCENT, color: 'oklch(0.18 0.03 80)',
           fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 6px 20px oklch(0.04 0.01 250 / 0.5)',
-          transition: 'transform .15s',
         }}
-        onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.06)')}
-        onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
         {open ? '✕' : '💬'}
       </button>
 
       {open && (
         <div style={{
-          position: 'fixed', left: 20, bottom: 84, zIndex: 150,
-          width: 372, maxWidth: 'calc(100vw - 40px)', height: 520, maxHeight: 'calc(100vh - 120px)',
+          position: 'fixed', left: panelLeft, top: panelTop, zIndex: 150,
+          width: PANEL_W, maxWidth: 'calc(100vw - 16px)', height: PANEL_H, maxHeight: 'calc(100vh - 16px)',
           display: 'flex', flexDirection: 'column',
           background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
           borderRadius: 14, boxShadow: '0 18px 50px oklch(0.04 0.01 250 / 0.6)', overflow: 'hidden',
