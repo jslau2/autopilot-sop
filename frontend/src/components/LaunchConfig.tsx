@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { suggestName } from '../hooks/useLaunchCycle';
+import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
 
 export const DEFAULT_GOAL = `Q3-2026 S&OP Planning Cycle — Shimano APAC Manufacturing
 Scope: 847 SKUs, 12 plants (SPL + SBMB), planning horizon W22–W34 (13 weeks)
@@ -18,13 +19,15 @@ export default function LaunchConfig({
 }: {
   demoMode: boolean;
   onClose: () => void;
-  onLaunch: (goal: string, name: string) => void;
+  onLaunch: (goal: string, name: string, entity: string) => void;
   initialGoal?: string;
   initialName?: string;
   scenarioOf?: string;
 }) {
+  const { active, entities } = useEntity();
   const [goal, setGoal] = useState(initialGoal ?? DEFAULT_GOAL);
   const [name, setName] = useState(() => initialName ?? suggestName(initialGoal ?? DEFAULT_GOAL));
+  const [entity, setEntity] = useState(() => (active !== ALL_ENTITIES ? active : entities[0] ?? ''));
   const [nameTouched, setNameTouched] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
@@ -55,7 +58,7 @@ export default function LaunchConfig({
 
   const launch = () => {
     if (!goal.trim()) return;
-    onLaunch(goal, name.trim());
+    onLaunch(goal, name.trim(), entity);
   };
 
   return (
@@ -149,6 +152,24 @@ export default function LaunchConfig({
               >{suggesting ? '…' : '✨ Suggest'}</button>
             )}
           </div>
+        </div>
+
+        {/* Planning entity */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+            PLANNING ENTITY
+          </label>
+          <select
+            value={entity}
+            onChange={e => setEntity(e.target.value)}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--bg-base)', border: '1px solid var(--border)',
+              borderRadius: 7, padding: '9px 12px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
+            }}
+          >
+            {entities.map(en => <option key={en} value={en}>{en}</option>)}
+          </select>
         </div>
 
         {/* Goal editor */}

@@ -69,6 +69,7 @@ class StartSession(BaseModel):
     goal: str = DEFAULT_GOAL
     name: str = ""
     parent_id: str = ""
+    entity: str = ""
 
 
 class AnswerBody(BaseModel):
@@ -461,13 +462,16 @@ def _session_summary(s: SessionState) -> dict:
         "step_count": len(s.steps),
         "parent_id": s.parent_id,
         "parent_name": sessions[s.parent_id].name if s.parent_id in sessions else "",
+        "entity": s.entity,
     }
 
 
 @app.get("/api/sessions")
-async def list_sessions():
-    """List all sessions, newest first — drives the session switcher and home page."""
+async def list_sessions(entity: str = ""):
+    """List all sessions, newest first. Optional ?entity= scopes to one entity."""
     ordered = sorted(sessions.values(), key=lambda s: s.created_at, reverse=True)
+    if entity:
+        ordered = [s for s in ordered if s.entity == entity]
     return {"sessions": [_session_summary(s) for s in ordered]}
 
 
@@ -493,6 +497,7 @@ async def create_session(body: StartSession):
     session = SessionState(session_id=session_id, name=name, goal=body.goal)
     if body.parent_id and body.parent_id in sessions:
         session.parent_id = body.parent_id
+    session.entity = (body.entity or "").strip()
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
@@ -546,6 +551,7 @@ async def get_session(session_id: str):
         "pending_question": session.pending_question,
         "parent_id": session.parent_id,
         "parent_name": sessions[session.parent_id].name if session.parent_id in sessions else "",
+        "entity": session.entity,
         "event_count": len(session.events),
     }
 

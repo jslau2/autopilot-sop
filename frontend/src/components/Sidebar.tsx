@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
-
-const SOP_PROJECTS = [
-  { id: 'p1', name: 'SPL & SBMB Plan', active: true },
-  { id: 'p2', name: 'China Region Plan', active: false },
-  { id: 'p3', name: 'Regional Consolidated', active: false },
-];
+import { useEntity, setActiveEntity, addEntity, ALL_ENTITIES } from '../hooks/useEntity';
 
 type SidebarSession = {
   session_id: string;
   name: string;
   status: string;
   created_at: number;
+  entity?: string;
 };
 
 function relTime(epochSec: number): string {
@@ -28,6 +24,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [dragOver, setDragOver] = useState(false);
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
+  const { active: activeEntity, entities } = useEntity();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sop-sidebar-collapsed') === '1');
 
   const toggleCollapsed = () => {
@@ -69,7 +66,9 @@ export default function Sidebar() {
   // on the fly without waiting for the next poll.
   const cycleList: SidebarSession[] = ctx.demoMode
     ? [{ session_id: ctx.activeSessionId, name: 'Q3-2026 S&OP Cycle', status: ctx.sessionStatus, created_at: Date.now() / 1000 }]
-    : sessions.map(s => s.session_id === ctx.activeSessionId ? { ...s, status: ctx.sessionStatus } : s);
+    : sessions
+        .filter(s => activeEntity === ALL_ENTITIES || (s.entity || '') === activeEntity)
+        .map(s => s.session_id === ctx.activeSessionId ? { ...s, status: ctx.sessionStatus } : s);
 
   const activeStatus = ctx.sessionStatus;
   const railDotClass = `sess-${activeStatus === 'running' ? 'running' : activeStatus === 'paused' ? 'paused' : 'done'}`;
@@ -126,15 +125,26 @@ export default function Sidebar() {
       <section className="sb-section">
         <div className="sb-label">PLANNING ENTITY</div>
         <div className="project-list">
-          {SOP_PROJECTS.map(p => (
-            <div key={p.id} className={`project-item${p.active ? ' is-active' : ''}`}>
-              <span className="project-bullet" style={{ background: p.active ? 'var(--accent)' : 'var(--border)' }} />
-              <span className="project-name">{p.name}</span>
-              {p.active && <span className="project-active-pill">active</span>}
-            </div>
-          ))}
+          {[ALL_ENTITIES, ...entities].map(name => {
+            const on = name === activeEntity;
+            return (
+              <div
+                key={name}
+                className={`project-item${on ? ' is-active' : ''}`}
+                onClick={() => setActiveEntity(name)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="project-bullet" style={{ background: on ? 'var(--accent)' : 'var(--border)' }} />
+                <span className="project-name">{name === ALL_ENTITIES ? 'All entities' : name}</span>
+                {on && <span className="project-active-pill">active</span>}
+              </div>
+            );
+          })}
         </div>
-        <button className="sb-ghost-btn">+ New entity</button>
+        <button
+          className="sb-ghost-btn"
+          onClick={() => { const n = window.prompt('New planning entity name:'); if (n && n.trim()) addEntity(n.trim()); }}
+        >+ New entity</button>
       </section>
 
       <section className="sb-section">
