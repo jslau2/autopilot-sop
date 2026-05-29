@@ -21,19 +21,24 @@ Constraints: Line 4 bottleneck (SPL-L3 at 92%), Supplier X lead-time extension (
 
 function LaunchConfig({ demoMode, onLaunch }: { demoMode: boolean; onLaunch: (goal: string) => void }) {
   const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
   return (
     <div style={{
-      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg-base)', padding: 32,
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'oklch(0.08 0.01 250 / 0.72)',
+      backdropFilter: 'blur(6px)',
+      padding: 32,
     }}>
       <div style={{
-        width: '100%', maxWidth: 580,
+        width: '100%', maxWidth: 560,
         background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
-        borderRadius: 12, padding: '32px 36px', display: 'flex', flexDirection: 'column', gap: 24,
+        borderRadius: 14, padding: '32px 36px', display: 'flex', flexDirection: 'column', gap: 22,
+        boxShadow: '0 24px 64px oklch(0.04 0.01 250 / 0.7)',
       }}>
         {/* Header */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <span style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px',
               borderRadius: 4, border: '1px solid',
@@ -47,10 +52,10 @@ function LaunchConfig({ demoMode, onLaunch }: { demoMode: boolean; onLaunch: (go
               Switch mode →
             </Link>
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0, lineHeight: 1.2 }}>
             Launch S&amp;OP Planning Cycle
           </h2>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>
             {demoMode
               ? 'Runs a scripted simulation — no backend required.'
               : 'Dispatches real AI agents via Azure OpenAI — backend must be running.'}
@@ -66,6 +71,7 @@ function LaunchConfig({ demoMode, onLaunch }: { demoMode: boolean; onLaunch: (go
             value={goal}
             onChange={e => setGoal(e.target.value)}
             rows={6}
+            autoFocus
             style={{
               width: '100%', boxSizing: 'border-box',
               background: 'var(--bg-base)', border: '1px solid var(--border)',
@@ -98,10 +104,11 @@ function LaunchConfig({ demoMode, onLaunch }: { demoMode: boolean; onLaunch: (go
           onClick={() => onLaunch(goal)}
           disabled={!goal.trim()}
           style={{
-            padding: '12px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
-            background: demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)',
+            padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
+            background: accentColor,
             color: '#fff', border: 'none', cursor: 'pointer',
             opacity: goal.trim() ? 1 : 0.5, transition: 'opacity 0.15s',
+            boxShadow: `0 4px 16px ${accentColor.replace(')', ' / 0.35)')}`,
           }}
         >
           {demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
@@ -192,11 +199,8 @@ export default function PipelineView() {
     setShowTour,
   };
 
-  if (!started) {
-    return <LaunchConfig demoMode={demoMode} onLaunch={startSession} />;
-  }
-
   return (
+    <>
     <DashboardContext.Provider value={ctxValue}>
       <div className="app">
         <Sidebar />
@@ -275,5 +279,7 @@ export default function PipelineView() {
         {showTour && <TourOverlay onClose={closeTour} />}
       </div>
     </DashboardContext.Provider>
+    {!started && <LaunchConfig demoMode={demoMode} onLaunch={startSession} />}
+    </>
   );
 }
