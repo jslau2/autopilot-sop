@@ -33,6 +33,7 @@ class SessionState:
     created_at: float = field(default_factory=time.time)
     elapsed_final: float | None = None   # set when terminal; freezes elapsed()
     current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
+    parent_id: str = ""                   # set when this run is a what-if branch of another
     bg_task: Any = None
 
     def now_ts(self) -> str:
