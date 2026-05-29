@@ -74,6 +74,10 @@ class AnswerBody(BaseModel):
     answer: str
 
 
+class SuggestNameBody(BaseModel):
+    goal: str = ""
+
+
 def _derive_session_name(goal: str, session_id: str) -> str:
     """
     Heuristic fallback name from the goal text: prefer the first non-empty line,
@@ -148,6 +152,38 @@ async def datasource_preview(source_id: str):
     if fn is None:
         raise HTTPException(status_code=404, detail=f"No preview for '{source_id}'")
     return fn()
+
+
+@app.post("/api/sessions/suggest-name")
+async def suggest_name(body: SuggestNameBody):
+    """
+    Suggest a concise cycle name from the goal using the LLM. Falls back to the
+    heuristic name (first line) if the model is unavailable.
+    """
+    fallback = _derive_session_name(body.goal, "")
+    try:
+        from orchestrator import get_client, DEPLOYMENT
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: get_client().chat.completions.create(
+                model=DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": (
+                        "You name S&OP planning cycles. Given the goal, reply with a single "
+                        "concise title (max 6 words, no quotes, no trailing punctuation). "
+                        "Capture the quarter/region and any scenario (e.g. 'Q3-2026 APAC Supplier-X Scenario')."
+                    )},
+                    {"role": "user", "content": body.goal[:1500]},
+                ],
+                temperature=0.4,
+                max_completion_tokens=24,
+            ),
+        )
+        name = (resp.choices[0].message.content or "").strip().strip('"').strip()
+        return {"name": name[:60] or fallback, "source": "llm"}
+    except Exception as exc:
+        return {"name": fallback, "source": "fallback", "detail": str(exc)}
 
 
 @app.get("/api/health")

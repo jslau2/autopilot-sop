@@ -20,7 +20,26 @@ export default function LaunchConfig({
   const [goal, setGoal] = useState(DEFAULT_GOAL);
   const [name, setName] = useState(() => suggestName(DEFAULT_GOAL));
   const [nameTouched, setNameTouched] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
+
+  // Live mode: ask the LLM for a name based on the goal.
+  const suggestViaLLM = async () => {
+    setSuggesting(true);
+    try {
+      const res = await fetch('/api/sessions/suggest-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal }),
+      });
+      const data = await res.json();
+      if (data.name) { setName(data.name); setNameTouched(true); }
+    } catch {
+      // fall back to the existing heuristic name silently
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   // Keep the suggested name in sync with the goal until the user edits it.
   const onGoalChange = (v: string) => {
@@ -93,17 +112,32 @@ export default function LaunchConfig({
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
             CYCLE NAME
           </label>
-          <input
-            value={name}
-            onChange={e => { setName(e.target.value); setNameTouched(true); }}
-            placeholder="Auto-named from goal if left blank"
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: 'var(--bg-base)', border: '1px solid var(--border)',
-              borderRadius: 7, padding: '9px 12px',
-              fontSize: 13, color: 'var(--text-1)', outline: 'none',
-            }}
-          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={name}
+              onChange={e => { setName(e.target.value); setNameTouched(true); }}
+              placeholder="Auto-named from goal if left blank"
+              style={{
+                flex: 1, boxSizing: 'border-box',
+                background: 'var(--bg-base)', border: '1px solid var(--border)',
+                borderRadius: 7, padding: '9px 12px',
+                fontSize: 13, color: 'var(--text-1)', outline: 'none',
+              }}
+            />
+            {!demoMode && (
+              <button
+                onClick={suggestViaLLM}
+                disabled={suggesting || !goal.trim()}
+                title="Suggest a name with AI"
+                style={{
+                  flexShrink: 0, padding: '0 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                  background: 'var(--bg-base)', border: `1px solid ${accentColor.replace(')', ' / 0.5)')}`,
+                  color: suggesting ? 'var(--text-3)' : accentColor, cursor: suggesting ? 'default' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >{suggesting ? '…' : '✨ Suggest'}</button>
+            )}
+          </div>
         </div>
 
         {/* Goal editor */}
