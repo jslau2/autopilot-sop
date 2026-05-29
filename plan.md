@@ -49,7 +49,15 @@ Today the structure fights the mental model:
 - [x] **Agent Console reworked + under the shell** — now a "Live Agent
   Activity" view: shell nav + a header strip with aggregate live counts
   (Active / Idle-Queued / Done / Agents), keeping the agent grid, message bus,
-  and event feed. Framed for its future as a cross-run/cross-user fleet monitor.
+  and event feed. Framed for its future as a cross-run/cross-user fleet monitor
+  (north-star tracked in todo.md).
+- [x] **Pipeline "Focus mode"** — the shell now also wraps the pipeline; a
+  Focus button hides it for a distraction-free workspace (persisted).
+- [x] **Naming fix** — the `/` nav item is **Home** (it *lists* cycles); an
+  individual **Cycle** is the pipeline opened from it. Breadcrumb reads
+  `Home › Cycle › <name> › <view>`.
+- [x] **Dead CSS removed** — `.con-header/.con-brand*/.con-nav-btn/.con-spacer`
+  and `.home-brand-*` after the rework.
 
 ## Non-goals (this branch)
 - Wiring Agent Settings edits to actually affect live runs (kept as todo).

@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useDemoMode } from '../hooks/useDemoMode';
 
-type NavKey = 'cycles' | 'console' | 'agents' | 'data';
+type NavKey = 'home' | 'console' | 'agents' | 'data';
 
 const NAV: { key: NavKey; label: string; to: string }[] = [
-  { key: 'cycles', label: 'Cycles', to: '/' },
+  { key: 'home', label: 'Home', to: '/' },
   { key: 'console', label: 'Agent Console', to: '/console' },
   { key: 'agents', label: 'Agents', to: '/agents' },
   { key: 'data', label: 'Data Sources', to: '/datasources' },

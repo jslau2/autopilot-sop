@@ -87,7 +87,7 @@ export default function Home() {
   }, [demoMode]);
 
   return (
-    <AppShell active="cycles">
+    <AppShell active="home">
     <div className="home-page">
       <div className="home-content">
 

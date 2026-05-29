@@ -14,6 +14,7 @@ import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import AppShell from '../components/AppShell';
 import type { KPIs } from '../types';
 
 type SessionMeta = {
@@ -281,6 +282,8 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showLaunch, setShowLaunch] = useState(false);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
+  const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') === '1');
+  const toggleFocus = () => setFocusMode(f => { localStorage.setItem('sop-focus-mode', f ? '0' : '1'); return !f; });
 
   // Resolve the cycle name for the breadcrumb (from nav state, then backend).
   const [cycleName, setCycleName] = useState<string>(
@@ -356,16 +359,18 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     setShowTour,
   };
 
-  return (
+  const inner = (
     <DashboardContext.Provider value={ctxValue}>
-      <div className="app">
+      <div className="app" style={{ height: focusMode ? '100vh' : 'calc(100vh - 53px)' }}>
         <Sidebar />
         <div className="main-area">
           <div className="main-toolbar">
             <div className="toolbar-goal" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, minWidth: 0 }}>
-              <Link to="/" style={{ color: 'var(--text-3)', textDecoration: 'none' }}>Cycles</Link>
+              <Link to="/" style={{ color: 'var(--text-3)', textDecoration: 'none' }}>Home</Link>
               <span style={{ color: 'var(--border)' }}>›</span>
-              <span style={{ color: 'var(--text-1)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{cycleName}</span>
+              <span style={{ color: 'var(--text-3)' }}>Cycle</span>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-1)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>{cycleName}</span>
               <span style={{ color: 'var(--border)' }}>›</span>
               <span style={{ color: 'var(--text-3)', textTransform: 'capitalize' }}>{viewMode}</span>
             </div>
@@ -401,10 +406,10 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   {S.manualPause ? '▶ Resume' : '⏸ Pause'}
                 </button>
               )}
-              <Link to="/console" className="cfg-toolbar-btn">⊞ Agent Console</Link>
-              <Link to="/agents" className="cfg-toolbar-btn">⚙ Agents</Link>
-              <Link to="/datasources" className="cfg-toolbar-btn">⬡ Data Sources</Link>
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
+              <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
+                {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
+              </button>
               <button
                 className="tour-help-btn"
                 onClick={() => setShowTour(true)}
@@ -446,4 +451,6 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
       </div>
     </DashboardContext.Provider>
   );
+
+  return focusMode ? inner : <AppShell active="home">{inner}</AppShell>;
 }
