@@ -12,6 +12,7 @@ import EventStream from '../components/EventStream';
 import TourOverlay from '../components/TourOverlay';
 import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
+import ReportModal from '../components/ReportModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import AppShell from '../components/AppShell';
@@ -267,23 +268,30 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'swimlane' | 'timeline'>('swimlane');
   const [showConfig, setShowConfig] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
   const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') === '1');
   const toggleFocus = () => setFocusMode(f => { localStorage.setItem('sop-focus-mode', f ? '0' : '1'); return !f; });
 
-  // Resolve the cycle name for the breadcrumb (from nav state, then backend).
+  // Resolve the cycle name + goal for the breadcrumb/report (nav state, then backend).
   const [cycleName, setCycleName] = useState<string>(
     () => (location.state as { name?: string } | null)?.name
       ?? (demoMode ? 'Demo Cycle' : `Cycle ${sessionId.slice(0, 8)}`)
   );
+  const [cycleGoal, setCycleGoal] = useState<string>(
+    () => (location.state as { goal?: string } | null)?.goal ?? (demoMode ? DEFAULT_GOAL : '')
+  );
   useEffect(() => {
     if (demoMode) return;
-    if ((location.state as { name?: string } | null)?.name) return;
     fetch(`/api/sessions/${sessionId}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.name) setCycleName(d.name); })
+      .then(d => {
+        if (!d) return;
+        if (d.name && !(location.state as { name?: string } | null)?.name) setCycleName(d.name);
+        if (d.goal) setCycleGoal(d.goal);
+      })
       .catch(() => { /* keep fallback */ });
   }, [demoMode, sessionId, location.state]);
 
@@ -395,6 +403,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                 </button>
               )}
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowReport(true)} title="Export an executive report (Markdown / PDF)">⤓ Report</button>
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
               </button>
@@ -428,6 +437,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
           />
         )}
         {showConfig && <CapacityConfigModal onClose={() => setShowConfig(false)} />}
+        {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} onClose={() => setShowReport(false)} />}
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}

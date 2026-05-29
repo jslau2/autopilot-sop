@@ -10,8 +10,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 - [ ] **Decision notifications** — toast + badge when any *background* cycle
   pauses for a human decision, so the human-in-the-loop checkpoint reaches you
   even when you're on another page or in another run.
-- [ ] **Executive report export** — one-click PDF/Markdown summary of a
-  completed cycle (KPIs + Finance sign-off + Risk register) for exec review.
+- [x] **Executive report export** — a "⤓ Report" button in the pipeline opens a
+  preview modal with one-click **Markdown** download and **Print / Save PDF**.
+  Built entirely from session state (`src/lib/report.ts`) so it works in demo
+  and live: KPIs, key decisions, Financial Sign-off, Risk Register, and an
+  agent activity summary.
 
 ## Deepen existing pieces
 
