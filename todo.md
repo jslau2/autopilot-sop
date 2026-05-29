@@ -24,6 +24,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 - [ ] **Wire Agent Settings to runtime** — make the prompt/model edits on the
   Agent Settings page actually affect live runs (turn the mockup into a real
   control panel).
+- [ ] **Planning Entity scoping** — the sidebar "Planning Entity" section
+  (SPL & SBMB Plan / China Region / Regional Consolidated) and its "+ New
+  entity" button are currently dummy/static. Make it real: an entity scopes
+  sessions and data to a plant grouping/region. Needs backend support — tag
+  new cycles with an entity, filter the session list by the selected entity,
+  and switch the active entity. Closer to a multi-tenant/scoping concept.
 
 ## Smaller polish / nice-to-haves
 
