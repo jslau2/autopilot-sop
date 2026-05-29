@@ -40,9 +40,16 @@ Today the structure fights the mental model:
 - [x] **5. Breadcrumbs + consistent naming** — pipeline shows `Cycles › <cycle
   name> › <view>`, so the user always knows where they are and can climb back.
 
-## Deferred (follow-ups)
-- Agent Console adopting the AppShell (kept its own header for now; pending its
-  planned rework into a live cross-user activity view).
+## Post-review refinements (done)
+- [x] **Single demo/live toggle** — `useDemoMode` shared store (localStorage +
+  event); the shell has a real two-segment toggle that works from any page and
+  stays in sync everywhere. Home's bespoke toggle removed; hero compacted.
+- [x] **Compact Home hero** — dropped the brand row + big toggle box; agent
+  strip moved below the nav cards so the cycle list surfaces sooner.
+- [x] **Agent Console reworked + under the shell** — now a "Live Agent
+  Activity" view: shell nav + a header strip with aggregate live counts
+  (Active / Idle-Queued / Done / Agents), keeping the agent grid, message bus,
+  and event feed. Framed for its future as a cross-run/cross-user fleet monitor.
 
 ## Non-goals (this branch)
 - Wiring Agent Settings edits to actually affect live runs (kept as todo).

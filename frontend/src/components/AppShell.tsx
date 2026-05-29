@@ -1,5 +1,6 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { useDemoMode } from '../hooks/useDemoMode';
 
 type NavKey = 'cycles' | 'console' | 'agents' | 'data';
 
@@ -16,8 +17,7 @@ const NAV: { key: NavKey; label: string; to: string }[] = [
  * reduces everything to three nouns: Cycles · Agents · Data.
  */
 export default function AppShell({ active, children }: { active: NavKey; children: ReactNode }) {
-  const navigate = useNavigate();
-  const demoMode = localStorage.getItem('sop-demo-mode') !== 'false';
+  const [demoMode, setDemoMode] = useDemoMode();
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
@@ -58,16 +58,29 @@ export default function AppShell({ active, children }: { active: NavKey; childre
 
         <span style={{ flex: 1 }} />
 
-        <button
-          onClick={() => navigate('/')}
-          title="Demo / Live mode is toggled on the Cycles (home) page"
+        {/* Demo / Live toggle — single source of truth, works from any page */}
+        <div
+          role="switch"
+          aria-checked={!demoMode}
+          onClick={() => setDemoMode(!demoMode)}
+          title="Toggle demo / live mode"
           style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', padding: '3px 9px', borderRadius: 5,
-            cursor: 'pointer', background: 'transparent',
-            color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
-            border: `1px solid ${demoMode ? 'oklch(0.45 0.12 145 / 0.4)' : 'oklch(0.55 0.18 260 / 0.4)'}`,
+            display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer',
+            padding: 2, borderRadius: 7, background: 'var(--bg-base)', border: '1px solid var(--border)',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
           }}
-        >{demoMode ? 'DEMO' : 'LIVE'}</button>
+        >
+          <span style={{
+            padding: '3px 9px', borderRadius: 5,
+            background: demoMode ? 'oklch(0.45 0.12 145 / 0.25)' : 'transparent',
+            color: demoMode ? 'oklch(0.78 0.18 145)' : 'var(--text-3)',
+          }}>DEMO</span>
+          <span style={{
+            padding: '3px 9px', borderRadius: 5,
+            background: !demoMode ? 'oklch(0.55 0.18 260 / 0.25)' : 'transparent',
+            color: !demoMode ? 'oklch(0.78 0.18 260)' : 'var(--text-3)',
+          }}>LIVE</span>
+        </div>
       </header>
 
       {children}
