@@ -78,6 +78,15 @@ class SuggestNameBody(BaseModel):
     goal: str = ""
 
 
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class ChatBody(BaseModel):
+    messages: list[ChatMessage] = []
+
+
 def _derive_session_name(goal: str, session_id: str) -> str:
     """
     Heuristic fallback name from the goal text: prefer the first non-empty line,
@@ -184,6 +193,146 @@ async def suggest_name(body: SuggestNameBody):
         return {"name": name[:60] or fallback, "source": "llm"}
     except Exception as exc:
         return {"name": fallback, "source": "fallback", "detail": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Planner chat — a conversational assistant that can pull session context
+# on demand via tools, and asks the user to clarify when the run is ambiguous.
+# ---------------------------------------------------------------------------
+
+CHAT_SYSTEM_PROMPT = (
+    "You are the Planner agent for Shimano APAC's autonomous S&OP system, acting as a concise, "
+    "practical conversational assistant to a human supply-chain planner. Ground your answers in "
+    "S&OP and supply-chain planning best practice.\n\n"
+    "By default, answer general planning questions directly. If the user refers to a specific "
+    "planning run / cycle / session (its status, plan, steps, KPIs, or decisions), use the tools "
+    "to look up real data — never fabricate run-specific numbers. Use list_sessions to discover "
+    "what runs exist. If it is ambiguous which session the user means (e.g. several exist and they "
+    "didn't specify), ask them to clarify and show the available sessions by name. Only call "
+    "get_session_context once you know which session. Keep replies short unless asked for detail."
+)
+
+CHAT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_sessions",
+            "description": "List planning runs/sessions (newest first) with id, name, status and a goal excerpt.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_session_context",
+            "description": "Get full context for one planning session: goal, status, KPIs, steps, and any pending decision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "The session_id to look up."},
+                },
+                "required": ["session_id"],
+            },
+        },
+    },
+]
+
+
+def _chat_list_sessions() -> list[dict]:
+    ordered = sorted(sessions.values(), key=lambda s: s.created_at, reverse=True)
+    return [{
+        "session_id": s.session_id,
+        "name": s.name,
+        "status": s.status,
+        "created_at": s.created_at,
+        "goal": (s.goal or "")[:200],
+    } for s in ordered]
+
+
+def _chat_get_session_context(session_id: str) -> dict:
+    s = sessions.get(session_id)
+    if s is None:
+        return {"error": f"No session with id '{session_id}'. Use list_sessions to see valid ids."}
+    steps = [{
+        "label": st.get("label"),
+        "agent": st.get("agent"),
+        "status": st.get("status"),
+    } for st in list(s.steps.values())[:60]]
+    return {
+        "session_id": s.session_id,
+        "name": s.name,
+        "goal": s.goal,
+        "status": s.status,
+        "elapsed": round(s.elapsed(), 1),
+        "kpis": s.kpis,
+        "pending_question": s.pending_question,
+        "steps": steps,
+    }
+
+
+def _chat_dispatch(name: str, args: dict):
+    if name == "list_sessions":
+        return _chat_list_sessions()
+    if name == "get_session_context":
+        return _chat_get_session_context(args.get("session_id", ""))
+    return {"error": f"Unknown tool '{name}'"}
+
+
+@app.post("/api/chat")
+async def planner_chat(body: ChatBody):
+    """Conversational planner assistant with tool access to session data."""
+    try:
+        from orchestrator import get_client, DEPLOYMENT
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
+
+    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+    for m in body.messages[-20:]:  # keep recent history bounded
+        if m.role in ("user", "assistant") and m.content:
+            messages.append({"role": m.role, "content": m.content})
+
+    loop = asyncio.get_event_loop()
+    try:
+        for _ in range(5):  # bounded tool-calling loop
+            resp = await loop.run_in_executor(
+                None,
+                lambda msgs=messages: get_client().chat.completions.create(
+                    model=DEPLOYMENT,
+                    messages=msgs,
+                    tools=CHAT_TOOLS,
+                    tool_choice="auto",
+                    temperature=0.4,
+                    max_completion_tokens=700,
+                ),
+            )
+            msg = resp.choices[0].message
+            if not msg.tool_calls:
+                return {"reply": (msg.content or "").strip()}
+
+            messages.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [{
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                } for tc in msg.tool_calls],
+            })
+            for tc in msg.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                result = _chat_dispatch(tc.function.name, args)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps(result, default=str),
+                })
+
+        return {"reply": "I wasn't able to complete that — could you rephrase or be more specific?"}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
 
 
 @app.get("/api/health")

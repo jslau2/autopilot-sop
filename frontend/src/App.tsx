@@ -6,6 +6,7 @@ import AgentConsole from './pages/AgentConsole';
 import AgentSettings from './pages/AgentSettings';
 import AgentManager from './pages/AgentManager';
 import DataSources from './pages/DataSources';
+import PlannerChat from './components/PlannerChat';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/manager" element={<AgentManager />} />
         <Route path="/datasources" element={<DataSources />} />
       </Routes>
+      <PlannerChat />
     </>
   );
 }
