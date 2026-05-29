@@ -42,9 +42,7 @@ function StepCard({ step, laneIndex, pxPerSec, elapsedT, onClick }: StepCardProp
     <div
       className={`step-card${statusClass}`}
       style={{
-        position: 'absolute',
-        left,
-        top,
+        position: 'absolute', left, top,
         width: step.endT != null ? width : undefined,
         minWidth: step.endT == null ? 80 : undefined,
         '--ac': color,
@@ -73,6 +71,68 @@ function StepCard({ step, laneIndex, pxPerSec, elapsedT, onClick }: StepCardProp
   );
 }
 
+interface ConnectorsProps {
+  stepsArr: Step[];
+  steps: Record<string, Step>;
+  pxPerSec: number;
+  elapsedT: number;
+}
+
+function Connectors({ stepsArr, steps, pxPerSec, elapsedT }: ConnectorsProps) {
+  const paths: React.ReactNode[] = [];
+
+  for (const step of stepsArr) {
+    if (!step.deps || step.deps.length === 0) continue;
+    const toLaneIdx = AGENT_ORDER.indexOf(step.agent);
+    if (toLaneIdx < 0) continue;
+    const toX = step.startT * pxPerSec;
+    const toY = toLaneIdx * LANE_H + LANE_H / 2;
+    const color = AGENTS[step.agent]?.color ?? 'var(--text-3)';
+
+    for (const depId of step.deps) {
+      const dep = steps[depId];
+      if (!dep) continue;
+      const fromLaneIdx = AGENT_ORDER.indexOf(dep.agent);
+      if (fromLaneIdx < 0) continue;
+      const fromX = (dep.endT ?? elapsedT) * pxPerSec;
+      const fromY = fromLaneIdx * LANE_H + LANE_H / 2;
+
+      const cpOffset = Math.max(Math.abs(toX - fromX) * 0.45, 30);
+      const d = `M ${fromX} ${fromY} C ${fromX + cpOffset} ${fromY}, ${toX - cpOffset} ${toY}, ${toX} ${toY}`;
+
+      paths.push(
+        <path
+          key={`${depId}->${step.id}`}
+          d={d}
+          fill="none"
+          style={{ stroke: color, color }}
+          strokeWidth={1.5}
+          strokeOpacity={0.4}
+          markerEnd="url(#sw-arrow)"
+        />
+      );
+    }
+  }
+
+  return (
+    <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+      <defs>
+        <marker id="sw-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill="currentColor" />
+        </marker>
+      </defs>
+      {paths}
+    </svg>
+  );
+}
+
+const zoomBtnStyle: React.CSSProperties = {
+  background: 'var(--bg-card)', border: '1px solid var(--border)',
+  color: 'var(--text-2)', borderRadius: 4, cursor: 'pointer',
+  fontSize: 13, padding: '2px 7px', lineHeight: 1.4,
+  transition: 'border-color 0.1s, color 0.1s',
+};
+
 export default function Swimlane() {
   const { steps, stepsArr, elapsedT, setSelectedStepId } = useDashboard();
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
@@ -92,7 +152,6 @@ export default function Swimlane() {
     setPxPerSec(Math.max(8, (containerW - 40) / maxT));
   }, [maxT]);
 
-  // Ctrl+scroll to zoom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -105,7 +164,6 @@ export default function Swimlane() {
     return () => el.removeEventListener('wheel', handler);
   }, [zoom]);
 
-  // Keyboard: + - = 0
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
@@ -162,16 +220,16 @@ export default function Swimlane() {
           <div style={{ position: 'relative', width: totalWidth, height: AGENT_ORDER.length * LANE_H }}>
             {/* Lane backgrounds */}
             {AGENT_ORDER.map((agentId, i) => (
-              <div
-                key={agentId}
-                style={{
-                  position: 'absolute', left: 0, right: 0,
-                  top: i * LANE_H, height: LANE_H,
-                  background: i % 2 === 0 ? 'transparent' : 'oklch(0 0 0 / 0.03)',
-                  borderBottom: '1px solid var(--border-s)',
-                }}
-              />
+              <div key={agentId} style={{
+                position: 'absolute', left: 0, right: 0,
+                top: i * LANE_H, height: LANE_H,
+                background: i % 2 === 0 ? 'transparent' : 'oklch(0 0 0 / 0.03)',
+                borderBottom: '1px solid var(--border-s)',
+              }} />
             ))}
+
+            {/* Dependency connectors — rendered below cards */}
+            <Connectors stepsArr={stepsArr} steps={steps} pxPerSec={pxPerSec} elapsedT={elapsedT} />
 
             {/* Time cursor */}
             <div style={{
@@ -200,10 +258,3 @@ export default function Swimlane() {
     </div>
   );
 }
-
-const zoomBtnStyle: React.CSSProperties = {
-  background: 'var(--bg-card)', border: '1px solid var(--border)',
-  color: 'var(--text-2)', borderRadius: 4, cursor: 'pointer',
-  fontSize: 13, padding: '2px 7px', lineHeight: 1.4,
-  transition: 'border-color 0.1s, color 0.1s',
-};
