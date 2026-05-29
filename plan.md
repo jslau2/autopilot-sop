@@ -20,22 +20,29 @@ Today the structure fights the mental model:
 
 ## Plan / checklist
 
-- [ ] **1. Persistent app shell (top nav)** — one consistent header across the
-  browse/config pages: `Logo · Cycles · Agents · Data · [demo/live]`. Removes
-  per-page headers and the "back Home to navigate" friction.
-- [ ] **2. Home reframe** — Planning Cycles stays primary (done earlier).
-  Replace the 4 big cards with a compact secondary nav to **Agents** and **Data
-  Sources**; drop the Pipeline View and Agent Console cards.
+- [x] **1. Persistent app shell (top nav)** — one consistent header across the
+  browse/config pages: `Logo · Cycles · Agent Console · Agents · Data ·
+  [demo/live]`. Removes per-page headers and the "back Home to navigate"
+  friction. (Pipeline keeps its own workspace toolbar; Agent Console keeps its
+  own header pending its rework.)
+- [x] **2. Home reframe** — Planning Cycles primary; brand de-duplicated into
+  the shell; the 4 big cards become 3 compact cards (**Agent Console**,
+  **Agents**, **Data Sources**). Pipeline View dropped as a card (reached by
+  opening a cycle).
 - [x] **3. Keep Agent Console as a first-class destination** — (revised) NOT
   merged or retired. It stays a standalone top-level page and gains a slot in
   the app-shell nav. Future ambition: a live, cross-user view of every agent
   actively working (a fleet/ops monitor as the app gains many users). Its
   nav links updated to the new structure.
-- [ ] **4. Merge Agent Settings + Agent Manager into an "Agents" hub** — one
+- [x] **4. Merge Agent Settings + Agent Manager into an "Agents" hub** — one
   page at `/agents` with tabs: **Configure** (prompts/models) and **Performance
   & Governance** (analytics). Old `/settings` and `/manager` redirect here.
-- [ ] **5. Breadcrumbs + consistent naming** — e.g. `Cycles › Q3-2026 APAC ›
-  Swimlane`, so the user always knows where they are and can climb back.
+- [x] **5. Breadcrumbs + consistent naming** — pipeline shows `Cycles › <cycle
+  name> › <view>`, so the user always knows where they are and can climb back.
+
+## Deferred (follow-ups)
+- Agent Console adopting the AppShell (kept its own header for now; pending its
+  planned rework into a live cross-user activity view).
 
 ## Non-goals (this branch)
 - Wiring Agent Settings edits to actually affect live runs (kept as todo).
