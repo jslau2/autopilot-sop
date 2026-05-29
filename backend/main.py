@@ -209,7 +209,11 @@ CHAT_SYSTEM_PROMPT = (
     "to look up real data — never fabricate run-specific numbers. Use list_sessions to discover "
     "what runs exist. If it is ambiguous which session the user means (e.g. several exist and they "
     "didn't specify), ask them to clarify and show the available sessions by name. Only call "
-    "get_session_context once you know which session. Keep replies short unless asked for detail."
+    "get_session_context once you know which session. Keep replies short unless asked for detail.\n\n"
+    "You can also ACT on the user's behalf: start_cycle launches a new planning run, and "
+    "answer_decision submits a human decision to a run that is paused awaiting one. Only take these "
+    "actions when the user clearly asks; for answer_decision, confirm which session and option first "
+    "if there's any ambiguity. After acting, briefly state what you did (include the run name)."
 )
 
 CHAT_TOOLS = [
@@ -232,6 +236,35 @@ CHAT_TOOLS = [
                     "session_id": {"type": "string", "description": "The session_id to look up."},
                 },
                 "required": ["session_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "start_cycle",
+            "description": "Start a NEW S&OP planning cycle/run. Use only when the user explicitly asks to start/launch a run.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "Planning goal/scope for the run. Optional — a sensible default is used if omitted."},
+                    "name": {"type": "string", "description": "Optional short name for the cycle."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "answer_decision",
+            "description": "Submit a human decision to a run that is PAUSED awaiting one. Use only when the user states their decision.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "The session_id of the paused run."},
+                    "answer": {"type": "string", "description": "The decision text / chosen option."},
+                },
+                "required": ["session_id", "answer"],
             },
         },
     },
@@ -270,11 +303,36 @@ def _chat_get_session_context(session_id: str) -> dict:
     }
 
 
-def _chat_dispatch(name: str, args: dict):
+def _chat_start_cycle(goal: str, name: str) -> dict:
+    """Create + launch a new session (same as POST /api/sessions)."""
+    goal = (goal or "").strip() or DEFAULT_GOAL
+    session_id = str(uuid.uuid4())
+    nm = (name or "").strip() or _derive_session_name(goal, session_id)
+    session = SessionState(session_id=session_id, name=nm, goal=goal)
+    sessions[session_id] = session
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    return {"session_id": session_id, "name": nm, "status": "running", "started": True}
+
+
+async def _chat_answer_decision(session_id: str, answer: str) -> dict:
+    s = sessions.get(session_id)
+    if s is None:
+        return {"error": f"No session with id '{session_id}'. Use list_sessions to see valid ids."}
+    if s.status != "paused" or s.pending_question is None:
+        return {"error": f"Session '{s.name}' is not awaiting a decision (status: {s.status})."}
+    await s.set_answer(answer)
+    return {"session_id": session_id, "name": s.name, "answer": answer, "submitted": True}
+
+
+async def _chat_dispatch(name: str, args: dict):
     if name == "list_sessions":
         return _chat_list_sessions()
     if name == "get_session_context":
         return _chat_get_session_context(args.get("session_id", ""))
+    if name == "start_cycle":
+        return _chat_start_cycle(args.get("goal", ""), args.get("name", ""))
+    if name == "answer_decision":
+        return await _chat_answer_decision(args.get("session_id", ""), args.get("answer", ""))
     return {"error": f"Unknown tool '{name}'"}
 
 
@@ -323,7 +381,7 @@ async def planner_chat(body: ChatBody):
                     args = json.loads(tc.function.arguments or "{}")
                 except json.JSONDecodeError:
                     args = {}
-                result = _chat_dispatch(tc.function.name, args)
+                result = await _chat_dispatch(tc.function.name, args)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,

@@ -28,9 +28,9 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   counts; swap the scripted sim for real data and add session/user grouping &
   filters. Needs auth/user identity for the multi-user dimension.
 
-- [ ] **Actionable chat** — give the planner chat write tools (start a cycle,
-  answer a pending decision) so it can act, not just advise. Currently
-  read-only (`list_sessions`, `get_session_context`).
+- [x] **Actionable chat** — the planner chat now has write tools: `start_cycle`
+  (launch a run) and `answer_decision` (submit a decision to a paused run),
+  alongside the read tools. Prompt-gated to act only on clear user intent.
 - [ ] **What-if scenario branching** — clone an existing run with tweaked
   constraints (e.g. Supplier X lead time, SPL-L3 capacity) to compare outcomes.
   Pairs with Run comparison.
