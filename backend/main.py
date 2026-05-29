@@ -436,6 +436,47 @@ async def reset_agent_config(agent_id: str):
     return cfg
 
 
+@app.get("/api/activity")
+async def activity():
+    """Cross-session agent activity for the live Agent Console (fleet view).
+    Aggregates every session's steps into per-agent status + the runs each agent
+    is currently working in. (Multi-user grouping is future work — needs auth.)"""
+    agents: dict[str, dict] = {}
+    runs = []
+    for s in sessions.values():
+        running_here = []
+        for st in s.steps.values():
+            aid = st.get("agent", "")
+            if not aid:
+                continue
+            a = agents.setdefault(aid, {"agent_id": aid, "active_sessions": [], "done_count": 0})
+            if st.get("status") == "running":
+                a["active_sessions"].append({
+                    "session_id": s.session_id, "name": s.name, "label": st.get("label", ""),
+                })
+                running_here.append(aid)
+            elif st.get("status") == "done":
+                a["done_count"] += 1
+        if s.status in ("running", "paused"):
+            runs.append({
+                "session_id": s.session_id, "name": s.name, "status": s.status,
+                "entity": s.entity, "running_agents": sorted(set(running_here)),
+            })
+    agent_list = [{
+        "agent_id": a["agent_id"],
+        "active_count": len(a["active_sessions"]),
+        "active_sessions": a["active_sessions"],
+        "done_count": a["done_count"],
+    } for a in agents.values()]
+    totals = {
+        "active_agents": sum(1 for a in agent_list if a["active_count"] > 0),
+        "running_sessions": sum(1 for s in sessions.values() if s.status == "running"),
+        "paused_sessions": sum(1 for s in sessions.values() if s.status == "paused"),
+        "total_sessions": len(sessions),
+    }
+    return {"agents": agent_list, "runs": sorted(runs, key=lambda r: r["name"]), "totals": totals}
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
