@@ -1,0 +1,161 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { suggestName } from '../hooks/useLaunchCycle';
+
+export const DEFAULT_GOAL = `Q3-2026 S&OP Planning Cycle — Shimano APAC Manufacturing
+Scope: 847 SKUs, 12 plants (SPL + SBMB), planning horizon W22–W34 (13 weeks)
+Targets: OTIF ≥ 98%, Gross Margin ≥ 22%, Weeks of Supply 4–5 wks
+Data sources: SAP S/4HANA, Supplier Portal, Tooling Asset Register
+Constraints: Line 4 bottleneck (SPL-L3 at 92%), Supplier X lead-time extension (8 weeks)`;
+
+export default function LaunchConfig({
+  demoMode,
+  onClose,
+  onLaunch,
+}: {
+  demoMode: boolean;
+  onClose: () => void;
+  onLaunch: (goal: string, name: string) => void;
+}) {
+  const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const [name, setName] = useState(() => suggestName(DEFAULT_GOAL));
+  const [nameTouched, setNameTouched] = useState(false);
+  const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
+
+  // Keep the suggested name in sync with the goal until the user edits it.
+  const onGoalChange = (v: string) => {
+    setGoal(v);
+    if (!nameTouched) setName(suggestName(v));
+  };
+
+  const launch = () => {
+    if (!goal.trim()) return;
+    onLaunch(goal, name.trim());
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'oklch(0.08 0.01 250 / 0.72)',
+        backdropFilter: 'blur(6px)',
+        padding: 32,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 560,
+          background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+          borderRadius: 14, padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 20,
+          boxShadow: '0 24px 64px oklch(0.04 0.01 250 / 0.7)',
+          maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
+        }}
+      >
+        {/* Header */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px',
+              borderRadius: 4, border: '1px solid',
+              ...(demoMode
+                ? { color: 'oklch(0.75 0.18 145)', background: 'oklch(0.45 0.12 145 / 0.12)', borderColor: 'oklch(0.45 0.12 145 / 0.4)' }
+                : { color: 'oklch(0.75 0.18 260)', background: 'oklch(0.55 0.18 260 / 0.12)', borderColor: 'oklch(0.55 0.18 260 / 0.4)' }),
+            }}>
+              {demoMode ? 'DEMO MODE' : 'LIVE MODE'}
+            </span>
+            <Link to="/" style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none' }}>
+              Switch mode →
+            </Link>
+            <button
+              onClick={onClose}
+              style={{
+                marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-3)', fontSize: 18, lineHeight: 1, padding: 2,
+              }}
+              aria-label="Close"
+            >×</button>
+          </div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0, lineHeight: 1.2 }}>
+            New Planning Cycle
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>
+            {demoMode
+              ? 'Runs a scripted simulation — no backend required.'
+              : 'Dispatches real AI agents via Azure OpenAI — backend must be running.'}
+          </p>
+        </div>
+
+        {/* Cycle name */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+            CYCLE NAME
+          </label>
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setNameTouched(true); }}
+            placeholder="Auto-named from goal if left blank"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--bg-base)', border: '1px solid var(--border)',
+              borderRadius: 7, padding: '9px 12px',
+              fontSize: 13, color: 'var(--text-1)', outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Goal editor */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+            PLANNING GOAL
+          </label>
+          <textarea
+            value={goal}
+            onChange={e => onGoalChange(e.target.value)}
+            rows={6}
+            autoFocus
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: 'var(--bg-base)', border: '1px solid var(--border)',
+              borderRadius: 7, padding: '10px 12px',
+              fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-1)',
+              resize: 'vertical', lineHeight: 1.6, outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Scope chips */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
+            SCOPE
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {['847 SKUs', '12 plants', 'W22–W34 horizon', 'SAP S/4HANA', 'Supplier Portal', 'OTIF ≥ 98%', 'Margin ≥ 22%'].map(chip => (
+              <span key={chip} style={{
+                fontSize: 11, padding: '3px 9px', borderRadius: 20,
+                background: 'var(--bg-base)', border: '1px solid var(--border)',
+                color: 'var(--text-2)',
+              }}>{chip}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Launch button */}
+        <button
+          onClick={launch}
+          disabled={!goal.trim()}
+          style={{
+            padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
+            background: accentColor, color: '#fff', border: 'none', cursor: 'pointer',
+            opacity: goal.trim() ? 1 : 0.5, transition: 'opacity 0.15s',
+            boxShadow: `0 4px 16px ${accentColor.replace(')', ' / 0.35)')}`,
+          }}
+        >
+          {demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
+        </button>
+      </div>
+    </div>
+  );
+}

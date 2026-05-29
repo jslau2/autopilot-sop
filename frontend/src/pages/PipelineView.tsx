@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardContext } from '../context/DashboardContext';
 import { useSimulation } from '../hooks/useSimulation';
 import { useLiveSession } from '../hooks/useLiveSession';
+import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import Sidebar from '../components/Sidebar';
 import Swimlane from '../components/Swimlane';
 import Timeline from '../components/Timeline';
@@ -11,109 +12,222 @@ import EventStream from '../components/EventStream';
 import TourOverlay from '../components/TourOverlay';
 import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
+import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import type { KPIs } from '../types';
 
-const DEFAULT_GOAL = `Q3-2026 S&OP Planning Cycle — Shimano APAC Manufacturing
-Scope: 847 SKUs, 12 plants (SPL + SBMB), planning horizon W22–W34 (13 weeks)
-Targets: OTIF ≥ 98%, Gross Margin ≥ 22%, Weeks of Supply 4–5 wks
-Data sources: SAP S/4HANA, Supplier Portal, Tooling Asset Register
-Constraints: Line 4 bottleneck (SPL-L3 at 92%), Supplier X lead-time extension (8 weeks)`;
+type SessionMeta = {
+  session_id: string;
+  name: string;
+  goal: string;
+  status: string;
+  created_at: number;
+  elapsed: number;
+  kpis: Record<string, string | number | null>;
+  step_count: number;
+};
 
-function LaunchConfig({ demoMode, onLaunch }: { demoMode: boolean; onLaunch: (goal: string) => void }) {
-  const [goal, setGoal] = useState(DEFAULT_GOAL);
-  const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
+function relativeTime(epochSec: number): string {
+  const secs = Math.max(0, Date.now() / 1000 - epochSec);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+const isDemoMode = () => localStorage.getItem('sop-demo-mode') !== 'false';
+
+// ---------------------------------------------------------------------------
+// Router shell — decides between landing (no session) and a run view.
+// ---------------------------------------------------------------------------
+export default function PipelineView() {
+  const { sessionId } = useParams();
+  const demoMode = isDemoMode();
+
+  if (!sessionId) {
+    return <PipelineLanding demoMode={demoMode} />;
+  }
+  // key forces a clean remount (fresh hook state + reconnect) when switching.
+  return <PipelineRun key={sessionId} sessionId={sessionId} demoMode={demoMode} />;
+}
+
+// ---------------------------------------------------------------------------
+// Landing / empty state — the consistent entry point: nothing runs until the
+// user clicks "+ New Cycle".
+// ---------------------------------------------------------------------------
+function PipelineLanding({ demoMode }: { demoMode: boolean }) {
+  const navigate = useNavigate();
+  const launch = useLaunchCycle();
+  const [showLaunch, setShowLaunch] = useState(false);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+
+  useEffect(() => {
+    if (demoMode) return;
+    fetch('/api/sessions')
+      .then(r => (r.ok ? r.json() : { sessions: [] }))
+      .then(d => setSessions(d.sessions ?? []))
+      .catch(() => setSessions([]));
+  }, [demoMode]);
+
+  const accent = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'oklch(0.08 0.01 250 / 0.72)',
-      backdropFilter: 'blur(6px)',
-      padding: 32,
-    }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', flexDirection: 'column' }}>
       <div style={{
-        width: '100%', maxWidth: 560,
-        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
-        borderRadius: 14, padding: '32px 36px', display: 'flex', flexDirection: 'column', gap: 22,
-        boxShadow: '0 24px 64px oklch(0.04 0.01 250 / 0.7)',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px',
+        borderBottom: '1px solid var(--border-subtle)',
       }}>
-        {/* Header */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px',
-              borderRadius: 4, border: '1px solid',
-              ...(demoMode
-                ? { color: 'oklch(0.75 0.18 145)', background: 'oklch(0.45 0.12 145 / 0.12)', borderColor: 'oklch(0.45 0.12 145 / 0.4)' }
-                : { color: 'oklch(0.75 0.18 260)', background: 'oklch(0.55 0.18 260 / 0.12)', borderColor: 'oklch(0.55 0.18 260 / 0.4)' }),
-            }}>
-              {demoMode ? 'DEMO MODE' : 'LIVE MODE'}
-            </span>
-            <Link to="/" style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none' }}>
-              Switch mode →
-            </Link>
-          </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0, lineHeight: 1.2 }}>
-            Launch S&amp;OP Planning Cycle
-          </h2>
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6, marginBottom: 0 }}>
-            {demoMode
-              ? 'Runs a scripted simulation — no backend required.'
-              : 'Dispatches real AI agents via Azure OpenAI — backend must be running.'}
+        <Link to="/" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>⌂ Home</Link>
+        <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>Pipeline View</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '2px 7px', borderRadius: 4,
+          color: demoMode ? 'oklch(0.75 0.18 145)' : 'oklch(0.75 0.18 260)',
+          border: `1px solid ${accent.replace(')', ' / 0.4)')}`,
+          background: accent.replace(')', ' / 0.12)'),
+        }}>{demoMode ? 'DEMO' : 'LIVE'}</span>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 28 }}>
+        <div style={{ textAlign: 'center', maxWidth: 460 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>
+            No active planning cycle
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--text-3)', marginTop: 8 }}>
+            Start a new S&amp;OP cycle to dispatch the agent pipeline
+            {demoMode ? ' as a scripted simulation.' : ', or resume one of your running sessions below.'}
           </p>
         </div>
 
-        {/* Goal editor */}
-        <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
-            PLANNING GOAL
-          </label>
-          <textarea
-            value={goal}
-            onChange={e => setGoal(e.target.value)}
-            rows={6}
-            autoFocus
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: 'var(--bg-base)', border: '1px solid var(--border)',
-              borderRadius: 7, padding: '10px 12px',
-              fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-1)',
-              resize: 'vertical', lineHeight: 1.6,
-              outline: 'none',
-            }}
-          />
-        </div>
+        <button
+          onClick={() => setShowLaunch(true)}
+          style={{
+            padding: '13px 28px', borderRadius: 9, fontSize: 15, fontWeight: 700,
+            background: accent, color: '#fff', border: 'none', cursor: 'pointer',
+            boxShadow: `0 4px 18px ${accent.replace(')', ' / 0.4)')}`,
+          }}
+        >+ New Cycle</button>
 
-        {/* Scope chips */}
-        <div>
-          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
-            SCOPE
-          </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {['847 SKUs', '12 plants', 'W22–W34 horizon', 'SAP S/4HANA', 'Supplier Portal', 'OTIF ≥ 98%', 'Margin ≥ 22%'].map(chip => (
-              <span key={chip} style={{
-                fontSize: 11, padding: '3px 9px', borderRadius: 20,
-                background: 'var(--bg-base)', border: '1px solid var(--border)',
-                color: 'var(--text-2)',
-              }}>{chip}</span>
+        {!demoMode && sessions.length > 0 && (
+          <div style={{ width: '100%', maxWidth: 620, marginTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', marginBottom: 10 }}>
+              RECENT CYCLES
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {sessions.map(s => (
+                <button
+                  key={s.session_id}
+                  onClick={() => navigate(`/pipeline/${s.session_id}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                    padding: '12px 16px', borderRadius: 9, cursor: 'pointer',
+                    background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: s.status === 'running' ? 'oklch(0.7 0.17 145)'
+                      : s.status === 'paused' ? 'oklch(0.78 0.15 75)'
+                      : 'var(--text-3)',
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {s.name || s.session_id.slice(0, 8)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      {s.step_count} steps · {relativeTime(s.created_at)}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+                    color: s.status === 'running' ? 'oklch(0.75 0.17 145)' : 'var(--text-3)',
+                    background: 'var(--bg-base)', border: '1px solid var(--border)',
+                  }}>{s.status}</span>
+                  <span style={{ color: 'var(--text-3)' }}>→</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showLaunch && (
+        <LaunchConfig
+          demoMode={demoMode}
+          onClose={() => setShowLaunch(false)}
+          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session switcher dropdown (live mode) — lists sessions, navigates on select.
+// ---------------------------------------------------------------------------
+function SessionSwitcher({ current }: { current: string }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/sessions')
+      .then(r => (r.ok ? r.json() : { sessions: [] }))
+      .then(d => setSessions(d.sessions ?? []))
+      .catch(() => setSessions([]));
+  }, [open]);
+
+  const currentMeta = sessions.find(s => s.session_id === current);
+  const label = currentMeta?.name || `Cycle ${current.slice(0, 8)}`;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        className="cfg-toolbar-btn"
+        onClick={() => setOpen(o => !o)}
+        style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        title="Switch session"
+      >
+        ⇄ {label} ▾
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+          <div style={{
+            position: 'absolute', top: '110%', right: 0, zIndex: 100, width: 280,
+            background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 9,
+            boxShadow: '0 12px 32px oklch(0.04 0.01 250 / 0.55)', padding: 6,
+            maxHeight: 360, overflowY: 'auto',
+          }}>
+            {sessions.length === 0 && (
+              <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>No sessions</div>
+            )}
+            {sessions.map(s => (
+              <button
+                key={s.session_id}
+                onClick={() => { setOpen(false); if (s.session_id !== current) navigate(`/pipeline/${s.session_id}`); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 9, width: '100%', textAlign: 'left',
+                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer', border: 'none',
+                  background: s.session_id === current ? 'var(--bg-base)' : 'transparent',
+                }}
+              >
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: s.status === 'running' ? 'oklch(0.7 0.17 145)'
+                    : s.status === 'paused' ? 'oklch(0.78 0.15 75)' : 'var(--text-3)',
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.name || s.session_id.slice(0, 8)}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{relativeTime(s.created_at)}</div>
+                </div>
+                {s.session_id === current && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>current</span>}
+              </button>
             ))}
           </div>
-        </div>
-
-        {/* Launch button */}
-        <button
-          onClick={() => onLaunch(goal)}
-          disabled={!goal.trim()}
-          style={{
-            padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
-            background: accentColor,
-            color: '#fff', border: 'none', cursor: 'pointer',
-            opacity: goal.trim() ? 1 : 0.5, transition: 'opacity 0.15s',
-            boxShadow: `0 4px 16px ${accentColor.replace(')', ' / 0.35)')}`,
-          }}
-        >
-          {demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
-        </button>
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -141,20 +255,33 @@ function KPIBar({ kpis }: { kpis: KPIs }) {
   );
 }
 
-export default function PipelineView() {
+// ---------------------------------------------------------------------------
+// The actual run view — bound to a single session id.
+// ---------------------------------------------------------------------------
+function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boolean }) {
+  const location = useLocation();
+  const launch = useLaunchCycle();
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'swimlane' | 'timeline'>('swimlane');
-  const [activeSessionId, setActiveSessionId] = useState('sess-001');
   const [showConfig, setShowConfig] = useState(false);
+  const [showLaunch, setShowLaunch] = useState(false);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
 
-  const demoMode = localStorage.getItem('sop-demo-mode') !== 'false';
-
-  // Both hooks always called (Rules of Hooks). Live session gates on !demoMode.
+  // Both hooks always called (Rules of Hooks). Live connects only when not demo.
   const simResult  = useSimulation(demoMode ? 0.5 : 0);
-  const liveResult = useLiveSession(!demoMode);
-  const { S, answerQuestion, terminateSession, setManualPause, started, startSession } = demoMode ? simResult : liveResult;
+  const liveResult = useLiveSession(demoMode ? undefined : sessionId);
+  const { S, answerQuestion, terminateSession, setManualPause, startSession } = demoMode ? simResult : liveResult;
+
+  // Demo: kick off the scripted simulation once on mount.
+  const launchedRef = useRef(false);
+  useEffect(() => {
+    if (demoMode && !launchedRef.current) {
+      launchedRef.current = true;
+      const goal = (location.state as { goal?: string } | null)?.goal ?? DEFAULT_GOAL;
+      startSession(goal);
+    }
+  }, [demoMode, startSession, location.state]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -187,8 +314,8 @@ export default function PipelineView() {
     setSelectedStepId,
     viewMode,
     setViewMode,
-    activeSessionId,
-    setActiveSessionId,
+    activeSessionId: sessionId,
+    setActiveSessionId: () => {},
     kpis: S.kpis,
     paused: S.paused,
     manualPause: S.manualPause,
@@ -200,7 +327,6 @@ export default function PipelineView() {
   };
 
   return (
-    <>
     <DashboardContext.Provider value={ctxValue}>
       <div className="app">
         <Sidebar />
@@ -223,6 +349,12 @@ export default function PipelineView() {
               >
                 {demoMode ? 'DEMO' : 'LIVE'}
               </Link>
+              {!demoMode && <SessionSwitcher current={sessionId} />}
+              <button
+                className="cfg-toolbar-btn"
+                onClick={() => setShowLaunch(true)}
+                style={{ fontWeight: 700 }}
+              >+ New Cycle</button>
               <button
                 className={`view-btn${viewMode === 'swimlane' ? ' is-active' : ''}`}
                 onClick={() => setViewMode('swimlane')}
@@ -276,10 +408,15 @@ export default function PipelineView() {
           />
         )}
         {showConfig && <CapacityConfigModal onClose={() => setShowConfig(false)} />}
+        {showLaunch && (
+          <LaunchConfig
+            demoMode={demoMode}
+            onClose={() => setShowLaunch(false)}
+            onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+          />
+        )}
         {showTour && <TourOverlay onClose={closeTour} />}
       </div>
     </DashboardContext.Provider>
-    {!started && <LaunchConfig demoMode={demoMode} onLaunch={startSession} />}
-    </>
   );
 }

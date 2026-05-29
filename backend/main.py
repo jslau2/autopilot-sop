@@ -63,10 +63,23 @@ Constraints: Line 4 bottleneck (SPL-L3 at 92%), Supplier X lead-time extension (
 # ---------------------------------------------------------------------------
 class StartSession(BaseModel):
     goal: str = DEFAULT_GOAL
+    name: str = ""
 
 
 class AnswerBody(BaseModel):
     answer: str
+
+
+def _derive_session_name(goal: str, session_id: str) -> str:
+    """
+    Heuristic fallback name from the goal text: prefer the first non-empty line,
+    trimmed to a sensible length. Falls back to a short session id.
+    """
+    for line in (goal or "").splitlines():
+        line = line.strip()
+        if line:
+            return line[:60]
+    return f"Cycle {session_id[:8]}"
 
 
 # ---------------------------------------------------------------------------
@@ -143,8 +156,29 @@ async def health_check():
     }
 
 
-# IMPORTANT: /api/sessions/current MUST be defined before /api/sessions/{session_id}
-# to prevent FastAPI from matching "current" as a session_id.
+# IMPORTANT: /api/sessions/current and the list endpoint MUST be defined before
+# /api/sessions/{session_id} to prevent FastAPI from matching "current" as a session_id.
+
+def _session_summary(s: SessionState) -> dict:
+    """Lightweight metadata for switcher / home listing."""
+    return {
+        "session_id": s.session_id,
+        "name": s.name,
+        "goal": s.goal,
+        "status": s.status,
+        "created_at": s.created_at,
+        "elapsed": s.elapsed(),
+        "kpis": s.kpis,
+        "step_count": len(s.steps),
+    }
+
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """List all sessions, newest first — drives the session switcher and home page."""
+    ordered = sorted(sessions.values(), key=lambda s: s.created_at, reverse=True)
+    return {"sessions": [_session_summary(s) for s in ordered]}
+
 
 @app.get("/api/sessions/current")
 async def get_current_session():
@@ -154,12 +188,7 @@ async def get_current_session():
 
     # Find the most recently created session
     latest = max(sessions.values(), key=lambda s: s.created_at)
-    return {
-        "session_id": latest.session_id,
-        "status": latest.status,
-        "created_at": latest.created_at,
-        "kpis": latest.kpis,
-    }
+    return _session_summary(latest)
 
 
 @app.post("/api/sessions")
@@ -169,7 +198,8 @@ async def create_session(body: StartSession):
     Returns the session_id immediately; use the SSE endpoint to stream progress.
     """
     session_id = str(uuid.uuid4())
-    session = SessionState(session_id=session_id)
+    name = (body.name or "").strip() or _derive_session_name(body.goal, session_id)
+    session = SessionState(session_id=session_id, name=name, goal=body.goal)
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
@@ -178,6 +208,7 @@ async def create_session(body: StartSession):
 
     return {
         "session_id": session_id,
+        "name": name,
         "status": "running",
         "message": "S&OP session started. Connect to SSE endpoint to stream events.",
     }
@@ -213,6 +244,8 @@ async def get_session(session_id: str):
 
     return {
         "session_id": session.session_id,
+        "name": session.name,
+        "goal": session.goal,
         "status": session.status,
         "elapsed": session.elapsed(),
         "kpis": session.kpis,

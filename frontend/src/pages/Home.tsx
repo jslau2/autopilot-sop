@@ -1,6 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
+import LaunchConfig from '../components/LaunchConfig';
+import { useLaunchCycle } from '../hooks/useLaunchCycle';
+
+type LiveSession = {
+  session_id: string;
+  name: string;
+  status: string;
+  created_at: number;
+  kpis: Record<string, string | number | null>;
+  step_count: number;
+};
+
+function relTime(epochSec: number): string {
+  const secs = Math.max(0, Date.now() / 1000 - epochSec);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
 
 const SESSIONS = [
   {
@@ -39,12 +58,24 @@ export default function Home() {
   const [demoMode, setDemoMode] = useState(
     () => localStorage.getItem('sop-demo-mode') !== 'false'
   );
+  const [showLaunch, setShowLaunch] = useState(false);
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const launch = useLaunchCycle();
 
   const toggleMode = () => {
     const next = !demoMode;
     setDemoMode(next);
     localStorage.setItem('sop-demo-mode', String(next));
   };
+
+  // In live mode, the cycle list reflects real backend sessions.
+  useEffect(() => {
+    if (demoMode) { setLiveSessions([]); return; }
+    fetch('/api/sessions')
+      .then(r => (r.ok ? r.json() : { sessions: [] }))
+      .then(d => setLiveSessions(d.sessions ?? []))
+      .catch(() => setLiveSessions([]));
+  }, [demoMode]);
 
   return (
     <div className="home-page">
@@ -197,11 +228,14 @@ export default function Home() {
         <div className="sessions-panel">
           <div className="sp-header">
             <span className="sp-title">Planning Cycles</span>
-            <span className="sp-count">{SESSIONS.length} sessions</span>
-            <button className="sp-new-btn">+ New cycle</button>
+            <span className="sp-count">
+              {demoMode ? `${SESSIONS.length} sessions` : `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'}`}
+            </span>
+            <button className="sp-new-btn" onClick={() => setShowLaunch(true)}>+ New cycle</button>
           </div>
-          {SESSIONS.map(s => (
-            <Link key={s.id} to={s.link} className={`home-session-item${s.status === 'running' ? ' is-active' : ''}`}>
+
+          {demoMode && SESSIONS.map(s => (
+            <Link key={s.id} to="/pipeline/demo" className={`home-session-item${s.status === 'running' ? ' is-active' : ''}`}>
               {s.status === 'running' ? (
                 <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
                   <div className="si-orb-ring" />
@@ -229,6 +263,49 @@ export default function Home() {
               <span className="si-open-btn">→</span>
             </Link>
           ))}
+
+          {!demoMode && liveSessions.length === 0 && (
+            <div style={{ padding: '20px 16px', fontSize: 13, color: 'var(--text-3)' }}>
+              No cycles yet — click <strong>+ New cycle</strong> to launch your first live run.
+            </div>
+          )}
+
+          {!demoMode && liveSessions.map(s => {
+            const running = s.status === 'running';
+            const kpiCells: [string, string][] = [];
+            if (s.kpis.otif != null) kpiCells.push([String(s.kpis.otif), 'OTIF']);
+            if (s.kpis.forecastAcc != null) kpiCells.push([String(s.kpis.forecastAcc), 'Fcst Acc']);
+            if (s.kpis.capacityUtil != null) kpiCells.push([String(s.kpis.capacityUtil), 'Cap Util']);
+            return (
+              <Link key={s.session_id} to={`/pipeline/${s.session_id}`} className={`home-session-item${running ? ' is-active' : ''}`}>
+                {running ? (
+                  <div className="si-orb" style={{ color: 'var(--ag-planner)' }}>
+                    <div className="si-orb-ring" />
+                    <div className="si-orb-arc" />
+                    <div className="si-orb-dot" />
+                  </div>
+                ) : (
+                  <div className="si-dot si-dot-done" style={{ flexShrink: 0, marginLeft: 12, marginRight: 2 }} />
+                )}
+                <div className="si-body">
+                  <div className="si-name">{s.name || s.session_id.slice(0, 8)}</div>
+                  <div className="si-meta">{s.step_count} steps · {relTime(s.created_at)}</div>
+                </div>
+                <div className="si-kpis">
+                  {kpiCells.map(([val, lbl]) => (
+                    <div key={lbl} className="si-kpi">
+                      <div className="si-kpi-val">{val}</div>
+                      <div className="si-kpi-lbl">{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+                <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
+                  {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
+                </span>
+                <span className="si-open-btn">→</span>
+              </Link>
+            );
+          })}
         </div>
 
         <div className="home-footer">
@@ -244,6 +321,14 @@ export default function Home() {
         </div>
 
       </div>
+
+      {showLaunch && (
+        <LaunchConfig
+          demoMode={demoMode}
+          onClose={() => setShowLaunch(false)}
+          onLaunch={(goal, name) => { setShowLaunch(false); launch(demoMode, goal, name); }}
+        />
+      )}
     </div>
   );
 }

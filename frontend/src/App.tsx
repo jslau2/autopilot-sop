@@ -20,6 +20,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/pipeline" element={<PipelineView />} />
+        <Route path="/pipeline/:sessionId" element={<PipelineView />} />
         <Route path="/console" element={<AgentConsole />} />
         <Route path="/settings" element={<AgentSettings />} />
         <Route path="/manager" element={<AgentManager />} />

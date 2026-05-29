@@ -10,6 +10,8 @@ from typing import Any
 @dataclass
 class SessionState:
     session_id: str
+    name: str = ""
+    goal: str = ""
     status: str = "running"   # running | paused | done | error
     elapsed_start: float = field(default_factory=time.time)
     steps: dict = field(default_factory=dict)
