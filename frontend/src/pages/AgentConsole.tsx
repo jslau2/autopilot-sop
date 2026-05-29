@@ -274,10 +274,9 @@ export default function AgentConsole() {
           <span className="con-brand-sep">/</span>
           <span className="con-brand-page">Agent Console</span>
         </div>
-        <Link to="/pipeline" className="con-nav-btn">← Pipeline View</Link>
-        <Link to="/settings" className="con-nav-btn">⚙ Settings</Link>
-        <Link to="/manager" className="con-nav-btn">📊 Manager</Link>
-        <Link to="/" className="con-nav-btn">⌂ Home</Link>
+        <Link to="/" className="con-nav-btn">⌂ Cycles</Link>
+        <Link to="/agents" className="con-nav-btn">⚙ Agents</Link>
+        <Link to="/datasources" className="con-nav-btn">⬡ Data Sources</Link>
         <span className="con-spacer" />
         <div className={`con-status-pill ${statusCls}`}>{statusLabel}</div>
         <span className="con-elapsed mono">{t.toFixed(1)}s</span>

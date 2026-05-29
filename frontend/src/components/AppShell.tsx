@@ -1,10 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
-type NavKey = 'cycles' | 'agents' | 'data';
+type NavKey = 'cycles' | 'console' | 'agents' | 'data';
 
 const NAV: { key: NavKey; label: string; to: string }[] = [
   { key: 'cycles', label: 'Cycles', to: '/' },
+  { key: 'console', label: 'Agent Console', to: '/console' },
   { key: 'agents', label: 'Agents', to: '/agents' },
   { key: 'data', label: 'Data Sources', to: '/datasources' },
 ];

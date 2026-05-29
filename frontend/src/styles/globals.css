@@ -678,6 +678,8 @@ input, textarea, select { font-family: inherit; }
 .agent-chip { font-size: 10.5px; font-weight: 500; padding: 4px 10px; border-radius: 12px; border: 1px solid; opacity: 0.75; transition: opacity 0.2s; white-space: nowrap; }
 .agent-chip:hover { opacity: 1; }
 .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+.nav-grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 720px) { .nav-grid-3 { grid-template-columns: 1fr; } }
 .nav-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 28px 28px 24px; cursor: pointer; transition: background 0.18s, border-color 0.18s, transform 0.15s; display: flex; flex-direction: column; gap: 12px; position: relative; overflow: hidden; }
 .nav-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--card-accent, var(--accent)); border-radius: 12px 12px 0 0; opacity: 0.6; transition: opacity 0.18s; }
 .nav-card:hover { background: var(--bg-card-h); border-color: var(--border); transform: translateY(-2px); }

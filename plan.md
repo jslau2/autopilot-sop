@@ -26,10 +26,11 @@ Today the structure fights the mental model:
 - [ ] **2. Home reframe** — Planning Cycles stays primary (done earlier).
   Replace the 4 big cards with a compact secondary nav to **Agents** and **Data
   Sources**; drop the Pipeline View and Agent Console cards.
-- [ ] **3. Agent Console as a tab inside a cycle** — add a third lens to the
-  pipeline view: `Swimlane · Timeline · Consoles`, driven by the real session
-  (per-agent cards from the session's steps), not the old standalone scripted
-  page. Retire the standalone `/console` route.
+- [x] **3. Keep Agent Console as a first-class destination** — (revised) NOT
+  merged or retired. It stays a standalone top-level page and gains a slot in
+  the app-shell nav. Future ambition: a live, cross-user view of every agent
+  actively working (a fleet/ops monitor as the app gains many users). Its
+  nav links updated to the new structure.
 - [ ] **4. Merge Agent Settings + Agent Manager into an "Agents" hub** — one
   page at `/agents` with tabs: **Configure** (prompts/models) and **Performance
   & Governance** (analytics). Old `/settings` and `/manager` redirect here.

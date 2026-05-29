@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import AppShell from '../components/AppShell';
 
 interface DataSource {
   id: string;
@@ -202,18 +202,13 @@ export default function DataSources() {
   const srcMap = Object.fromEntries(SOURCES.map(s => [s.id, s]));
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-1)' }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px',
-        borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-card)',
-      }}>
-        <Link to="/pipeline" className="cfg-toolbar-btn" style={{ textDecoration: 'none' }}>← Pipeline</Link>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Data Sources</span>
-        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{SOURCES.length} sources · {SOURCES.filter(s => s.status === 'live').length} live</span>
+    <AppShell active="data">
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '20px 28px 0', maxWidth: 1100 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Data Sources</h1>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{SOURCES.length} sources · {SOURCES.filter(s => s.status === 'live').length} live</span>
       </div>
 
-      <div style={{ padding: '24px 28px', maxWidth: 1100 }}>
+      <div style={{ padding: '16px 28px 28px', maxWidth: 1100 }}>
         {/* Summary strip */}
         <div style={{
           display: 'flex', gap: 0, marginBottom: 28,
@@ -293,6 +288,6 @@ export default function DataSources() {
       </div>
 
       {selected && <DataPreviewPanel src={selected} onClose={() => setSelected(null)} />}
-    </div>
+    </AppShell>
   );
 }

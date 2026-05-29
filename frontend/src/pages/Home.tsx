@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
+import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
@@ -93,22 +94,11 @@ export default function Home() {
   }, [demoMode]);
 
   return (
+    <AppShell active="cycles">
     <div className="home-page">
       <div className="home-content">
 
         <div className="home-header">
-          <div className="home-brand-row">
-            <div className="home-brand-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="14" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="10" y="9" width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="17" y="4" width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <span className="home-brand-name">Autopilot S&amp;OP</span>
-            <span className="home-brand-badge">beta</span>
-          </div>
           <p className="home-tagline">AI-driven Sales &amp; Operations Planning — from demand signal to approved plan</p>
           <p className="home-sub-tagline">12 specialised agents · parallel orchestration · human-in-the-loop decisions</p>
 
@@ -298,27 +288,7 @@ export default function Home() {
           )}
         </div>
 
-        <div className="nav-grid">
-          <Link to="/pipeline" className="nav-card" style={{ '--card-accent': 'var(--ag-planner)' } as React.CSSProperties}>
-            <div className="nc-icon" style={{ color: 'var(--ag-planner)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="3" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="3" y="9" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" opacity=".6" />
-                <rect x="3" y="15" width="18" height="3" rx="1" stroke="currentColor" strokeWidth="1.5" opacity=".35" />
-                <circle cx="20" cy="4.5" r="2" fill="currentColor" opacity=".8" />
-              </svg>
-            </div>
-            <div className="nc-title">Pipeline View</div>
-            <div className="nc-desc">The main orchestration dashboard — agents on a swimlane timeline, live KPIs, step-by-step task cards, and the decision modal.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Swimlane &amp; timeline views</div>
-              <div className="nc-feat">Live KPI bar (OTIF · Forecast Acc · WOS)</div>
-              <div className="nc-feat">Click any step for full agent reasoning</div>
-              <div className="nc-feat">Capacity Config &amp; constraint register</div>
-            </div>
-            <div className="nc-cta">Open Pipeline View →</div>
-          </Link>
-
+        <div className="nav-grid nav-grid-3">
           <Link to="/console" className="nav-card" style={{ '--card-accent': 'var(--accent)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--accent)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -328,60 +298,41 @@ export default function Home() {
               </svg>
             </div>
             <div className="nc-title">Agent Console</div>
-            <div className="nc-desc">Deep orchestration detail — per-agent task IDs, live progress bars, reasoning logs, and the inter-agent message bus.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Task IDs &amp; live progress per agent</div>
-              <div className="nc-feat">Inter-agent message bus (BEGIN · ACK · ALERT)</div>
-              <div className="nc-feat">Bobble-head live status icons</div>
-              <div className="nc-feat">Session overview &amp; global event feed</div>
-            </div>
+            <div className="nc-desc">Live activity across all agents — per-agent progress, reasoning logs, and the inter-agent message bus. The real-time ops view.</div>
             <div className="nc-cta">Open Agent Console →</div>
           </Link>
 
-          <Link to="/settings" className="nav-card" style={{ '--card-accent': 'var(--ag-spi)' } as React.CSSProperties}>
+          <Link to="/agents" className="nav-card" style={{ '--card-accent': 'var(--ag-spi)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--ag-spi)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.636 5.636l2.121 2.121M16.243 16.243l2.121 2.121M5.636 18.364l2.121-2.121M16.243 7.757l2.121-2.121" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
-            <div className="nc-title">Agent Settings</div>
-            <div className="nc-desc">Configure system prompts, model selection, temperature, and tool access per agent. View governance evaluation status.</div>
-            <div className="nc-features">
-              <div className="nc-feat">System prompt editor per agent</div>
-              <div className="nc-feat">Model config (temperature, tokens)</div>
-              <div className="nc-feat">Tool access toggles</div>
-              <div className="nc-feat">Governance evaluation badges</div>
-            </div>
-            <div className="nc-cta">Open Agent Settings →</div>
+            <div className="nc-title">Agents</div>
+            <div className="nc-desc">Configure prompts, models &amp; tools per agent, and review performance &amp; governance. The 12-agent roster lives here.</div>
+            <div className="nc-cta">Open Agents →</div>
           </Link>
 
-          <Link to="/manager" className="nav-card" style={{ '--card-accent': 'var(--ag-finance)' } as React.CSSProperties}>
+          <Link to="/datasources" className="nav-card" style={{ '--card-accent': 'var(--ag-finance)' } as React.CSSProperties}>
             <div className="nc-icon" style={{ color: 'var(--ag-finance)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <ellipse cx="12" cy="5" rx="8" ry="3" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" strokeWidth="1.5" />
               </svg>
             </div>
-            <div className="nc-title">Agent Manager</div>
-            <div className="nc-desc">Per-agent analytics: growth time-trend charts, performance balance radar, feedback rating distribution, and Governance Agent assessment.</div>
-            <div className="nc-features">
-              <div className="nc-feat">Multi-metric growth trend line chart</div>
-              <div className="nc-feat">Governance Agent written assessment</div>
-              <div className="nc-feat">User feedback log per agent</div>
-              <div className="nc-feat">Automated prompt engineering tab</div>
-            </div>
-            <div className="nc-cta">Open Agent Manager →</div>
+            <div className="nc-title">Data Sources</div>
+            <div className="nc-desc">The ERP &amp; external feeds powering the plan — SAP S/4HANA, Supplier Portal, Tooling Register — with live data preview.</div>
+            <div className="nc-cta">Open Data Sources →</div>
           </Link>
         </div>
 
         <div className="home-footer">
-          <Link to="/pipeline">Pipeline View</Link>
-          &nbsp;·&nbsp;
           <Link to="/console">Agent Console</Link>
           &nbsp;·&nbsp;
-          <Link to="/settings">Agent Settings</Link>
+          <Link to="/agents">Agents</Link>
           &nbsp;·&nbsp;
-          <Link to="/manager">Agent Manager</Link>
+          <Link to="/datasources">Data Sources</Link>
           &nbsp;·&nbsp;
           <span>Autopilot S&amp;OP · beta · APAC Manufacturing</span>
         </div>
@@ -396,5 +347,6 @@ export default function Home() {
         />
       )}
     </div>
+    </AppShell>
   );
 }

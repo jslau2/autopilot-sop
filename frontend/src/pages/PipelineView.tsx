@@ -282,6 +282,20 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
 
+  // Resolve the cycle name for the breadcrumb (from nav state, then backend).
+  const [cycleName, setCycleName] = useState<string>(
+    () => (location.state as { name?: string } | null)?.name
+      ?? (demoMode ? 'Demo Cycle' : `Cycle ${sessionId.slice(0, 8)}`)
+  );
+  useEffect(() => {
+    if (demoMode) return;
+    if ((location.state as { name?: string } | null)?.name) return;
+    fetch(`/api/sessions/${sessionId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.name) setCycleName(d.name); })
+      .catch(() => { /* keep fallback */ });
+  }, [demoMode, sessionId, location.state]);
+
   // Both hooks always called (Rules of Hooks). Live connects only when not demo.
   const simResult  = useSimulation(demoMode ? 0.5 : 0);
   const liveResult = useLiveSession(demoMode ? undefined : sessionId);
@@ -348,8 +362,12 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         <Sidebar />
         <div className="main-area">
           <div className="main-toolbar">
-            <div className="toolbar-goal">
-              <em className="goal-text">Q3-2026 S&amp;OP · APAC Manufacturing · OTIF ≥ 98% · Margin ≥ 22% · 847 SKUs</em>
+            <div className="toolbar-goal" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, minWidth: 0 }}>
+              <Link to="/" style={{ color: 'var(--text-3)', textDecoration: 'none' }}>Cycles</Link>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-1)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{cycleName}</span>
+              <span style={{ color: 'var(--border)' }}>›</span>
+              <span style={{ color: 'var(--text-3)', textTransform: 'capitalize' }}>{viewMode}</span>
             </div>
             <div className="toolbar-right">
               <Link
@@ -383,11 +401,9 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   {S.manualPause ? '▶ Resume' : '⏸ Pause'}
                 </button>
               )}
-              <Link to="/datasources" className="cfg-toolbar-btn">⬡ Data Sources</Link>
               <Link to="/console" className="cfg-toolbar-btn">⊞ Agent Console</Link>
-              <Link to="/settings" className="cfg-toolbar-btn">⚙ Agent Settings</Link>
-              <Link to="/manager" className="cfg-toolbar-btn">📊 Agent Manager</Link>
-              <Link to="/" className="cfg-toolbar-btn">⌂ Home</Link>
+              <Link to="/agents" className="cfg-toolbar-btn">⚙ Agents</Link>
+              <Link to="/datasources" className="cfg-toolbar-btn">⬡ Data Sources</Link>
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
               <button
                 className="tour-help-btn"
