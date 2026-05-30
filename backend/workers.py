@@ -305,6 +305,7 @@ async def run_worker_agent(
             result = {"error": str(exc)}
             break
 
+        session.add_usage(getattr(response, "usage", None))
         msg = response.choices[0].message
 
         # If there are tool calls, execute them

@@ -139,8 +139,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
 ## Smaller polish / nice-to-haves
 
-- [ ] **Token / cost tracking** — show Azure OpenAI token usage and est. cost
-  per run (live mode).
+- [x] **Token / cost tracking** — sessions accumulate Azure OpenAI token usage
+  (`session.add_usage` from every planner/worker completion); `GET
+  /api/sessions/{id}/usage` returns prompt/completion/total tokens, call count,
+  and an estimated USD cost (prices configurable via `AZURE_PRICE_INPUT/OUTPUT`
+  per 1M tokens). A live `UsageChip` in the pipeline toolbar shows `tok · $cost`
+  (hover for the breakdown). Persisted. (Fresh, isolated take.)
 - [ ] **Streaming chat** — token-by-token responses in the planner chat for a
   more "live" feel.
 - [ ] **Per-session chat threads** — store chat history server-side, tied to a

@@ -251,6 +251,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                 session.status = "error"
                 return
 
+            session.add_usage(getattr(response, "usage", None))
             msg = response.choices[0].message
 
             if not msg.tool_calls:

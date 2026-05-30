@@ -35,6 +35,9 @@ class SessionState:
     current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
     decisions: list = field(default_factory=list)  # audit trail of human decisions
     approvals: list = field(default_factory=list)   # plan sign-offs (approvals workflow)
+    usage: dict = field(default_factory=lambda: {
+        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0,
+    })
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
     bg_task: Any = None
@@ -44,6 +47,18 @@ class SessionState:
         t = time.localtime()
         ms = int((time.time() % 1) * 1000)
         return f"{t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}.{ms:03d}"
+
+    def add_usage(self, usage: Any) -> None:
+        """Accumulate Azure OpenAI token usage from a completion response."""
+        if usage is None:
+            return
+        try:
+            self.usage["prompt_tokens"] += int(getattr(usage, "prompt_tokens", 0) or 0)
+            self.usage["completion_tokens"] += int(getattr(usage, "completion_tokens", 0) or 0)
+            self.usage["total_tokens"] += int(getattr(usage, "total_tokens", 0) or 0)
+            self.usage["calls"] += 1
+        except Exception:
+            pass
 
     def elapsed(self) -> float:
         """Seconds elapsed since session start (frozen once the session ends)."""
