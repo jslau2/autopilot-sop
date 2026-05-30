@@ -2,6 +2,57 @@
 
 Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
+## ★ High-impact bets (practical · sellable · sticky · trial+feedback)
+
+> The set most likely to make planners want to try it, use it daily, and give
+> feedback. Suggested first wave: Scenario comparison → Feedback widget →
+> Run-on-your-data → Auto exec summary.
+
+### Trial magnets — make them lean in and want to try
+- [ ] **Run it on YOUR data (CSV/Excel upload)** — make the sidebar "Drop ERP
+  export" zone real: upload SKU/demand/inventory data and have the agents plan
+  on the user's own numbers. The biggest "demo → trial" converter and feedback
+  magnet.
+- [ ] **Scenario gallery / templates** — one-click starts (Demand surge,
+  Supplier disruption, New product launch, Cost-down quarter). Removes the
+  blank-canvas problem; shows range instantly.
+- [ ] **Conversational kickoff** — extend the actionable chat so a natural-
+  language brief ("Plan Q4 with +10% growth and Supplier X delayed 4 weeks")
+  configures and launches a cycle.
+- [ ] **Auto-generated executive summary** — an LLM 3-sentence "what happened +
+  what I recommend" at the top of each finished run. Cheap, high perceived
+  intelligence.
+
+### Daily-use practicality — why they come back
+- [ ] **Scenario comparison dashboard** — side-by-side of 2–3 cycles
+  (baseline vs what-if): KPI deltas, cost/margin/OTIF trade-offs, a
+  "recommended" highlight. The #1 S&OP-manager feature; pairs with what-if
+  branching. (Supersedes the simpler "Run comparison" below.)
+- [ ] **Scheduled / recurring autonomous runs** — "run the weekly S&OP every
+  Monday 6am and ping me." The literal autopilot promise; big stickiness.
+- [ ] **Alerts & notifications** — toast + optional email/Slack/Teams webhook
+  when a run pauses for a decision, a KPI breaches threshold, or a risk goes
+  critical. (Extends "Decision notifications" below.)
+- [ ] **Interactive what-if sliders** — drag capacity / lead-time / demand% and
+  watch KPIs re-estimate live (lightweight estimate, not a full re-run).
+
+### Trust & sellability — what closes the deal
+- [ ] **Decision log / audit trail** — every human decision with rationale,
+  timestamp, and resulting KPI impact. Governance/compliance + trust.
+- [ ] **Explainability + data lineage ("Why?")** — any KPI/recommendation
+  traces back to agent reasoning AND the source row (SAP table / supplier feed).
+- [ ] **ROI / value dashboard** — quantify each run's worth ("protected $340k
+  revenue, saved $34k, +2.3pts OTIF"). Sells to the budget holder.
+- [ ] **Approvals workflow** — plan sign-off from finance/ops leads with
+  comments; matches how S&OP actually closes.
+
+### Feedback loop
+- [ ] **In-app feedback widget** — 👍/👎 + comment on any agent output and on the
+  whole run, feeding the Agent Manager governance analytics. Users feel heard;
+  you get product signal.
+- [ ] **Shareable run / report links** — read-only share of a completed cycle or
+  its report → collaboration + organic virality.
+
 ## High-leverage (finish the sessions / concurrency story)
 
 - [ ] **Run comparison** — pick two cycles, show side-by-side KPIs, the human
