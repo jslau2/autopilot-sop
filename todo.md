@@ -62,8 +62,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   `GET /api/sessions/{id}/decisions`, and shown in a 🗒 Decisions modal (pipeline
   toolbar). Demo derives the log from answered question steps. Rationale also
   flows into the exported report.
-- [ ] **Explainability + data lineage ("Why?")** — any KPI/recommendation
-  traces back to agent reasoning AND the source row (SAP table / supplier feed).
+- [x] **Explainability + data lineage ("Why?")** — every KPI cell is clickable
+  (ⓘ) and opens an ExplainModal that traces the number to the agents that drove
+  it (reasoning), the step results, and the source systems/feeds it came from
+  (SAP tables / supplier portal), with a lineage chain `sources → agents → KPI`
+  (`lib/lineage.ts`). Works in demo + live (uses live agent traces when present).
 - [x] **ROI / value dashboard** — 💰 Value modal (pipeline toolbar) translates a
   run's KPIs into business value: Plan Δ EBIT, revenue protected (OTIF uplift ×
   $/pt), optimisation savings (scanned from agent metrics), OTIF uplift, plus a
