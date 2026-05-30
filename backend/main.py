@@ -13,7 +13,7 @@ import json
 import time
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -70,6 +70,7 @@ class StartSession(BaseModel):
     name: str = ""
     parent_id: str = ""
     entity: str = ""
+    data_upload_id: str = ""   # attach a previously uploaded dataset
 
 
 class AnswerBody(BaseModel):
@@ -169,6 +170,46 @@ _DATASOURCE_PREVIEW = {
     "tooling-register":lambda: mock_data.get_tooling_data(),
     "erm":             lambda: mock_data.generate_risk_register(),
 }
+
+
+# ---------------------------------------------------------------------------
+# Run-on-your-data — upload + profile a CSV/TSV export
+# ---------------------------------------------------------------------------
+@app.post("/api/uploads")
+async def upload_data(request: Request, filename: str = "upload.csv"):
+    """
+    Parse + profile an uploaded CSV/TSV dataset for planning on real numbers.
+    The file is sent as the raw request body (no multipart dependency); the
+    original filename is passed as ?filename=.
+    """
+    import uploads as uploads_mod
+    raw = await request.body()
+    if len(raw) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 8 MB).")
+    name = filename or "upload.csv"
+    if name.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=415, detail="Excel not supported yet — please export to CSV and re-upload.")
+    try:
+        rec = uploads_mod.parse_csv(name, raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return uploads_mod.public_record(rec)
+
+
+@app.get("/api/uploads")
+async def list_uploads():
+    import uploads as uploads_mod
+    return {"uploads": [uploads_mod.public_record(r) for r in
+                        sorted(uploads_mod.uploads.values(), key=lambda r: r["uploaded_at"], reverse=True)]}
+
+
+@app.get("/api/uploads/{upload_id}")
+async def get_upload(upload_id: str):
+    import uploads as uploads_mod
+    rec = uploads_mod.uploads.get(upload_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"No upload '{upload_id}'")
+    return uploads_mod.public_record(rec)
 
 
 @app.get("/api/datasources/{source_id}/preview")
@@ -637,14 +678,24 @@ async def create_session(body: StartSession):
     """
     session_id = str(uuid.uuid4())
     name = (body.name or "").strip() or _derive_session_name(body.goal, session_id)
-    session = SessionState(session_id=session_id, name=name, goal=body.goal)
+
+    # If a dataset was uploaded, fold its summary into the goal so the agents
+    # plan on the user's real numbers.
+    goal = body.goal
+    if body.data_upload_id:
+        import uploads as uploads_mod
+        rec = uploads_mod.uploads.get(body.data_upload_id)
+        if rec:
+            goal = f"{body.goal}\n\n--- UPLOADED DATA ---\n{rec['summary']}"
+
+    session = SessionState(session_id=session_id, name=name, goal=goal)
     if body.parent_id and body.parent_id in sessions:
         session.parent_id = body.parent_id
     session.entity = (body.entity or "").strip()
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
-    bg_task = asyncio.create_task(run_orchestrator(session, body.goal))
+    bg_task = asyncio.create_task(run_orchestrator(session, goal))
     session.bg_task = bg_task
 
     return {

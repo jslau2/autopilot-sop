@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 import { useEntity, setActiveEntity, addEntity, ALL_ENTITIES } from '../hooks/useEntity';
+import DataUpload from './DataUpload';
 
 type SidebarSession = {
   session_id: string;
@@ -22,7 +23,6 @@ function relTime(epochSec: number): string {
 export default function Sidebar() {
   const ctx = useDashboard();
   const navigate = useNavigate();
-  const [dragOver, setDragOver] = useState(false);
   const [sessions, setSessions] = useState<SidebarSession[]>([]);
   const { active: activeEntity, entities } = useEntity();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sop-sidebar-collapsed') === '1');
@@ -152,20 +152,7 @@ export default function Sidebar() {
           <span>DATA SOURCES</span>
           <Link to="/datasources" style={{ fontSize: 9.5, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>View all →</Link>
         </div>
-        <div
-          className={`drop-zone${dragOver ? ' drag-over' : ''}`}
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={e => { e.preventDefault(); setDragOver(false); }}
-        >
-          <div className="dz-icon">⬡</div>
-          <div className="dz-hint">Drop ERP export or connect</div>
-          <div className="dz-current">
-            <span className="dz-file-dot" />
-            SAP S/4HANA · Live
-          </div>
-          <div className="dz-stats">847 SKUs · 12 plants · W22–W34</div>
-        </div>
+        <DataUpload demoMode={ctx.demoMode} onPlan={seed => ctx.onNewCycle(seed)} />
       </section>
 
       <section className="sb-section sb-sessions">
@@ -192,7 +179,7 @@ export default function Sidebar() {
             </div>
           ))}
         </div>
-        <button className="sb-ghost-btn" onClick={ctx.onNewCycle}>+ New cycle</button>
+        <button className="sb-ghost-btn" onClick={() => ctx.onNewCycle()}>+ New cycle</button>
       </section>
 
       <div className="sidebar-footer">

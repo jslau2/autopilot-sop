@@ -9,10 +9,13 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 > Run-on-your-data → Auto exec summary.
 
 ### Trial magnets — make them lean in and want to try
-- [ ] **Run it on YOUR data (CSV/Excel upload)** — make the sidebar "Drop ERP
-  export" zone real: upload SKU/demand/inventory data and have the agents plan
-  on the user's own numbers. The biggest "demo → trial" converter and feedback
-  magnet.
+- [x] **Run it on YOUR data (CSV upload)** — the sidebar dropzone is now real
+  (`DataUpload`): drop/click a CSV/TSV → it's parsed + profiled (auto-detects
+  SKU/demand/inventory/date/plant columns, counts unique SKUs, totals, period
+  range). Live uploads to `POST /api/uploads` (raw body, no multipart dep, via
+  `uploads.py`); demo parses client-side. "▶ Plan on this data" launches a cycle
+  seeded with the data summary so the agents plan on the user's numbers
+  (`data_upload_id` folded into the goal). Excel → asks for CSV export (todo).
 - [ ] **Scenario gallery / templates** — one-click starts (Demand surge,
   Supplier disruption, New product launch, Cost-down quarter). Removes the
   blank-canvas problem; shows range instantly.

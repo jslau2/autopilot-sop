@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { Step, SimEvent, KPIs, SessionStatus } from '../types';
+import type { UploadSeed } from '../components/DataUpload';
 
 export interface DashboardContextValue {
   steps: Record<string, Step>;
@@ -15,7 +16,7 @@ export interface DashboardContextValue {
   activeSessionId: string;
   setActiveSessionId: (id: string) => void;
   demoMode: boolean;
-  onNewCycle: () => void;
+  onNewCycle: (seed?: UploadSeed) => void;
   kpis: KPIs;
   paused: boolean;
   manualPause: boolean;
