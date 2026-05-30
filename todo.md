@@ -85,8 +85,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   locally. `GET /api/feedback/summary` rolls up satisfaction %, per-agent
   counts, and recent comments, surfaced live in the Agents Hub → Performance &
   Governance tab.
-- [ ] **Shareable run / report links** — read-only share of a completed cycle or
-  its report → collaboration + organic virality.
+- [x] **Shareable run / report links** — `POST /api/sessions/{id}/share` mints a
+  short token (`shares.py`, persisted, idempotent per run); `GET /api/share/{token}`
+  returns a read-only snapshot (KPIs, exec summary, decisions, approvals, agent
+  activity). A public `/share/:token` page renders it with no app chrome (chat &
+  bell hidden). "🔗 Share link" in the Report modal copies the URL (live mode).
 
 ## High-leverage (finish the sessions / concurrency story)
 

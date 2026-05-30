@@ -937,6 +937,54 @@ async def add_approval(session_id: str, body: ApprovalBody):
     return _approval_status(session)
 
 
+def _share_snapshot(s: SessionState) -> dict:
+    """Read-only report-style snapshot for a shared link."""
+    done_msg = {}
+    for ev in s.events:
+        if ev.get("type") == "step_complete" and ev.get("step_id"):
+            done_msg[ev["step_id"]] = ev.get("message", "")
+    activity = []
+    for st in s.steps.values():
+        if st.get("agent") == "planner":
+            continue
+        activity.append({
+            "agent": st.get("agent", ""),
+            "label": st.get("label", ""),
+            "result": done_msg.get(st.get("step_id", ""), ""),
+            "data_source": st.get("data_source", ""),
+        })
+    return {
+        "name": s.name,
+        "goal": s.goal,
+        "status": s.status,
+        "kpis": s.kpis,
+        "exec_summary": _heuristic_exec_summary(s),
+        "decisions": s.decisions,
+        "approvals": getattr(s, "approvals", []),
+        "activity": activity,
+        "elapsed": round(s.elapsed(), 1),
+    }
+
+
+@app.post("/api/sessions/{session_id}/share")
+async def create_share(session_id: str):
+    import shares
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    token = shares.create_token(session_id)
+    return {"token": token, "path": f"/share/{token}"}
+
+
+@app.get("/api/share/{token}")
+async def get_shared(token: str):
+    import shares
+    session_id = shares.resolve(token)
+    if not session_id or session_id not in sessions:
+        raise HTTPException(status_code=404, detail="This shared link is invalid or has expired.")
+    return _share_snapshot(sessions[session_id])
+
+
 @app.get("/api/sessions/{session_id}/decisions")
 async def get_decisions(session_id: str):
     """Audit trail of human decisions for a run (with KPI snapshots)."""
