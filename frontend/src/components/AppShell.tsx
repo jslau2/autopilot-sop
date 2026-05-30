@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useDemoMode } from '../hooks/useDemoMode';
 import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
 
-type NavKey = 'home' | 'cycle' | 'console' | 'agents' | 'data' | 'compare' | 'schedules';
+type NavKey = 'home' | 'cycle' | 'console' | 'agents' | 'data' | 'compare' | 'schedules' | 'admin';
 
 const NAV: { key: NavKey; label: string; to: string }[] = [
   { key: 'home', label: 'Home', to: '/' },
@@ -11,6 +11,7 @@ const NAV: { key: NavKey; label: string; to: string }[] = [
   { key: 'console', label: 'Agent Console', to: '/console' },
   { key: 'agents', label: 'Agents Hub', to: '/agents' },
   { key: 'data', label: 'Data Sources', to: '/datasources' },
+  { key: 'admin', label: 'Admin', to: '/admin' },
 ];
 
 /**
