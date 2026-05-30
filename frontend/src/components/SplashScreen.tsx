@@ -13,31 +13,26 @@ const RINGS = [
   { radius: 136, period: 2800 },
 ];
 
-// Build per-agent orbit keyframes + logo spin keyframe
+// Per-agent orbit keyframes + shared animations — computed once at module load
 const SPLASH_CSS = (() => {
   const pieces: string[] = [`
     @keyframes spl-logo-spin {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
     }
-    .spl-logo-arm {
-      transform-origin: 36px 36px;
-      animation: spl-logo-spin 2.4s linear infinite;
-    }
     @keyframes spl-planner-pulse {
       0%, 100% { box-shadow: 0 0 14px 4px oklch(0.80 0.16 78 / 0.20); }
       50%       { box-shadow: 0 0 28px 10px oklch(0.80 0.16 78 / 0.45); }
     }
-    .spl-planner-pulse {
-      animation: spl-planner-pulse 2.2s ease-in-out infinite;
-    }
+    .spl-planner-pulse { animation: spl-planner-pulse 2.2s ease-in-out infinite; }
   `];
 
   SPECIALISTS.forEach((id, i) => {
     const { code } = AGENTS[id];
-    const ring   = RINGS[i % 3];
-    const start  = (i / SPECIALISTS.length) * 360;
-    const delay  = -(start / 360) * ring.period;
+    const ring  = RINGS[i % 3];
+    const start = (i / SPECIALISTS.length) * 360;
+    // Negative delay fast-forwards to the correct starting angle
+    const delay = -(start / 360) * ring.period;
     pieces.push(`
       @keyframes spl-orbit-${code} {
         from { transform: rotate(0deg)   translateX(${ring.radius}px) rotate(0deg); }
@@ -53,24 +48,26 @@ const SPLASH_CSS = (() => {
   return pieces.join('\n');
 })();
 
-function OrbitLogo() {
+// Chat bubble with an orbit ring — the splash finale
+function ChatBubbleLogo() {
   return (
-    <div style={{ position: 'relative', width: 72, height: 72 }}>
-      <svg width="72" height="72" viewBox="0 0 72 72" fill="none"
+    <div style={{ position: 'relative', width: 80, height: 80 }}>
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none"
            style={{ position: 'absolute', inset: 0 }}>
-        <circle cx="36" cy="36" r="28"
-                stroke="var(--accent)" strokeWidth="1.5" strokeOpacity="0.45" />
-        <g className="spl-logo-arm">
-          <circle cx="36" cy="8" r="3.5" fill="var(--accent)" />
+        {/* Static orbit ring */}
+        <circle cx="40" cy="40" r="34"
+                stroke="var(--accent)" strokeWidth="1.5" strokeOpacity="0.4" />
+        {/* Spinning dot — rotates around the ring center */}
+        <g style={{ transformOrigin: '40px 40px', animation: 'spl-logo-spin 2.4s linear infinite' }}>
+          <circle cx="40" cy="6" r="4" fill="var(--accent)" />
         </g>
       </svg>
+      {/* Chat bubble icon, centered over the ring */}
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
              style={{ color: 'var(--accent)' }}>
-          <rect x="3"  y="14" width="4" height="7"  rx="1" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="10" y="9"  width="4" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="17" y="4"  width="4" height="17" rx="1" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M5 14 L12 9 L19 4" stroke="currentColor" strokeWidth="1.5"
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                stroke="currentColor" strokeWidth="1.5"
                 strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
@@ -85,11 +82,11 @@ export default function SplashScreen({ onComplete }: Props) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('orbit'),  350),
-      setTimeout(() => setPhase('fade'),   2900),
-      setTimeout(() => setPhase('logo'),   3700),
-      setTimeout(() => setPhase('exit'),   4500),
-      setTimeout(onComplete,               5000),
+      setTimeout(() => setPhase('orbit'),  350),   // agents + PLN spring in
+      setTimeout(() => setPhase('fade'),   2900),   // dots start spiralling inward
+      setTimeout(() => setPhase('logo'),   4100),   // chat bubble emerges
+      setTimeout(() => setPhase('exit'),   4900),   // overlay fades out
+      setTimeout(onComplete,               5400),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onComplete]);
@@ -99,11 +96,10 @@ export default function SplashScreen({ onComplete }: Props) {
     setTimeout(onComplete, 400);
   }
 
-  const isOrbiting   = phase === 'orbit';
-  const isFading     = phase === 'fade';
-  const showLogo     = phase === 'logo' || phase === 'exit';
-  const showPlanner  = phase === 'enter' || phase === 'orbit' || phase === 'fade';
-  const textVisible  = isOrbiting || isFading;
+  const isOrbiting  = phase === 'orbit';
+  const isShrinking = phase === 'fade' || phase === 'logo' || phase === 'exit';
+  const showLogo    = phase === 'logo' || phase === 'exit';
+  const textVisible = isOrbiting || phase === 'fade';
 
   return (
     <div
@@ -115,16 +111,15 @@ export default function SplashScreen({ onComplete }: Props) {
         background: 'var(--bg-base)',
         opacity: phase === 'exit' ? 0 : 1,
         transition: phase === 'exit' ? 'opacity 0.5s ease' : undefined,
-        cursor: 'pointer',
-        userSelect: 'none',
+        cursor: 'pointer', userSelect: 'none',
       }}
     >
       <style>{SPLASH_CSS}</style>
 
-      {/* Orbital stage ─ 320×320 canvas */}
+      {/* 320×320 stage */}
       <div style={{ position: 'relative', width: 320, height: 320, flexShrink: 0 }}>
 
-        {/* Decorative ring guides */}
+        {/* Decorative orbit ring guides — fade out when dots start converging */}
         {RINGS.map((ring, i) => (
           <div key={i} style={{
             position: 'absolute', left: '50%', top: '50%',
@@ -133,21 +128,30 @@ export default function SplashScreen({ onComplete }: Props) {
             borderRadius: '50%',
             border: '1px solid oklch(0.26 0.01 245)',
             opacity: isOrbiting ? 0.55 : 0,
-            transition: isOrbiting ? 'opacity 1s ease' : 'opacity 0.4s ease',
+            transition: isOrbiting ? 'opacity 1s ease' : 'opacity 0.5s ease',
             pointerEvents: 'none',
           }} />
         ))}
 
-        {/* Agent satellite dots */}
+        {/*
+          Two-layer agent dots:
+          · Outer div  — zero-size orbit anchor; CSS animation runs continuously
+          · Inner div  — visible dot; scale(0) during convergence
+          Because the outer keeps orbiting while the inner shrinks, the dot
+          physically travels toward center as it disappears — seamless spiral-in.
+        */}
         {SPECIALISTS.map((id, i) => {
           const ag = AGENTS[id];
+          const stagger = `${i * 0.05}s`;
           return (
             <div
               key={id}
               className={`spl-dot-${ag.code}`}
-              style={{
-                position: 'absolute', left: '50%', top: '50%',
-                width: 34, height: 34, marginLeft: -17, marginTop: -17,
+              style={{ position: 'absolute', left: '50%', top: '50%', width: 0, height: 0, pointerEvents: 'none' }}
+            >
+              <div style={{
+                width: 34, height: 34,
+                marginLeft: -17, marginTop: -17,
                 borderRadius: '50%',
                 background: `${ag.rawColor}1a`,
                 border: `2px solid ${ag.rawColor}`,
@@ -156,22 +160,23 @@ export default function SplashScreen({ onComplete }: Props) {
                 color: ag.rawColor,
                 fontFamily: 'var(--font-mono)',
                 letterSpacing: '0.02em',
+                // Dots spring in when orbiting, spiral-shrink when converging
+                transform: isShrinking ? 'scale(0)' : (isOrbiting ? 'scale(1)' : 'scale(0)'),
                 opacity: isOrbiting ? 1 : 0,
-                transition: isOrbiting
-                  ? 'opacity 0.6s ease'
-                  : isFading
-                    ? `opacity ${0.1 + i * 0.055}s ease`
-                    : 'opacity 0.1s ease',
-                willChange: 'transform',
-                pointerEvents: 'none',
-              }}
-            >
-              {ag.code}
+                transition: isShrinking
+                  ? `transform 0.55s cubic-bezier(0.55,0.06,0.68,0.19) ${stagger}, opacity 0.25s ease ${stagger}`
+                  : isOrbiting
+                    ? 'transform 0.45s cubic-bezier(0.34,1.56,0.64,1), opacity 0.5s ease'
+                    : 'none',
+                willChange: 'transform, opacity',
+              }}>
+                {ag.code}
+              </div>
             </div>
           );
         })}
 
-        {/* Central Planner node */}
+        {/* Central Planner node — pulses while agents orbit, fades when they converge */}
         <div
           className={isOrbiting ? 'spl-planner-pulse' : ''}
           style={{
@@ -183,8 +188,8 @@ export default function SplashScreen({ onComplete }: Props) {
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: 2,
             zIndex: 2, pointerEvents: 'none',
-            transform: showPlanner ? 'scale(1)' : 'scale(0.5)',
-            opacity: showPlanner ? (isFading ? 0.35 : 1) : 0,
+            transform: isOrbiting ? 'scale(1)' : 'scale(0.5)',
+            opacity: isOrbiting ? 1 : 0,
             transition: 'transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.5s ease',
           }}
         >
@@ -192,27 +197,26 @@ export default function SplashScreen({ onComplete }: Props) {
           <span style={{ fontSize: 7, color: `${AGENTS.planner.rawColor}88`, fontFamily: 'var(--font-mono)' }}>Planner</span>
         </div>
 
-        {/* Finale: orbit logo */}
+        {/* Chat bubble finale — springs in after dots converge */}
         <div style={{
           position: 'absolute', left: '50%', top: '50%',
-          marginLeft: -36, marginTop: -36,
+          marginLeft: -40, marginTop: -40,
           zIndex: 3, pointerEvents: 'none',
-          transform: showLogo ? 'scale(1)' : 'scale(0.25)',
+          transform: showLogo ? 'scale(1)' : 'scale(0.2)',
           opacity: showLogo ? 1 : 0,
-          transition: 'transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease',
+          transition: 'transform 0.65s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease',
         }}>
-          <OrbitLogo />
+          <ChatBubbleLogo />
         </div>
       </div>
 
-      {/* Wordmark */}
+      {/* Wordmark — visible while agents orbit and converge */}
       <div style={{
         marginTop: 32,
         opacity: textVisible ? 1 : 0,
         transform: textVisible ? 'translateY(0)' : 'translateY(8px)',
         transition: 'opacity 0.55s ease, transform 0.55s ease',
-        textAlign: 'center',
-        pointerEvents: 'none',
+        textAlign: 'center', pointerEvents: 'none',
       }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.02em' }}>
           Autopilot S&amp;OP
@@ -222,7 +226,6 @@ export default function SplashScreen({ onComplete }: Props) {
         </div>
       </div>
 
-      {/* Skip hint */}
       <div style={{
         position: 'absolute', bottom: 28,
         fontSize: 10, color: 'var(--text-3)',
