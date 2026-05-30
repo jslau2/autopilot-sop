@@ -38,6 +38,7 @@ class SessionState:
     usage: dict = field(default_factory=lambda: {
         "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0,
     })
+    chat: list = field(default_factory=list)   # per-session planner chat thread
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
     bg_task: Any = None

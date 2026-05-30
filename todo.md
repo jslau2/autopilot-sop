@@ -147,9 +147,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   (hover for the breakdown). Persisted. (Fresh, isolated take.)
 - [ ] **Streaming chat** — token-by-token responses in the planner chat for a
   more "live" feel.
-- [ ] **Per-session chat threads** — store chat history server-side, tied to a
-  run, so each cycle keeps its own reviewable conversation (currently
-  browser-local via localStorage).
+- [x] **Per-session chat threads** — when viewing a run, the planner chat becomes
+  that run's own thread, stored server-side on the session (`chat`, persisted)
+  via `GET/POST/DELETE /api/sessions/{id}/chat`. The thread is auto-scoped to the
+  run (the assistant defaults to its context). Off a run page it stays the global
+  localStorage thread. Chat loop refactored into a shared `_run_chat` helper.
 
 ## Known limitations (by design, document if asked)
 

@@ -542,11 +542,53 @@ async def _chat_dispatch(name: str, args: dict):
     return {"error": f"Unknown tool '{name}'"}
 
 
+async def _run_chat(messages: list[dict]) -> str:
+    """Run the bounded planner tool-calling loop over `messages`, return the reply."""
+    from orchestrator import get_client, DEPLOYMENT
+    loop = asyncio.get_event_loop()
+    for _ in range(5):
+        resp = await loop.run_in_executor(
+            None,
+            lambda msgs=messages: get_client().chat.completions.create(
+                model=DEPLOYMENT,
+                messages=msgs,
+                tools=CHAT_TOOLS,
+                tool_choice="auto",
+                temperature=0.4,
+                max_completion_tokens=700,
+            ),
+        )
+        msg = resp.choices[0].message
+        if not msg.tool_calls:
+            return (msg.content or "").strip()
+        messages.append({
+            "role": "assistant",
+            "content": msg.content,
+            "tool_calls": [{
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            } for tc in msg.tool_calls],
+        })
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            result = await _chat_dispatch(tc.function.name, args)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result, default=str),
+            })
+    return "I wasn't able to complete that — could you rephrase or be more specific?"
+
+
 @app.post("/api/chat")
 async def planner_chat(body: ChatBody):
     """Conversational planner assistant with tool access to session data."""
     try:
-        from orchestrator import get_client, DEPLOYMENT
+        from orchestrator import get_client, DEPLOYMENT  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
 
@@ -554,49 +596,72 @@ async def planner_chat(body: ChatBody):
     for m in body.messages[-20:]:  # keep recent history bounded
         if m.role in ("user", "assistant") and m.content:
             messages.append({"role": m.role, "content": m.content})
-
-    loop = asyncio.get_event_loop()
     try:
-        for _ in range(5):  # bounded tool-calling loop
-            resp = await loop.run_in_executor(
-                None,
-                lambda msgs=messages: get_client().chat.completions.create(
-                    model=DEPLOYMENT,
-                    messages=msgs,
-                    tools=CHAT_TOOLS,
-                    tool_choice="auto",
-                    temperature=0.4,
-                    max_completion_tokens=700,
-                ),
-            )
-            msg = resp.choices[0].message
-            if not msg.tool_calls:
-                return {"reply": (msg.content or "").strip()}
-
-            messages.append({
-                "role": "assistant",
-                "content": msg.content,
-                "tool_calls": [{
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                } for tc in msg.tool_calls],
-            })
-            for tc in msg.tool_calls:
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                result = await _chat_dispatch(tc.function.name, args)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": json.dumps(result, default=str),
-                })
-
-        return {"reply": "I wasn't able to complete that — could you rephrase or be more specific?"}
+        return {"reply": await _run_chat(messages)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
+
+
+# --- Per-session chat threads (stored server-side, tied to a run) ----------
+class SessionChatBody(BaseModel):
+    content: str
+
+
+@app.get("/api/sessions/{session_id}/chat")
+async def get_session_chat(session_id: str):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    return {"messages": getattr(session, "chat", [])}
+
+
+@app.post("/api/sessions/{session_id}/chat")
+async def post_session_chat(session_id: str, body: SessionChatBody):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    text = (body.content or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Empty message")
+
+    # Build the LLM context: system prompt + a note about the current run + history.
+    context_note = (
+        f"The user is currently viewing run '{session.name}' (session_id: {session.session_id}). "
+        "Default to THIS run when they ask about 'this run' / 'the cycle' — call get_session_context "
+        f"with session_id '{session.session_id}' for its real data."
+    )
+    messages: list[dict] = [
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + context_note},
+    ]
+    for m in session.chat[-20:]:
+        if m.get("role") in ("user", "assistant") and m.get("content"):
+            messages.append({"role": m["role"], "content": m["content"]})
+    messages.append({"role": "user", "content": text})
+
+    session.chat.append({"role": "user", "content": text})
+    try:
+        reply = await _run_chat(messages)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
+    session.chat.append({"role": "assistant", "content": reply})
+    try:
+        save_session(session)
+    except Exception:
+        pass
+    return {"reply": reply, "messages": session.chat}
+
+
+@app.delete("/api/sessions/{session_id}/chat")
+async def clear_session_chat(session_id: str):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    session.chat = []
+    try:
+        save_session(session)
+    except Exception:
+        pass
+    return {"cleared": True}
 
 
 # ---------------------------------------------------------------------------
