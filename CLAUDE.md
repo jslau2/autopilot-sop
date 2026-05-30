@@ -40,8 +40,12 @@ Backend:
   preview.
 - `backend/session.py` — `SessionState` (events, steps, kpis, status, …) and
   the global `sessions` registry; `emit_*` helpers.
-- `backend/persistence.py` — JSON archive of **terminal** sessions
-  (`backend/sessions/*.json`, gitignored); loaded on startup.
+- `backend/session_store.py` — SQLite archive of **terminal** sessions
+  (`backend/sessions.db`, gitignored). Lists read summary columns; full runs are
+  **hydrated lazily** when opened (not bulk-loaded at startup). One-time
+  migration folds legacy `sessions/*.json` in. `persistence.py` is a thin shim
+  delegating here (`save_session`/`delete_session_file`). In `main.py`,
+  `_get_session(id)` returns the live session or hydrates from the store (LRU).
 - `backend/main.py` — FastAPI routes (sessions CRUD, SSE, chat + streaming,
   datasource preview, suggest-name, kickoff, exec-summary, decisions, approvals,
   usage, share, notifications, schedules) + the Planner chat tools (`CHAT_TOOLS`).

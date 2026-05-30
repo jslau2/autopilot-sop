@@ -11,6 +11,10 @@ backend/__pycache__/
 backend/*.pyc
 backend/.env
 backend/sessions/
+backend/sessions.migrated/
+backend/sessions.db
+backend/sessions.db-wal
+backend/sessions.db-shm
 backend/agent_overrides.json
 backend/feedback.json
 backend/notify_config.json
