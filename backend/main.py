@@ -584,6 +584,39 @@ async def _run_chat(messages: list[dict]) -> str:
     return "I wasn't able to complete that — could you rephrase or be more specific?"
 
 
+async def _chunk_stream(text: str):
+    """Stream a resolved reply token-ish by token for a live-typing feel.
+    (Tool calls are resolved server-side first, then the final answer streams.)"""
+    if not text:
+        yield ""
+        return
+    words = text.split(" ")
+    for i, w in enumerate(words):
+        yield (" " if i > 0 else "") + w
+        await asyncio.sleep(0.015)
+
+
+_STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+@app.post("/api/chat/stream")
+async def planner_chat_stream(body: ChatBody):
+    """Streaming variant of /api/chat — streams the reply text as it's produced."""
+    try:
+        from orchestrator import get_client, DEPLOYMENT  # noqa: F401
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
+    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+    for m in body.messages[-20:]:
+        if m.role in ("user", "assistant") and m.content:
+            messages.append({"role": m.role, "content": m.content})
+    try:
+        reply = await _run_chat(messages)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
+    return StreamingResponse(_chunk_stream(reply), media_type="text/plain", headers=_STREAM_HEADERS)
+
+
 @app.post("/api/chat")
 async def planner_chat(body: ChatBody):
     """Conversational planner assistant with tool access to session data."""
@@ -649,6 +682,40 @@ async def post_session_chat(session_id: str, body: SessionChatBody):
     except Exception:
         pass
     return {"reply": reply, "messages": session.chat}
+
+
+@app.post("/api/sessions/{session_id}/chat/stream")
+async def post_session_chat_stream(session_id: str, body: SessionChatBody):
+    """Streaming variant of the per-session chat — persists, then streams the reply."""
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    text = (body.content or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Empty message")
+
+    context_note = (
+        f"The user is currently viewing run '{session.name}' (session_id: {session.session_id}). "
+        "Default to THIS run when they ask about 'this run' / 'the cycle' — call get_session_context "
+        f"with session_id '{session.session_id}' for its real data."
+    )
+    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + context_note}]
+    for m in session.chat[-20:]:
+        if m.get("role") in ("user", "assistant") and m.get("content"):
+            messages.append({"role": m["role"], "content": m["content"]})
+    messages.append({"role": "user", "content": text})
+
+    session.chat.append({"role": "user", "content": text})
+    try:
+        reply = await _run_chat(messages)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
+    session.chat.append({"role": "assistant", "content": reply})
+    try:
+        save_session(session)
+    except Exception:
+        pass
+    return StreamingResponse(_chunk_stream(reply), media_type="text/plain", headers=_STREAM_HEADERS)
 
 
 @app.delete("/api/sessions/{session_id}/chat")
