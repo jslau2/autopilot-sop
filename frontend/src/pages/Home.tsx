@@ -7,6 +7,7 @@ import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import StopCycleControl from '../components/StopCycleControl';
 import TemplateGallery from '../components/TemplateGallery';
 import KickoffBar from '../components/KickoffBar';
 import type { ScenarioTemplate } from '../data/templates';
@@ -238,6 +239,13 @@ export default function Home() {
                   onMouseOver={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-base)'; }}
                   onMouseOut={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
                 >⎇</span>
+                {(s.status === 'running' || s.status === 'paused') && (
+                  <StopCycleControl
+                    sessionId={s.session_id}
+                    name={s.name}
+                    onStopped={() => setLiveSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, status: 'done' } : x))}
+                  />
+                )}
                 <DeleteCycleControl
                   sessionId={s.session_id}
                   name={s.name}

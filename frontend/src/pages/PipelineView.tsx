@@ -22,6 +22,7 @@ import ApprovalsModal from '../components/ApprovalsModal';
 import UsageChip from '../components/UsageChip';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import StopCycleControl from '../components/StopCycleControl';
 import KickoffBar from '../components/KickoffBar';
 import AppShell from '../components/AppShell';
 import type { KPIs } from '../types';
@@ -236,6 +237,13 @@ function SessionSwitcher({ current }: { current: string }) {
                   <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{relativeTime(s.created_at)}</div>
                 </div>
                 {s.session_id === current && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>current</span>}
+                {(s.status === 'running' || s.status === 'paused') && (
+                  <StopCycleControl
+                    sessionId={s.session_id}
+                    name={s.name}
+                    onStopped={() => setSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, status: 'done' } : x))}
+                  />
+                )}
                 <DeleteCycleControl
                   sessionId={s.session_id}
                   name={s.name}
@@ -456,6 +464,14 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                 title="Compare this cycle with others side-by-side"
                 style={{ textDecoration: 'none' }}
               >⇄ Compare</Link>
+              {!demoMode && S.sessionStatus !== 'done' && (
+                <button
+                  className="cfg-toolbar-btn"
+                  title="Stop this run (halts the agents, keeps the archived record)"
+                  onClick={() => { if (window.confirm('Stop this run? It will be halted but kept (archived) so you can still review it.')) terminateSession(); }}
+                  style={{ color: 'oklch(0.72 0.16 75)', borderColor: 'oklch(0.72 0.16 75 / 0.45)' }}
+                >⛔ Stop</button>
+              )}
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
               </button>
