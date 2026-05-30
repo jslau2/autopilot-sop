@@ -53,8 +53,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   flows into the exported report.
 - [ ] **Explainability + data lineage ("Why?")** — any KPI/recommendation
   traces back to agent reasoning AND the source row (SAP table / supplier feed).
-- [ ] **ROI / value dashboard** — quantify each run's worth ("protected $340k
-  revenue, saved $34k, +2.3pts OTIF"). Sells to the budget holder.
+- [x] **ROI / value dashboard** — 💰 Value modal (pipeline toolbar) translates a
+  run's KPIs into business value: Plan Δ EBIT, revenue protected (OTIF uplift ×
+  $/pt), optimisation savings (scanned from agent metrics), OTIF uplift, plus a
+  headline **annualised value**. Transparent, assumption-driven model
+  (`lib/value.ts`) with the calculation basis spelled out. Works in demo + live.
 - [ ] **Approvals workflow** — plan sign-off from finance/ops leads with
   comments; matches how S&OP actually closes.
 
