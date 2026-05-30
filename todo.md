@@ -145,8 +145,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   and an estimated USD cost (prices configurable via `AZURE_PRICE_INPUT/OUTPUT`
   per 1M tokens). A live `UsageChip` in the pipeline toolbar shows `tok · $cost`
   (hover for the breakdown). Persisted. (Fresh, isolated take.)
-- [ ] **Streaming chat** — token-by-token responses in the planner chat for a
-  more "live" feel.
+- [x] **Streaming chat** — `POST /api/chat/stream` and
+  `POST /api/sessions/{id}/chat/stream` stream the reply as a chunked text
+  response; PlannerChat reads the stream and grows the assistant bubble
+  token-by-token for a live-typing feel. (Tool calls are resolved server-side
+  first, then the final answer streams.)
 - [x] **Per-session chat threads** — when viewing a run, the planner chat becomes
   that run's own thread, stored server-side on the session (`chat`, persisted)
   via `GET/POST/DELETE /api/sessions/{id}/chat`. The thread is auto-scoped to the

@@ -143,26 +143,37 @@ export default function PlannerChat() {
     setInput('');
     setLoading(true);
     try {
-      if (threadId) {
-        // Per-session thread — server owns history & context.
-        const res = await fetch(`/api/sessions/${threadId}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: text }),
+      const url = threadId ? `/api/sessions/${threadId}/chat/stream` : '/api/chat/stream';
+      const body = threadId ? { content: text } : { messages: next };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      // Stream tokens into a growing assistant bubble for a live-typing feel.
+      setMessages(m => [...m, { role: 'assistant', content: '' }]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setMessages(m => {
+          const copy = m.slice();
+          copy[copy.length - 1] = { role: 'assistant', content: acc };
+          return copy;
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (Array.isArray(data.messages)) setMessages(data.messages);
-        else setMessages(m => [...m, { role: 'assistant', content: data.reply || '(no response)' }]);
-      } else {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: next }),
+      }
+      if (!acc) {
+        setMessages(m => {
+          const copy = m.slice();
+          copy[copy.length - 1] = { role: 'assistant', content: '(no response)' };
+          return copy;
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setMessages(m => [...m, { role: 'assistant', content: data.reply || '(no response)' }]);
       }
     } catch {
       setMessages(m => [...m, {
