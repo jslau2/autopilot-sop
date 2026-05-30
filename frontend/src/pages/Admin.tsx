@@ -7,6 +7,7 @@ interface Totals {
   prompt_tokens: number; completion_tokens: number; total_tokens: number;
   calls: number; errors: number; cost_usd: number;
   price_input_per_m: number; price_output_per_m: number;
+  retention_days?: number; window_calls?: number;
 }
 interface AgentRow { agent: string; calls: number; total_tokens: number; cost_usd: number; }
 interface SessionRow { session_id: string; name: string; calls: number; total_tokens: number; cost_usd: number; }
@@ -53,7 +54,8 @@ export default function Admin() {
             <Link to="/" style={{ fontSize: 12, color: 'var(--text-3)', textDecoration: 'none' }}>← Home</Link>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 18px' }}>
-            Total token usage and estimated cost across every run, with a full audit trail of LLM API calls.
+            Lifetime token usage and estimated cost across every run (counters never reset), with a full audit trail of LLM API calls.
+            {t?.retention_days ? ` Breakdowns & trail cover the last ${t.retention_days} days (${t.window_calls?.toLocaleString()} calls retained).` : ''}
           </p>
 
           {demoMode ? (
