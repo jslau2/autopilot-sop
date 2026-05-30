@@ -2,6 +2,89 @@
 
 Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
+## ★★★ TOP PRIORITY — Real Intelligence (make it trustworthy · production-ready · commercially defensible)
+
+> Everything below this section is UI shell. These items are what turn the app from
+> a demo into a product a supply chain planner would stake their job on.
+> Suggested order: SAP read → forecasting → accuracy tracking → optimization → negotiation → learning → SAP write-back.
+
+### 1. Real data layer — the non-negotiable foundation
+- [ ] **SAP S/4HANA read integration** — replace `mock_data.py` tool responses with
+  live OData API calls: inventory positions, open POs, production orders, goods
+  receipts, sales orders, BOM/routing. Without real data every agent output is
+  fiction. Start read-only; write-back comes after trust is established.
+- [ ] **Demand signals beyond SAP** — distributor sell-through (POS, not shipments),
+  APAC seasonality calendars, channel mix. Shimano bicycle components have strong
+  regional seasonal patterns the ERP alone doesn't capture.
+- [ ] **Supplier data feed** — live lead times, confirmed vs. requested dates,
+  allocation limits from key suppliers. Powers the procurement and risk agents with
+  ground truth instead of hardcoded assumptions.
+
+### 2. Real forecasting engine — replace AutoML Forecast agent's mock tools
+- [ ] **Statistical baseline** — Prophet or `statsforecast` hierarchical time-series
+  for SKU-level demand; bottom-up aggregation across the 847-SKU catalogue.
+- [ ] **ML layer** — LightGBM/XGBoost with features: seasonality, promotions, price,
+  channel, weather. Materially outperforms statistical baseline on intermittent demand.
+- [ ] **Prediction intervals, not point forecasts** — the Risk agent needs probability
+  distributions; single-number forecasts hide the uncertainty that drives safety stock.
+- [ ] **LLM agent role shift** — agent interprets the model output, flags anomalies,
+  adjusts for known events (promos, NPIs) the model doesn't see. Forecast accuracy
+  becomes auditable and improvable independently of the LLM.
+
+### 3. Plan accuracy tracking — proves (or disproves) the system is working
+- [ ] **Actuals ingestion loop** — pull SAP delivery actuals weekly; compare to the
+  plan that was approved for that week. Without this there is no feedback signal.
+- [ ] **Forecast accuracy dashboard** — MAPE, bias, WMAPE by SKU and horizon on every
+  completed cycle. Planners won't trust a system whose accuracy they can't inspect.
+- [ ] **Decision quality tracking** — for each human-approved recommendation, did the
+  resulting actuals hit the stated KPI target? Surfaces which agent outputs are
+  reliable and which need human scrutiny.
+- [ ] **Agent scorecard** — automated per-agent accuracy metrics surfaced in Agents Hub.
+  Creates accountability and a prioritised improvement backlog.
+
+### 4. Real optimization engine — replace Plan Optimizer agent's mock tools
+- [ ] **LP/MIP solver** — `PuLP` or `OR-Tools` mixed-integer program: maximise OTIF
+  subject to capacity by plant/line, safety stock floors, lead-time constraints,
+  budget cap. Deterministic, auditable, reproducible — properties an LLM alone can't
+  provide for a plan that moves real inventory.
+- [ ] **LLM agent as interpreter** — translates business constraints into solver
+  parameters, runs the solver tool, explains the output and trade-offs in plain
+  language. Optimization is math; communication is LLM.
+- [ ] **Sensitivity analysis** — solver re-runs with ±10% demand and capacity to show
+  how fragile the plan is. Directly feeds the what-if simulator with real numbers.
+
+### 5. Agent negotiation protocol — the genuine agentic leap beyond a pipeline
+- [ ] **Conflict detection** — after the initial parallel pass, Planner identifies
+  unresolved conflicts: demand > capacity, cost > budget, OTIF < target.
+- [ ] **Structured re-dispatch** — conflicting agents re-run with each other's
+  constraints as context and must propose a compromise (partial fulfillment,
+  alternative sourcing, deferred delivery), not just re-state their position.
+- [ ] **Convergence loop** — iterate until conflicts resolve or a pre-set round limit
+  triggers human escalation. This is what makes the system more capable than a
+  human S&OP process: it runs this across 847 SKUs simultaneously.
+
+### 6. Memory and learning — compounding returns over time
+- [ ] **RAG over past decisions** — when an agent faces a situation (e.g. +30% spike
+  on a hero SKU), retrieve how similar past cycles handled it and what the outcome
+  was. Wire into agent context via a vector store over the decisions/approvals store.
+- [ ] **Wire the feedback store** — 👍/👎 on agent outputs currently writes to a dead
+  end. Use approved recommendations as few-shot examples and overridden ones as
+  counter-examples in agent prompts. Accuracy compounds with each cycle.
+- [ ] **Constraint memory** — if a planner consistently overrides a specific agent's
+  estimates (e.g. Line 4 capacity), flag it automatically and surface a prompt to
+  correct the underlying assumption.
+
+### 7. SAP write-back — from recommendation to execution (earned after #3 proves trust)
+- [ ] **Safety stock parameter updates** — lowest-risk write-back; approved targets
+  push directly to SAP MRP parameters. Good first proof of closed-loop execution.
+- [ ] **Purchase order creation/update** — approved procurement recommendations raise
+  or amend SAP POs automatically. Requires approval workflow gate (already built).
+- [ ] **Production order updates** — approved production plan updates SAP planned
+  orders. Highest-commitment write-back; only after accuracy tracking (#3) shows
+  consistent plan quality.
+
+---
+
 ## ★ High-impact bets (practical · sellable · sticky · trial+feedback)
 
 > The set most likely to make planners want to try it, use it daily, and give
@@ -116,7 +199,6 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   the console polls it and shows live agent tiles, aggregate counts, and an
   Active Runs panel (click to open a run). Multi-USER grouping still needs
   auth/user identity — remaining future work.
-
 - [x] **Actionable chat** — the planner chat now has write tools: `start_cycle`
   (launch a run) and `answer_decision` (submit a decision to a paused run),
   alongside the read tools. Prompt-gated to act only on clear user intent.
@@ -144,7 +226,7 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   /api/sessions/{id}/usage` returns prompt/completion/total tokens, call count,
   and an estimated USD cost (prices configurable via `AZURE_PRICE_INPUT/OUTPUT`
   per 1M tokens). A live `UsageChip` in the pipeline toolbar shows `tok · $cost`
-  (hover for the breakdown). Persisted. (Fresh, isolated take.)
+  (hover for the breakdown). Persisted.
 - [x] **Streaming chat** — `POST /api/chat/stream` and
   `POST /api/sessions/{id}/chat/stream` stream the reply as a chunked text
   response; PlannerChat reads the stream and grows the assistant bubble
