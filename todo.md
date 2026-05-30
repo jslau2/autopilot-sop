@@ -37,9 +37,13 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   current run). Supersedes the simpler "Run comparison" below.
 - [ ] **Scheduled / recurring autonomous runs** — "run the weekly S&OP every
   Monday 6am and ping me." The literal autopilot promise; big stickiness.
-- [ ] **Alerts & notifications** — toast + optional email/Slack/Teams webhook
-  when a run pauses for a decision, a KPI breaches threshold, or a risk goes
-  critical. (Extends "Decision notifications" below.)
+- [x] **Alerts & notifications** — global `NotificationCenter` (bell + toasts,
+  mounted app-wide) polls `GET /api/notifications`, which derives alerts from
+  live session state (run paused for a decision, OTIF below target, capacity
+  critical). New alerts toast once; the bell shows an unread count; clicking an
+  alert opens that run. Optional **Slack/Teams webhook** (`notifications.py`,
+  stdlib, best-effort) configurable from the bell, with a "Send test". Closes
+  "Decision notifications" below.
 - [ ] **Interactive what-if sliders** — drag capacity / lead-time / demand% and
   watch KPIs re-estimate live (lightweight estimate, not a full re-run).
 
@@ -75,9 +79,9 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
 - [x] **Run comparison** — done as the **Scenario comparison dashboard** above
   (`/compare`): side-by-side KPIs, per-cycle key decision, and plan deltas.
-- [ ] **Decision notifications** — toast + badge when any *background* cycle
-  pauses for a human decision, so the human-in-the-loop checkpoint reaches you
-  even when you're on another page or in another run.
+- [x] **Decision notifications** — delivered as part of **Alerts &
+  notifications** above: a paused background cycle raises a toast + bell badge on
+  any page, and clicking it jumps straight to the run.
 - [x] **Executive report export** — a "⤓ Report" button in the pipeline opens a
   preview modal with one-click **Markdown** download and **Print / Save PDF**.
   Built entirely from session state (`src/lib/report.ts`) so it works in demo

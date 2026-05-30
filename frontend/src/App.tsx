@@ -7,6 +7,7 @@ import Agents from './pages/Agents';
 import DataSources from './pages/DataSources';
 import Compare from './pages/Compare';
 import PlannerChat from './components/PlannerChat';
+import NotificationCenter from './components/NotificationCenter';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/manager" element={<Navigate to="/agents/performance" replace />} />
       </Routes>
       <PlannerChat />
+      <NotificationCenter />
     </>
   );
 }

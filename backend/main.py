@@ -621,6 +621,41 @@ async def feedback_summary():
     return feedback_store.summary()
 
 
+# ---------------------------------------------------------------------------
+# Alerts & notifications — derived from live session state + optional webhook
+# ---------------------------------------------------------------------------
+class WebhookBody(BaseModel):
+    webhook_url: str | None = None
+    enabled: bool | None = None
+
+
+@app.get("/api/notifications")
+async def get_notifications():
+    import notifications
+    return {"alerts": notifications.compute_alerts(sessions)}
+
+
+@app.get("/api/notifications/webhook")
+async def get_webhook():
+    import notifications
+    cfg = notifications.get_config()
+    # don't echo the full URL back for safety; just whether it's set
+    return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
+
+
+@app.put("/api/notifications/webhook")
+async def set_webhook(body: WebhookBody):
+    import notifications
+    cfg = notifications.set_config(body.webhook_url, body.enabled)
+    return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
+
+
+@app.post("/api/notifications/test")
+async def test_webhook():
+    import notifications
+    return notifications.dispatch_webhook("✅ Autopilot S&OP test alert — your webhook is connected.")
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
