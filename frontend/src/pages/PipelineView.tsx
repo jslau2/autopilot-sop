@@ -17,6 +17,7 @@ import ExecSummaryBanner from '../components/ExecSummaryBanner';
 import DecisionLogModal from '../components/DecisionLogModal';
 import ValueDashboardModal from '../components/ValueDashboardModal';
 import WhatIfModal from '../components/WhatIfModal';
+import ExplainModal from '../components/ExplainModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import KickoffBar from '../components/KickoffBar';
@@ -250,19 +251,25 @@ function SessionSwitcher({ current }: { current: string }) {
   );
 }
 
-function KPIBar({ kpis }: { kpis: KPIs }) {
+function KPIBar({ kpis, onExplain }: { kpis: KPIs; onExplain: (key: string) => void }) {
   const cells = [
-    { lbl: 'OTIF Forecast', val: kpis.otif, good: kpis.otif === '97.8%', sub: 'target ≥ 98%' },
-    { lbl: 'Forecast Accuracy', val: kpis.forecastAcc, good: true, sub: 'MAPE at SKU×wk' },
-    { lbl: 'Capacity Util.', val: kpis.capacityUtil, warn: kpis.capacityUtil === '87%', sub: 'avg all lines' },
-    { lbl: 'Weeks of Supply', val: kpis.wos ? kpis.wos + ' wk' : null, good: true, sub: 'target 4–5 wk' },
-    { lbl: 'Plan Δ EBIT', val: kpis.planDelta != null ? `+$${kpis.planDelta}k` : null, good: (kpis.planDelta ?? 0) > 0, sub: 'vs unconstrained' },
+    { key: 'otif', lbl: 'OTIF Forecast', val: kpis.otif, good: kpis.otif === '97.8%', sub: 'target ≥ 98%' },
+    { key: 'forecastAcc', lbl: 'Forecast Accuracy', val: kpis.forecastAcc, good: true, sub: 'MAPE at SKU×wk' },
+    { key: 'capacityUtil', lbl: 'Capacity Util.', val: kpis.capacityUtil, warn: kpis.capacityUtil === '87%', sub: 'avg all lines' },
+    { key: 'wos', lbl: 'Weeks of Supply', val: kpis.wos ? kpis.wos + ' wk' : null, good: true, sub: 'target 4–5 wk' },
+    { key: 'planDelta', lbl: 'Plan Δ EBIT', val: kpis.planDelta != null ? `+$${kpis.planDelta}k` : null, good: (kpis.planDelta ?? 0) > 0, sub: 'vs unconstrained' },
   ];
   return (
     <div className="kpi-bar">
       {cells.map((c, i) => (
-        <div key={i} className="kpi-cell">
-          <span className="kpi-lbl">{c.lbl}</span>
+        <div
+          key={i}
+          className="kpi-cell"
+          onClick={() => onExplain(c.key)}
+          title="Why? — trace this KPI to its agents & data"
+          style={{ cursor: 'pointer', position: 'relative' }}
+        >
+          <span className="kpi-lbl">{c.lbl} <span style={{ opacity: 0.5, fontWeight: 400 }}>ⓘ</span></span>
           <span className={`kpi-val${!c.val ? ' kpi-computing' : c.good ? ' kpi-good' : c.warn ? ' kpi-warn' : ''}`}>
             {c.val ?? '—'}
           </span>
@@ -286,6 +293,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showDecisions, setShowDecisions] = useState(false);
   const [showValue, setShowValue] = useState(false);
   const [showWhatIf, setShowWhatIf] = useState(false);
+  const [explainKey, setExplainKey] = useState<string | null>(null);
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
@@ -457,7 +465,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             </div>
           </div>
 
-          <KPIBar kpis={S.kpis} />
+          <KPIBar kpis={S.kpis} onExplain={setExplainKey} />
 
           {S.sessionStatus === 'done' && (
             <ExecSummaryBanner
@@ -487,6 +495,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowReport(false)} />}
         {showDecisions && <DecisionLogModal S={S} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowDecisions(false)} />}
         {showValue && <ValueDashboardModal S={S} name={cycleName} onClose={() => setShowValue(false)} />}
+        {explainKey && <ExplainModal S={S} kpiKey={explainKey} onClose={() => setExplainKey(null)} />}
         {showWhatIf && (
           <WhatIfModal
             kpis={S.kpis}
