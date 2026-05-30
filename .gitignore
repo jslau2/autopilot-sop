@@ -15,6 +15,7 @@ backend/agent_overrides.json
 backend/feedback.json
 backend/notify_config.json
 backend/shares.json
+backend/schedules.json
 
 # Misc
 .DS_Store

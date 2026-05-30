@@ -41,6 +41,9 @@ import mock_data
 # Restore archived (completed / terminated) sessions so they survive restarts.
 sessions.update(load_sessions())
 
+import scheduler
+scheduler.load()
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -85,6 +88,17 @@ class SuggestNameBody(BaseModel):
 class KickoffBody(BaseModel):
     brief: str = ""
     entity: str = ""
+
+
+class ScheduleBody(BaseModel):
+    name: str = ""
+    goal: str = DEFAULT_GOAL
+    cadence: str = "weekly"
+    entity: str = ""
+
+
+class ScheduleUpdateBody(BaseModel):
+    enabled: bool | None = None
 
 
 class ChatMessage(BaseModel):
@@ -716,6 +730,77 @@ async def set_webhook(body: WebhookBody):
 async def test_webhook():
     import notifications
     return notifications.dispatch_webhook("✅ Autopilot S&OP test alert — your webhook is connected.")
+
+
+# ---------------------------------------------------------------------------
+# Scheduled / recurring autonomous runs
+# ---------------------------------------------------------------------------
+def _launch_session(goal: str, name: str, entity: str = "") -> str:
+    """Create + start a session (shared by the API and the scheduler)."""
+    session_id = str(uuid.uuid4())
+    nm = (name or "").strip() or _derive_session_name(goal, session_id)
+    session = SessionState(session_id=session_id, name=nm, goal=goal)
+    session.entity = entity
+    sessions[session_id] = session
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    return session_id
+
+
+async def _schedule_loop():
+    """Background loop: launch any due schedules. Checks every 20s."""
+    while True:
+        try:
+            for sch in scheduler.due():
+                name = f"{sch['name']} · {time.strftime('%Y-%m-%d %H:%M')}"
+                sid = _launch_session(sch["goal"], name, sch.get("entity", ""))
+                scheduler.mark_ran(sch["id"], sid)
+                logging.getLogger("scheduler").info("Launched scheduled run %s -> %s", sch["id"], sid)
+        except Exception:
+            logging.getLogger("scheduler").exception("schedule loop error")
+        await asyncio.sleep(20)
+
+
+@app.on_event("startup")
+async def _start_scheduler():
+    asyncio.create_task(_schedule_loop())
+
+
+@app.get("/api/schedules")
+async def list_schedules():
+    return {"schedules": sorted(scheduler.schedules.values(), key=lambda s: s.get("created_at", 0), reverse=True),
+            "cadences": list(scheduler.CADENCE_SECONDS.keys())}
+
+
+@app.post("/api/schedules")
+async def create_schedule(body: ScheduleBody):
+    return scheduler.create(body.name, body.goal, body.cadence, body.entity)
+
+
+@app.put("/api/schedules/{sid}")
+async def update_schedule(sid: str, body: ScheduleUpdateBody):
+    sch = scheduler.update(sid, enabled=body.enabled)
+    if sch is None:
+        raise HTTPException(status_code=404, detail=f"No schedule '{sid}'")
+    return sch
+
+
+@app.post("/api/schedules/{sid}/run-now")
+async def run_schedule_now(sid: str):
+    sch = scheduler.force_due(sid)
+    if sch is None:
+        raise HTTPException(status_code=404, detail=f"No schedule '{sid}'")
+    # launch immediately rather than waiting for the loop tick
+    name = f"{sch['name']} · {time.strftime('%Y-%m-%d %H:%M')}"
+    session_id = _launch_session(sch["goal"], name, sch.get("entity", ""))
+    scheduler.mark_ran(sid, session_id)
+    return {"schedule_id": sid, "session_id": session_id, "launched": True}
+
+
+@app.delete("/api/schedules/{sid}")
+async def delete_schedule(sid: str):
+    if not scheduler.delete(sid):
+        raise HTTPException(status_code=404, detail=f"No schedule '{sid}'")
+    return {"deleted": True}
 
 
 @app.get("/api/health")
