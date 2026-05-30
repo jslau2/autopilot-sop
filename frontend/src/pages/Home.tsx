@@ -282,9 +282,9 @@ export default function Home() {
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.636 5.636l2.121 2.121M16.243 16.243l2.121 2.121M5.636 18.364l2.121-2.121M16.243 7.757l2.121-2.121" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
-            <div className="nc-title">Agents</div>
+            <div className="nc-title">Agents Hub</div>
             <div className="nc-desc">Configure prompts, models &amp; tools per agent, and review performance &amp; governance. The 12-agent roster lives here.</div>
-            <div className="nc-cta">Open Agents →</div>
+            <div className="nc-cta">Open Agents Hub →</div>
           </Link>
 
           <Link to="/datasources" className="nav-card" style={{ '--card-accent': 'var(--ag-finance)' } as React.CSSProperties}>
@@ -318,7 +318,7 @@ export default function Home() {
         <div className="home-footer">
           <Link to="/console">Agent Console</Link>
           &nbsp;·&nbsp;
-          <Link to="/agents">Agents</Link>
+          <Link to="/agents">Agents Hub</Link>
           &nbsp;·&nbsp;
           <Link to="/datasources">Data Sources</Link>
           &nbsp;·&nbsp;

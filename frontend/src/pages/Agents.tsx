@@ -23,9 +23,13 @@ export default function Agents() {
   return (
     <AppShell active="agents">
       <div style={{ height: 'calc(100vh - 53px)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '16px 22px 4px' }}>
+        <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', margin: 0 }}>Agents Hub</h1>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Configure & govern the 12-agent roster</span>
+      </div>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-        padding: '12px 22px 0', background: 'var(--bg-base)',
+        padding: '4px 22px 0', background: 'var(--bg-base)',
       }}>
         {TABS.map(t => {
           const on = t.key === active;

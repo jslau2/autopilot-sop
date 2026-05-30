@@ -9,7 +9,7 @@ const NAV: { key: NavKey; label: string; to: string }[] = [
   { key: 'home', label: 'Home', to: '/' },
   { key: 'cycle', label: 'Cycle', to: '/pipeline' },
   { key: 'console', label: 'Agent Console', to: '/console' },
-  { key: 'agents', label: 'Agents', to: '/agents' },
+  { key: 'agents', label: 'Agents Hub', to: '/agents' },
   { key: 'data', label: 'Data Sources', to: '/datasources' },
 ];
 

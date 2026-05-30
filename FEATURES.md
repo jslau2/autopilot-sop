@@ -66,7 +66,7 @@ loop.
 - **Agent Console — Live Agent Activity:** a real-time fleet monitor showing
   every agent's status aggregated across **all active runs**, with an Active
   Runs panel. (Demo mode shows a scripted walkthrough.)
-- **Agents hub:**
+- **Agents Hub:**
   - *Configure* — edit each agent's **system prompt & temperature**; changes
     apply to new live runs.
   - *Performance & Governance* — per-agent analytics, growth trends, and a

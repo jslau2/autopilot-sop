@@ -55,7 +55,7 @@ Frontend:
   (no session), `PipelineRun` (a session, keyed by id), `SessionSwitcher`,
   breadcrumb, Focus mode. Picks `useSimulation` (demo) or `useLiveSession`.
 - `src/pages/Home.tsx` — lists Planning Cycles (paginated) + nav cards.
-- `src/pages/Agents.tsx` — hub with tabs Configure (`AgentSettings`) /
+- `src/pages/Agents.tsx` — Agents Hub: tabs Configure (`AgentSettings`) /
   Performance (`AgentManager`), both rendered with `embedded` prop.
 - `src/pages/AgentConsole.tsx` — "Live Agent Activity" view (currently scripted;
   north-star: live across sessions/users — see todo.md).
