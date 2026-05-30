@@ -170,10 +170,20 @@ export default function PlannerChat() {
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         ) : (
-          // Sparkles — a recognizable "AI" glyph
-          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11.6 3.2 13.2 8a2 2 0 0 0 1.3 1.3l4.8 1.6-4.8 1.6A2 2 0 0 0 13.2 16l-1.6 4.8L10 16a2 2 0 0 0-1.3-1.3L3.9 13l4.8-1.6A2 2 0 0 0 10 8z" />
-            <path d="M19 3v3.5M20.75 4.75h-3.5" />
+          // Orbiting agent core — an autonomous orchestrator coordinating agents
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.4" opacity="0.4" />
+            <g>
+              <circle cx="19.5" cy="12" r="1.9" fill="currentColor" />
+              <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite" />
+            </g>
+            <g>
+              <circle cx="6" cy="12" r="1.3" fill="currentColor" opacity="0.7" />
+              <animateTransform attributeName="transform" type="rotate" from="120 12 12" to="480 12 12" dur="9s" repeatCount="indefinite" />
+            </g>
+            <circle cx="12" cy="12" r="3.4" fill="currentColor">
+              <animate attributeName="r" values="3;3.7;3" dur="2.6s" repeatCount="indefinite" />
+            </circle>
           </svg>
         )}
       </button>
@@ -196,9 +206,11 @@ export default function PlannerChat() {
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               color: 'oklch(0.18 0.03 80)', flexShrink: 0,
             }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11.6 3.2 13.2 8a2 2 0 0 0 1.3 1.3l4.8 1.6-4.8 1.6A2 2 0 0 0 13.2 16l-1.6 4.8L10 16a2 2 0 0 0-1.3-1.3L3.9 13l4.8-1.6A2 2 0 0 0 10 8z" />
-                <path d="M19 3v3.5M20.75 4.75h-3.5" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.6" opacity="0.45" />
+                <circle cx="19.5" cy="12" r="1.9" fill="currentColor" />
+                <circle cx="6" cy="12" r="1.3" fill="currentColor" opacity="0.7" />
+                <circle cx="12" cy="12" r="3.4" fill="currentColor" />
               </svg>
             </span>
             <div style={{ flex: 1 }}>
