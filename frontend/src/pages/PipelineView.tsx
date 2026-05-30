@@ -271,7 +271,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showConfig, setShowConfig] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
-  const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string } | null>(null);
+  const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
@@ -348,7 +348,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     activeSessionId: sessionId,
     setActiveSessionId: () => {},
     demoMode,
-    onNewCycle: () => { setLaunchSeed(null); setShowLaunch(true); },
+    onNewCycle: (seed?: { goal?: string; name?: string; uploadId?: string }) => { setLaunchSeed(seed ?? null); setShowLaunch(true); },
     kpis: S.kpis,
     paused: S.paused,
     manualPause: S.manualPause,
@@ -473,7 +473,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             initialName={launchSeed?.name}
             scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity }); }}
+            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}
