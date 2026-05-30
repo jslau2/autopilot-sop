@@ -34,6 +34,7 @@ class SessionState:
     elapsed_final: float | None = None   # set when terminal; freezes elapsed()
     current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
     decisions: list = field(default_factory=list)  # audit trail of human decisions
+    approvals: list = field(default_factory=list)   # plan sign-offs (approvals workflow)
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
     bg_task: Any = None

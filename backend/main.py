@@ -101,6 +101,13 @@ class AgentConfigBody(BaseModel):
     temperature: float | None = None
 
 
+class ApprovalBody(BaseModel):
+    role: str
+    decision: str = "approve"   # "approve" | "reject"
+    approver: str = ""
+    comment: str = ""
+
+
 class FeedbackBody(BaseModel):
     session_id: str = ""
     target: str = "run"          # "run" or a step_id
@@ -871,6 +878,63 @@ async def submit_answer(session_id: str, body: AnswerBody):
         "answer": body.answer,
         "status": session.status,
     }
+
+
+REQUIRED_APPROVAL_ROLES = ["Finance Lead", "Operations Lead", "Demand Planning"]
+
+
+def _approval_status(session: SessionState) -> dict:
+    """Latest sign-off per role + overall plan status."""
+    latest: dict[str, dict] = {}
+    for a in session.approvals:
+        latest[a.get("role", "")] = a
+    roles = []
+    approved = True
+    for role in REQUIRED_APPROVAL_ROLES:
+        a = latest.get(role)
+        state = a.get("decision") if a else "pending"
+        roles.append({
+            "role": role, "state": state,
+            "approver": a.get("approver", "") if a else "",
+            "comment": a.get("comment", "") if a else "",
+            "ts": a.get("ts", "") if a else "",
+        })
+        if state != "approve":
+            approved = False
+    if any(r["state"] == "reject" for r in roles):
+        overall = "rejected"
+    elif approved:
+        overall = "approved"
+    else:
+        overall = "pending"
+    return {"roles": roles, "overall": overall, "history": session.approvals}
+
+
+@app.get("/api/sessions/{session_id}/approvals")
+async def get_approvals(session_id: str):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    return _approval_status(session)
+
+
+@app.post("/api/sessions/{session_id}/approvals")
+async def add_approval(session_id: str, body: ApprovalBody):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    session.approvals.append({
+        "ts": session.now_ts(),
+        "role": body.role,
+        "decision": "reject" if body.decision == "reject" else "approve",
+        "approver": body.approver,
+        "comment": body.comment,
+    })
+    try:
+        save_session(session)
+    except Exception:
+        pass
+    return _approval_status(session)
 
 
 @app.get("/api/sessions/{session_id}/decisions")
