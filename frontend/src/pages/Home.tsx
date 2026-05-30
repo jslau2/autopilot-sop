@@ -120,6 +120,15 @@ export default function Home() {
             <span className="sp-count">
               {demoMode ? `${SESSIONS.length} sessions` : `${filteredLive.length} session${filteredLive.length === 1 ? '' : 's'}${activeEntity !== ALL_ENTITIES ? ' · ' + activeEntity : ''}`}
             </span>
+            <Link
+              to="/compare"
+              title="Compare cycles side-by-side"
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 7, textDecoration: 'none',
+                color: 'var(--text-2)', background: 'var(--bg-base)', border: '1px solid var(--border)',
+                marginRight: 8,
+              }}
+            >⇄ Compare</Link>
             <button className="sp-new-btn" onClick={newCycle}>+ New cycle</button>
           </div>
 

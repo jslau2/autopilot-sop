@@ -5,6 +5,7 @@ import PipelineView from './pages/PipelineView';
 import AgentConsole from './pages/AgentConsole';
 import Agents from './pages/Agents';
 import DataSources from './pages/DataSources';
+import Compare from './pages/Compare';
 import PlannerChat from './components/PlannerChat';
 
 function ScrollToTop() {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/agents" element={<Agents />} />
         <Route path="/agents/:tab" element={<Agents />} />
         <Route path="/datasources" element={<DataSources />} />
+        <Route path="/compare" element={<Compare />} />
         {/* Renamed config routes → redirect into the merged Agents hub */}
         <Route path="/settings" element={<Navigate to="/agents/configure" replace />} />
         <Route path="/manager" element={<Navigate to="/agents/performance" replace />} />
