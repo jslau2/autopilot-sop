@@ -44,6 +44,9 @@ sessions.update(load_sessions())
 import scheduler
 scheduler.load()
 
+import llm_audit
+llm_audit.load()
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -259,8 +262,8 @@ async def suggest_name(body: SuggestNameBody):
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
-            lambda: get_client().chat.completions.create(
-                model=DEPLOYMENT,
+            lambda: llm_audit.audited_create(
+                get_client(), agent="suggest-name", model=DEPLOYMENT,
                 messages=[
                     {"role": "system", "content": (
                         "You name S&OP planning cycles. Given the goal, reply with a single "
@@ -298,8 +301,8 @@ async def kickoff(body: KickoffBody):
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
-            lambda: get_client().chat.completions.create(
-                model=DEPLOYMENT,
+            lambda: llm_audit.audited_create(
+                get_client(), agent="kickoff", model=DEPLOYMENT,
                 messages=[
                     {"role": "system", "content": (
                         "You turn a planner's plain-English brief into a structured S&OP planning goal for "
@@ -380,8 +383,8 @@ async def exec_summary(session_id: str):
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
-            lambda: get_client().chat.completions.create(
-                model=DEPLOYMENT,
+            lambda: llm_audit.audited_create(
+                get_client(), session=s, agent="exec-summary", model=DEPLOYMENT,
                 messages=[
                     {"role": "system", "content": (
                         "You are the Planner agent. Write a crisp 3-sentence executive summary of an "
@@ -542,15 +545,15 @@ async def _chat_dispatch(name: str, args: dict):
     return {"error": f"Unknown tool '{name}'"}
 
 
-async def _run_chat(messages: list[dict]) -> str:
+async def _run_chat(messages: list[dict], session=None) -> str:
     """Run the bounded planner tool-calling loop over `messages`, return the reply."""
     from orchestrator import get_client, DEPLOYMENT
     loop = asyncio.get_event_loop()
     for _ in range(5):
         resp = await loop.run_in_executor(
             None,
-            lambda msgs=messages: get_client().chat.completions.create(
-                model=DEPLOYMENT,
+            lambda msgs=messages: llm_audit.audited_create(
+                get_client(), session=session, agent="chat", model=DEPLOYMENT,
                 messages=msgs,
                 tools=CHAT_TOOLS,
                 tool_choice="auto",
@@ -673,7 +676,7 @@ async def post_session_chat(session_id: str, body: SessionChatBody):
 
     session.chat.append({"role": "user", "content": text})
     try:
-        reply = await _run_chat(messages)
+        reply = await _run_chat(messages, session=session)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
     session.chat.append({"role": "assistant", "content": reply})
@@ -707,7 +710,7 @@ async def post_session_chat_stream(session_id: str, body: SessionChatBody):
 
     session.chat.append({"role": "user", "content": text})
     try:
-        reply = await _run_chat(messages)
+        reply = await _run_chat(messages, session=session)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
     session.chat.append({"role": "assistant", "content": reply})
@@ -933,6 +936,16 @@ async def delete_schedule(sid: str):
     if not scheduler.delete(sid):
         raise HTTPException(status_code=404, detail=f"No schedule '{sid}'")
     return {"deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin Hub — fleet-wide LLM usage / cost audit
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/llm-usage")
+async def admin_llm_usage(recent_limit: int = 100):
+    """Fleet-wide token/cost totals + per-agent / per-session rollups + a recent
+    call audit trail. (No auth yet — admin gating is future work.)"""
+    return llm_audit.summary(recent_limit=recent_limit)
 
 
 @app.get("/api/health")
@@ -1202,22 +1215,15 @@ async def get_shared(token: str):
     return _share_snapshot(sessions[session_id])
 
 
-import os as _os
-# Price per 1M tokens (USD). Defaults reflect a small/nano deployment; override
-# with AZURE_PRICE_INPUT / AZURE_PRICE_OUTPUT (USD per 1M tokens).
-PRICE_INPUT_PER_M = float(_os.getenv("AZURE_PRICE_INPUT", "0.05"))
-PRICE_OUTPUT_PER_M = float(_os.getenv("AZURE_PRICE_OUTPUT", "0.40"))
-
-
 def _usage_payload(s: SessionState) -> dict:
+    # Single source of truth for pricing lives in llm_audit.
     u = s.usage
-    cost = (u["prompt_tokens"] / 1_000_000 * PRICE_INPUT_PER_M
-            + u["completion_tokens"] / 1_000_000 * PRICE_OUTPUT_PER_M)
+    cost = llm_audit.cost_of(u["prompt_tokens"], u["completion_tokens"])
     return {
         **u,
         "est_cost_usd": round(cost, 6),
-        "price_input_per_m": PRICE_INPUT_PER_M,
-        "price_output_per_m": PRICE_OUTPUT_PER_M,
+        "price_input_per_m": llm_audit.PRICE_INPUT_PER_M,
+        "price_output_per_m": llm_audit.PRICE_OUTPUT_PER_M,
     }
 
 

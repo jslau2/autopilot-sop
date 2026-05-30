@@ -16,6 +16,7 @@ backend/feedback.json
 backend/notify_config.json
 backend/shares.json
 backend/schedules.json
+backend/llm_audit.json
 
 # Misc
 .DS_Store

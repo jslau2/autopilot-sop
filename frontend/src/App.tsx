@@ -8,6 +8,7 @@ import DataSources from './pages/DataSources';
 import Compare from './pages/Compare';
 import SharePage from './pages/SharePage';
 import Schedules from './pages/Schedules';
+import Admin from './pages/Admin';
 import PlannerChat from './components/PlannerChat';
 import NotificationCenter from './components/NotificationCenter';
 
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/compare" element={<Compare />} />
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/schedules" element={<Schedules />} />
+        <Route path="/admin" element={<Admin />} />
         {/* Renamed config routes → redirect into the merged Agents hub */}
         <Route path="/settings" element={<Navigate to="/agents/configure" replace />} />
         <Route path="/manager" element={<Navigate to="/agents/performance" replace />} />

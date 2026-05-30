@@ -230,10 +230,12 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
             # Call the Planner LLM
             try:
+                import llm_audit
                 response = await loop.run_in_executor(
                     None,
-                    lambda: get_client().chat.completions.create(
-                        model=DEPLOYMENT,
+                    lambda: llm_audit.audited_create(
+                        get_client(),
+                        session=session, agent="planner", model=DEPLOYMENT,
                         messages=messages,
                         tools=PLANNER_TOOLS,
                         tool_choice="auto",
@@ -251,7 +253,6 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                 session.status = "error"
                 return
 
-            session.add_usage(getattr(response, "usage", None))
             msg = response.choices[0].message
 
             if not msg.tool_calls:
