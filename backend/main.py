@@ -33,19 +33,55 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
+from collections import OrderedDict
+
 from session import SessionState, sessions
 from orchestrator import run_orchestrator
-from persistence import save_session, delete_session_file, load_sessions
+from persistence import save_session, delete_session_file
 import mock_data
+import session_store
 
-# Restore archived (completed / terminated) sessions so they survive restarts.
-sessions.update(load_sessions())
+# Archived (terminal) sessions live in SQLite and are hydrated lazily — they are
+# NOT bulk-loaded into memory at startup (that used to grow RAM with history).
+session_store.init()
 
 import scheduler
 scheduler.load()
 
 import llm_audit
 llm_audit.load()
+
+# Small LRU of archived sessions hydrated on demand (when a past run is opened),
+# so reopening history doesn't permanently grow memory.
+_HYDRATED_CAP = 32
+_hydrated: "OrderedDict[str, SessionState]" = OrderedDict()
+
+
+def _get_session(session_id: str) -> SessionState | None:
+    """Live session if present, else hydrate from the archive (cached)."""
+    s = sessions.get(session_id)
+    if s is not None:
+        return s
+    s = _hydrated.get(session_id)
+    if s is not None:
+        _hydrated.move_to_end(session_id)
+        return s
+    s = session_store.hydrate(session_id)
+    if s is not None:
+        _hydrated[session_id] = s
+        _hydrated.move_to_end(session_id)
+        while len(_hydrated) > _HYDRATED_CAP:
+            _hydrated.popitem(last=False)
+    return s
+
+
+def _resolve_name(session_id: str) -> str:
+    if not session_id:
+        return ""
+    s = sessions.get(session_id) or _hydrated.get(session_id)
+    if s is not None:
+        return s.name
+    return session_store.name_of(session_id)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -365,7 +401,7 @@ async def exec_summary(session_id: str):
     LLM-generated 3-sentence executive summary ("what happened + what I
     recommend") for a run. Falls back to a heuristic if the model is unavailable.
     """
-    s = sessions.get(session_id)
+    s = _get_session(session_id)
     if s is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -481,18 +517,18 @@ CHAT_TOOLS = [
 
 
 def _chat_list_sessions() -> list[dict]:
-    ordered = sorted(sessions.values(), key=lambda s: s.created_at, reverse=True)
+    # Live + archived (lazy summaries) so the assistant can reference past runs.
     return [{
-        "session_id": s.session_id,
-        "name": s.name,
-        "status": s.status,
-        "created_at": s.created_at,
-        "goal": (s.goal or "")[:200],
-    } for s in ordered]
+        "session_id": s["session_id"],
+        "name": s["name"],
+        "status": s["status"],
+        "created_at": s["created_at"],
+        "goal": (s.get("goal") or "")[:200],
+    } for s in _merged_summaries()]
 
 
 def _chat_get_session_context(session_id: str) -> dict:
-    s = sessions.get(session_id)
+    s = _get_session(session_id)
     if s is None:
         return {"error": f"No session with id '{session_id}'. Use list_sessions to see valid ids."}
     steps = [{
@@ -524,7 +560,7 @@ def _chat_start_cycle(goal: str, name: str) -> dict:
 
 
 async def _chat_answer_decision(session_id: str, answer: str) -> dict:
-    s = sessions.get(session_id)
+    s = _get_session(session_id)
     if s is None:
         return {"error": f"No session with id '{session_id}'. Use list_sessions to see valid ids."}
     if s.status != "paused" or s.pending_question is None:
@@ -645,7 +681,7 @@ class SessionChatBody(BaseModel):
 
 @app.get("/api/sessions/{session_id}/chat")
 async def get_session_chat(session_id: str):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     return {"messages": getattr(session, "chat", [])}
@@ -653,7 +689,7 @@ async def get_session_chat(session_id: str):
 
 @app.post("/api/sessions/{session_id}/chat")
 async def post_session_chat(session_id: str, body: SessionChatBody):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     text = (body.content or "").strip()
@@ -690,7 +726,7 @@ async def post_session_chat(session_id: str, body: SessionChatBody):
 @app.post("/api/sessions/{session_id}/chat/stream")
 async def post_session_chat_stream(session_id: str, body: SessionChatBody):
     """Streaming variant of the per-session chat — persists, then streams the reply."""
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     text = (body.content or "").strip()
@@ -723,7 +759,7 @@ async def post_session_chat_stream(session_id: str, body: SessionChatBody):
 
 @app.delete("/api/sessions/{session_id}/chat")
 async def clear_session_chat(session_id: str):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     session.chat = []
@@ -973,29 +1009,42 @@ def _session_summary(s: SessionState) -> dict:
         "kpis": s.kpis,
         "step_count": len(s.steps),
         "parent_id": s.parent_id,
-        "parent_name": sessions[s.parent_id].name if s.parent_id in sessions else "",
+        "parent_name": _resolve_name(s.parent_id),
         "entity": s.entity,
     }
+
+
+def _merged_summaries(entity: str = "") -> list[dict]:
+    """All sessions newest-first: live (in-memory) + archived (SQLite summaries,
+    NOT hydrated). Live overrides archived for the same id. Parent names resolved."""
+    merged: dict[str, dict] = {}
+    for row in session_store.summaries(entity):
+        merged[row["session_id"]] = row
+    for s in sessions.values():
+        if entity and s.entity != entity:
+            continue
+        merged[s.session_id] = _session_summary(s)
+    items = sorted(merged.values(), key=lambda s: s.get("created_at", 0), reverse=True)
+    names = {it["session_id"]: it.get("name", "") for it in items}
+    for it in items:
+        pid = it.get("parent_id", "")
+        it["parent_name"] = names.get(pid) or _resolve_name(pid)
+    return items
 
 
 @app.get("/api/sessions")
 async def list_sessions(entity: str = ""):
     """List all sessions, newest first. Optional ?entity= scopes to one entity."""
-    ordered = sorted(sessions.values(), key=lambda s: s.created_at, reverse=True)
-    if entity:
-        ordered = [s for s in ordered if s.entity == entity]
-    return {"sessions": [_session_summary(s) for s in ordered]}
+    return {"sessions": _merged_summaries(entity)}
 
 
 @app.get("/api/sessions/current")
 async def get_current_session():
-    """Return the most recently created session ID, or 404 if none."""
-    if not sessions:
+    """Return the most recently created session, or 404 if none."""
+    items = _merged_summaries()
+    if not items:
         raise HTTPException(status_code=404, detail="No active sessions")
-
-    # Find the most recently created session
-    latest = max(sessions.values(), key=lambda s: s.created_at)
-    return _session_summary(latest)
+    return items[0]
 
 
 @app.post("/api/sessions")
@@ -1040,7 +1089,7 @@ async def stream_events(session_id: str):
     SSE endpoint — streams all S&OP events for a session.
     Replays historical events on reconnect, then streams new ones.
     """
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -1058,7 +1107,7 @@ async def stream_events(session_id: str):
 @app.get("/api/sessions/{session_id}")
 async def get_session(session_id: str):
     """Return current state of a session."""
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -1072,7 +1121,7 @@ async def get_session(session_id: str):
         "steps": session.steps,
         "pending_question": session.pending_question,
         "parent_id": session.parent_id,
-        "parent_name": sessions[session.parent_id].name if session.parent_id in sessions else "",
+        "parent_name": _resolve_name(session.parent_id),
         "entity": session.entity,
         "event_count": len(session.events),
     }
@@ -1084,7 +1133,7 @@ async def submit_answer(session_id: str, body: AnswerBody):
     Submit a human answer for a paused session.
     The orchestrator is awaiting this answer at ask_human().
     """
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -1142,7 +1191,7 @@ def _approval_status(session: SessionState) -> dict:
 
 @app.get("/api/sessions/{session_id}/approvals")
 async def get_approvals(session_id: str):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     return _approval_status(session)
@@ -1150,7 +1199,7 @@ async def get_approvals(session_id: str):
 
 @app.post("/api/sessions/{session_id}/approvals")
 async def add_approval(session_id: str, body: ApprovalBody):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     session.approvals.append({
@@ -1199,7 +1248,7 @@ def _share_snapshot(s: SessionState) -> dict:
 @app.post("/api/sessions/{session_id}/share")
 async def create_share(session_id: str):
     import shares
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     token = shares.create_token(session_id)
@@ -1210,9 +1259,10 @@ async def create_share(session_id: str):
 async def get_shared(token: str):
     import shares
     session_id = shares.resolve(token)
-    if not session_id or session_id not in sessions:
+    session = _get_session(session_id) if session_id else None
+    if session is None:
         raise HTTPException(status_code=404, detail="This shared link is invalid or has expired.")
-    return _share_snapshot(sessions[session_id])
+    return _share_snapshot(session)
 
 
 def _usage_payload(s: SessionState) -> dict:
@@ -1229,7 +1279,7 @@ def _usage_payload(s: SessionState) -> dict:
 
 @app.get("/api/sessions/{session_id}/usage")
 async def get_usage(session_id: str):
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     return _usage_payload(session)
@@ -1238,7 +1288,7 @@ async def get_usage(session_id: str):
 @app.get("/api/sessions/{session_id}/decisions")
 async def get_decisions(session_id: str):
     """Audit trail of human decisions for a run (with KPI snapshots)."""
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
     return {"session_id": session_id, "decisions": session.decisions}
@@ -1263,7 +1313,7 @@ async def terminate_session(session_id: str):
     Stop a running session but KEEP it: the orchestrator is cancelled and the
     session is marked done and archived so it can be reviewed later.
     """
-    session = sessions.get(session_id)
+    session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -1279,12 +1329,15 @@ async def terminate_session(session_id: str):
 
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
-    """Permanently remove a session from memory and disk (hard delete)."""
+    """Permanently remove a session from memory and the archive (hard delete)."""
     session = sessions.pop(session_id, None)
-    if session is None:
+    _hydrated.pop(session_id, None)
+    archived = session_store.exists(session_id)
+    if session is None and not archived:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-    await _stop_session_tasks(session)
-    delete_session_file(session_id)
+    if session is not None:
+        await _stop_session_tasks(session)
+    session_store.delete(session_id)   # remove from SQLite archive
 
     return {"session_id": session_id, "deleted": True}
