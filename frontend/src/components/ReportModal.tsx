@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { SimState } from '../types';
 import { buildReport, reportToMarkdown, reportToHtml } from '../lib/report';
 import { useExecSummary } from '../hooks/useExecSummary';
@@ -36,6 +36,20 @@ export default function ReportModal({
 
   const onMarkdown = () => download(`sop-report-${base}.md`, reportToMarkdown(report), 'text/markdown');
 
+  const [shareMsg, setShareMsg] = useState('');
+  const onShare = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/share`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      const { path } = await res.json();
+      const url = `${window.location.origin}${path}`;
+      try { await navigator.clipboard.writeText(url); setShareMsg('✓ Link copied'); }
+      catch { setShareMsg(url); }
+    } catch { setShareMsg('✗ Could not create link'); }
+    setTimeout(() => setShareMsg(''), 4000);
+  };
+
   const onPrint = () => {
     const w = window.open('', '_blank', 'width=900,height=1000');
     if (!w) return;
@@ -72,6 +86,11 @@ export default function ReportModal({
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Executive Report</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{name} · preview below</div>
           </div>
+          {sessionId && !demoMode && (
+            <button className="cfg-toolbar-btn" onClick={onShare} title="Create a read-only shareable link">
+              {shareMsg || '🔗 Share link'}
+            </button>
+          )}
           <button className="cfg-toolbar-btn" onClick={onMarkdown}>⤓ Markdown</button>
           <button
             onClick={onPrint}
