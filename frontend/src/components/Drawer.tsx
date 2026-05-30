@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { AGENTS } from '../data/agents';
 import { REASONING } from '../data/reasoning';
+import FeedbackControl from './FeedbackControl';
 
 interface TraceMessage {
   role: string;
@@ -86,7 +87,7 @@ function TraceView({ trace }: { trace: TraceMessage[] }) {
 }
 
 export default function Drawer({ stepId, onClose }: DrawerProps) {
-  const { steps } = useDashboard();
+  const { steps, demoMode, activeSessionId } = useDashboard();
   const step = steps[stepId];
   const [tab, setTab] = useState<'output' | 'reasoning' | 'raw'>('output');
 
@@ -201,6 +202,21 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
               }
             </div>
           )}
+        </div>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          padding: '10px 16px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Rate this agent output</span>
+          <FeedbackControl
+            sessionId={activeSessionId}
+            target={step.id}
+            targetLabel={`${agent.name} · ${step.label}`}
+            agentId={step.agent}
+            demoMode={demoMode}
+            compact
+          />
         </div>
       </div>
     </div>

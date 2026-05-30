@@ -12,6 +12,7 @@ backend/*.pyc
 backend/.env
 backend/sessions/
 backend/agent_overrides.json
+backend/feedback.json
 
 # Misc
 .DS_Store
