@@ -2,6 +2,7 @@
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/shot.mjs
 *.tsbuildinfo
 
 # Backend
@@ -10,7 +11,20 @@ backend/__pycache__/
 backend/*.pyc
 backend/.env
 backend/sessions/
+backend/sessions.migrated/
+backend/sessions.db
+backend/sessions.db-wal
+backend/sessions.db-shm
 backend/agent_overrides.json
+backend/feedback.json
+backend/notify_config.json
+backend/shares.json
+backend/schedules.json
+backend/llm_audit.json
+backend/llm_audit.db
+backend/llm_audit.db-wal
+backend/llm_audit.db-shm
+backend/llm_audit.json.migrated
 
 # Misc
 .DS_Store

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { suggestName } from '../hooks/useLaunchCycle';
 import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
+import { TEMPLATES } from '../data/templates';
 
 export const DEFAULT_GOAL = `Q3-2026 S&OP Planning Cycle — Shimano APAC Manufacturing
 Scope: 847 SKUs, 12 plants (SPL + SBMB), planning horizon W22–W34 (13 weeks)
@@ -120,6 +121,29 @@ export default function LaunchConfig({
               : 'Dispatches real AI agents via Azure OpenAI — backend must be running.'}
           </p>
         </div>
+
+        {/* Template quick-pick */}
+        {!scenarioOf && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+              START FROM A TEMPLATE
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setGoal(t.goal); setName(t.name); setNameTouched(true); }}
+                  title={t.blurb}
+                  style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 16, cursor: 'pointer',
+                    background: 'var(--bg-base)', border: `1px solid ${t.accent.replace(')', ' / 0.5)')}`,
+                    color: 'var(--text-2)',
+                  }}
+                >{t.icon} {t.title}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cycle name */}
         <div>

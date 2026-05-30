@@ -284,10 +284,12 @@ async def run_worker_agent(
     for iteration in range(8):
         logger.debug("[%s/%s] iter %d — sending %d messages to LLM", agent_id, task_id, iteration+1, len(messages))
         try:
+            import llm_audit
             response = await loop.run_in_executor(
                 None,
-                lambda: get_client().chat.completions.create(
-                    model=DEPLOYMENT,
+                lambda: llm_audit.audited_create(
+                    get_client(),
+                    session=session, agent=agent_id, model=DEPLOYMENT,
                     messages=messages,
                     tools=tools if tools else None,
                     tool_choice="auto" if tools else None,

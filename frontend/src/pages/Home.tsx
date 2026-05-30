@@ -7,6 +7,10 @@ import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import StopCycleControl from '../components/StopCycleControl';
+import TemplateGallery from '../components/TemplateGallery';
+import KickoffBar from '../components/KickoffBar';
+import type { ScenarioTemplate } from '../data/templates';
 
 type LiveSession = {
   session_id: string;
@@ -73,6 +77,10 @@ export default function Home() {
     setLaunchSeed({ goal: s.goal, name: `${s.name} (what-if)`, parentId: s.session_id, scenarioOf: s.name });
     setShowLaunch(true);
   };
+  const useTemplate = (t: ScenarioTemplate) => {
+    setLaunchSeed({ goal: t.goal, name: t.name });
+    setShowLaunch(true);
+  };
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
@@ -114,12 +122,39 @@ export default function Home() {
           </p>
         </div>
 
+        <div style={{ marginBottom: 18 }}>
+          <KickoffBar
+            demoMode={demoMode}
+            onDemoSeed={(brief) => { setLaunchSeed({ goal: brief }); setShowLaunch(true); }}
+          />
+        </div>
+
+        <TemplateGallery onPick={useTemplate} />
+
         <div className="sessions-panel">
           <div className="sp-header">
             <span className="sp-title">Planning Cycles</span>
             <span className="sp-count">
               {demoMode ? `${SESSIONS.length} sessions` : `${filteredLive.length} session${filteredLive.length === 1 ? '' : 's'}${activeEntity !== ALL_ENTITIES ? ' · ' + activeEntity : ''}`}
             </span>
+            <Link
+              to="/schedules"
+              title="Scheduled / recurring autonomous runs"
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 7, textDecoration: 'none',
+                color: 'var(--text-2)', background: 'var(--bg-base)', border: '1px solid var(--border)',
+                marginRight: 8,
+              }}
+            >⏱ Schedules</Link>
+            <Link
+              to="/compare"
+              title="Compare cycles side-by-side"
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 7, textDecoration: 'none',
+                color: 'var(--text-2)', background: 'var(--bg-base)', border: '1px solid var(--border)',
+                marginRight: 8,
+              }}
+            >⇄ Compare</Link>
             <button className="sp-new-btn" onClick={newCycle}>+ New cycle</button>
           </div>
 
@@ -204,6 +239,13 @@ export default function Home() {
                   onMouseOver={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-base)'; }}
                   onMouseOut={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
                 >⎇</span>
+                {(s.status === 'running' || s.status === 'paused') && (
+                  <StopCycleControl
+                    sessionId={s.session_id}
+                    name={s.name}
+                    onStopped={() => setLiveSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, status: 'done' } : x))}
+                  />
+                )}
                 <DeleteCycleControl
                   sessionId={s.session_id}
                   name={s.name}

@@ -13,8 +13,17 @@ import TourOverlay from '../components/TourOverlay';
 import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import ReportModal from '../components/ReportModal';
+import ExecSummaryBanner from '../components/ExecSummaryBanner';
+import DecisionLogModal from '../components/DecisionLogModal';
+import ValueDashboardModal from '../components/ValueDashboardModal';
+import WhatIfModal from '../components/WhatIfModal';
+import ExplainModal from '../components/ExplainModal';
+import ApprovalsModal from '../components/ApprovalsModal';
+import UsageChip from '../components/UsageChip';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import StopCycleControl from '../components/StopCycleControl';
+import KickoffBar from '../components/KickoffBar';
 import AppShell from '../components/AppShell';
 import type { KPIs } from '../types';
 
@@ -61,6 +70,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
   const navigate = useNavigate();
   const launch = useLaunchCycle();
   const [showLaunch, setShowLaunch] = useState(false);
+  const [kickoffBrief, setKickoffBrief] = useState<string | undefined>(undefined);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
 
   useEffect(() => {
@@ -95,6 +105,13 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
             boxShadow: `0 4px 18px ${accent.replace(')', ' / 0.4)')}`,
           }}
         >+ New Cycle</button>
+
+        <div style={{ width: '100%', maxWidth: 620 }}>
+          <KickoffBar
+            demoMode={demoMode}
+            onDemoSeed={(brief) => { setKickoffBrief(brief); setShowLaunch(true); }}
+          />
+        </div>
 
         {!demoMode && sessions.length > 0 && (
           <div style={{ width: '100%', maxWidth: 620, marginTop: 8 }}>
@@ -147,8 +164,9 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
       {showLaunch && (
         <LaunchConfig
           demoMode={demoMode}
-          onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { entity }); }}
+          initialGoal={kickoffBrief}
+          onClose={() => { setShowLaunch(false); setKickoffBrief(undefined); }}
+          onLaunch={(goal, name, entity) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity }); }}
         />
       )}
     </div>
@@ -219,6 +237,13 @@ function SessionSwitcher({ current }: { current: string }) {
                   <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{relativeTime(s.created_at)}</div>
                 </div>
                 {s.session_id === current && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>current</span>}
+                {(s.status === 'running' || s.status === 'paused') && (
+                  <StopCycleControl
+                    sessionId={s.session_id}
+                    name={s.name}
+                    onStopped={() => setSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, status: 'done' } : x))}
+                  />
+                )}
                 <DeleteCycleControl
                   sessionId={s.session_id}
                   name={s.name}
@@ -236,19 +261,25 @@ function SessionSwitcher({ current }: { current: string }) {
   );
 }
 
-function KPIBar({ kpis }: { kpis: KPIs }) {
+function KPIBar({ kpis, onExplain }: { kpis: KPIs; onExplain: (key: string) => void }) {
   const cells = [
-    { lbl: 'OTIF Forecast', val: kpis.otif, good: kpis.otif === '97.8%', sub: 'target ≥ 98%' },
-    { lbl: 'Forecast Accuracy', val: kpis.forecastAcc, good: true, sub: 'MAPE at SKU×wk' },
-    { lbl: 'Capacity Util.', val: kpis.capacityUtil, warn: kpis.capacityUtil === '87%', sub: 'avg all lines' },
-    { lbl: 'Weeks of Supply', val: kpis.wos ? kpis.wos + ' wk' : null, good: true, sub: 'target 4–5 wk' },
-    { lbl: 'Plan Δ EBIT', val: kpis.planDelta != null ? `+$${kpis.planDelta}k` : null, good: (kpis.planDelta ?? 0) > 0, sub: 'vs unconstrained' },
+    { key: 'otif', lbl: 'OTIF Forecast', val: kpis.otif, good: kpis.otif === '97.8%', sub: 'target ≥ 98%' },
+    { key: 'forecastAcc', lbl: 'Forecast Accuracy', val: kpis.forecastAcc, good: true, sub: 'MAPE at SKU×wk' },
+    { key: 'capacityUtil', lbl: 'Capacity Util.', val: kpis.capacityUtil, warn: kpis.capacityUtil === '87%', sub: 'avg all lines' },
+    { key: 'wos', lbl: 'Weeks of Supply', val: kpis.wos ? kpis.wos + ' wk' : null, good: true, sub: 'target 4–5 wk' },
+    { key: 'planDelta', lbl: 'Plan Δ EBIT', val: kpis.planDelta != null ? `+$${kpis.planDelta}k` : null, good: (kpis.planDelta ?? 0) > 0, sub: 'vs unconstrained' },
   ];
   return (
     <div className="kpi-bar">
       {cells.map((c, i) => (
-        <div key={i} className="kpi-cell">
-          <span className="kpi-lbl">{c.lbl}</span>
+        <div
+          key={i}
+          className="kpi-cell"
+          onClick={() => onExplain(c.key)}
+          title="Why? — trace this KPI to its agents & data"
+          style={{ cursor: 'pointer', position: 'relative' }}
+        >
+          <span className="kpi-lbl">{c.lbl} <span style={{ opacity: 0.5, fontWeight: 400 }}>ⓘ</span></span>
           <span className={`kpi-val${!c.val ? ' kpi-computing' : c.good ? ' kpi-good' : c.warn ? ' kpi-warn' : ''}`}>
             {c.val ?? '—'}
           </span>
@@ -269,8 +300,13 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [viewMode, setViewMode] = useState<'swimlane' | 'timeline'>('swimlane');
   const [showConfig, setShowConfig] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showDecisions, setShowDecisions] = useState(false);
+  const [showValue, setShowValue] = useState(false);
+  const [showWhatIf, setShowWhatIf] = useState(false);
+  const [explainKey, setExplainKey] = useState<string | null>(null);
+  const [showApprovals, setShowApprovals] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
-  const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string } | null>(null);
+  const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
@@ -347,7 +383,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     activeSessionId: sessionId,
     setActiveSessionId: () => {},
     demoMode,
-    onNewCycle: () => { setLaunchSeed(null); setShowLaunch(true); },
+    onNewCycle: (seed?: { goal?: string; name?: string; uploadId?: string }) => { setLaunchSeed(seed ?? null); setShowLaunch(true); },
     kpis: S.kpis,
     paused: S.paused,
     manualPause: S.manualPause,
@@ -410,6 +446,9 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               )}
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
               <button className="cfg-toolbar-btn" onClick={() => setShowReport(true)} title="Export an executive report (Markdown / PDF)">⤓ Report</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowDecisions(true)} title="Decision log / audit trail">🗒 Decisions</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowValue(true)} title="ROI / value of this cycle">💰 Value</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowApprovals(true)} title="Plan approvals / sign-off">✓ Approvals</button>
               <button
                 className="cfg-toolbar-btn"
                 title="What-if — branch this cycle with tweaked constraints"
@@ -418,6 +457,21 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   setShowLaunch(true);
                 }}
               >⎇ What-if</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowWhatIf(true)} title="Interactive what-if sliders — estimate KPIs live">🎚 Simulate</button>
+              <Link
+                className="cfg-toolbar-btn"
+                to={demoMode ? '/compare' : `/compare?ids=${sessionId}`}
+                title="Compare this cycle with others side-by-side"
+                style={{ textDecoration: 'none' }}
+              >⇄ Compare</Link>
+              {!demoMode && S.sessionStatus !== 'done' && (
+                <button
+                  className="cfg-toolbar-btn"
+                  title="Stop this run (halts the agents, keeps the archived record)"
+                  onClick={() => { if (window.confirm('Stop this run? It will be halted but kept (archived) so you can still review it.')) terminateSession(); }}
+                  style={{ color: 'oklch(0.72 0.16 75)', borderColor: 'oklch(0.72 0.16 75 / 0.45)' }}
+                >⛔ Stop</button>
+              )}
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
               </button>
@@ -426,12 +480,20 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                 onClick={() => setShowTour(true)}
                 style={{ width: 'auto', padding: '4px 10px', borderRadius: 5, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
               >↺ Tour</button>
+              {!demoMode && <UsageChip sessionId={sessionId} active={S.sessionStatus !== 'done'} />}
               <div className={`status-pill ${statusClass}`}>{statusLabel}</div>
               <span className="elapsed-time mono">{S.elapsedT.toFixed(1)}s</span>
             </div>
           </div>
 
-          <KPIBar kpis={S.kpis} />
+          <KPIBar kpis={S.kpis} onExplain={setExplainKey} />
+
+          {S.sessionStatus === 'done' && (
+            <ExecSummaryBanner
+              S={S} name={cycleName} goal={cycleGoal}
+              sessionId={demoMode ? undefined : sessionId} demoMode={demoMode}
+            />
+          )}
 
           <div className="main-graph">
             {viewMode === 'swimlane' ? <Swimlane /> : <Timeline />}
@@ -451,7 +513,27 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
           />
         )}
         {showConfig && <CapacityConfigModal onClose={() => setShowConfig(false)} />}
-        {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} onClose={() => setShowReport(false)} />}
+        {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowReport(false)} />}
+        {showDecisions && <DecisionLogModal S={S} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowDecisions(false)} />}
+        {showValue && <ValueDashboardModal S={S} name={cycleName} onClose={() => setShowValue(false)} />}
+        {explainKey && <ExplainModal S={S} kpiKey={explainKey} onClose={() => setExplainKey(null)} />}
+        {showApprovals && <ApprovalsModal sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowApprovals(false)} />}
+        {showWhatIf && (
+          <WhatIfModal
+            kpis={S.kpis}
+            onClose={() => setShowWhatIf(false)}
+            onBranch={(note) => {
+              setShowWhatIf(false);
+              setLaunchSeed({
+                goal: `${cycleGoal}\n\n${note}`,
+                name: `${cycleName} (what-if)`,
+                parentId: demoMode ? undefined : sessionId,
+                scenarioOf: cycleName,
+              });
+              setShowLaunch(true);
+            }}
+          />
+        )}
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}
@@ -459,7 +541,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             initialName={launchSeed?.name}
             scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity }); }}
+            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}

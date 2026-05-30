@@ -200,12 +200,12 @@ export function useLiveSession(sessionId?: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const answerQuestion = useCallback((answer: string) => {
+  const answerQuestion = useCallback((answer: string, rationale = '') => {
     const q = S.pendingQuestion;
     if (!q) return;
     const step = S.steps[q.stepId];
     if (step) {
-      step.output = { answer };
+      step.output = { answer, rationale };
       step.status = 'done';
       step.endT = S.elapsedT;
     }
@@ -221,7 +221,7 @@ export function useLiveSession(sessionId?: string) {
       fetch(`/api/sessions/${sessionIdRef.current}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer }),
+        body: JSON.stringify({ answer, rationale }),
       }).catch(err => console.error('Failed to send answer:', err));
     }
   }, []);

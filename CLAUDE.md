@@ -40,10 +40,20 @@ Backend:
   preview.
 - `backend/session.py` — `SessionState` (events, steps, kpis, status, …) and
   the global `sessions` registry; `emit_*` helpers.
-- `backend/persistence.py` — JSON archive of **terminal** sessions
-  (`backend/sessions/*.json`, gitignored); loaded on startup.
-- `backend/main.py` — FastAPI routes (sessions CRUD, SSE, chat, datasource
-  preview, suggest-name) + the Planner chat tools (`CHAT_TOOLS`).
+- `backend/session_store.py` — SQLite archive of **terminal** sessions
+  (`backend/sessions.db`, gitignored). Lists read summary columns; full runs are
+  **hydrated lazily** when opened (not bulk-loaded at startup). One-time
+  migration folds legacy `sessions/*.json` in. `persistence.py` is a thin shim
+  delegating here (`save_session`/`delete_session_file`). In `main.py`,
+  `_get_session(id)` returns the live session or hydrates from the store (LRU).
+- `backend/main.py` — FastAPI routes (sessions CRUD, SSE, chat + streaming,
+  datasource preview, suggest-name, kickoff, exec-summary, decisions, approvals,
+  usage, share, notifications, schedules) + the Planner chat tools (`CHAT_TOOLS`).
+- Feature modules: `feedback_store.py` (👍/👎), `uploads.py` (run-on-your-data),
+  `notifications.py` (alerts + webhook), `shares.py` (read-only links),
+  `scheduler.py` (recurring runs). All write JSON next to the backend
+  (gitignored). `SessionState` also carries `decisions`, `approvals`, `usage`,
+  and per-run `chat`.
 
 Frontend:
 - `src/data/agents.ts` — agent display names/colors. NB: `rawColor` holds actual
@@ -54,7 +64,12 @@ Frontend:
 - `src/pages/PipelineView.tsx` — the **Cycle** workspace: `PipelineLanding`
   (no session), `PipelineRun` (a session, keyed by id), `SessionSwitcher`,
   breadcrumb, Focus mode. Picks `useSimulation` (demo) or `useLiveSession`.
-- `src/pages/Home.tsx` — lists Planning Cycles (paginated) + nav cards.
+- `src/pages/Home.tsx` — conversational kickoff + scenario templates + Planning
+  Cycles (paginated) + nav cards.
+- `src/pages/Compare.tsx` (scenario comparison), `Schedules.tsx` (recurring
+  runs), `SharePage.tsx` (public read-only). Pipeline modals: `ReportModal`,
+  `DecisionLogModal`, `ValueDashboardModal`, `WhatIfModal`, `ExplainModal`,
+  `ApprovalsModal`; `NotificationCenter` + `FeedbackControl` are app-wide.
 - `src/pages/Agents.tsx` — Agents Hub: tabs Configure (`AgentSettings`) /
   Performance (`AgentManager`), both rendered with `embedded` prop.
 - `src/pages/AgentConsole.tsx` — "Live Agent Activity" view (currently scripted;

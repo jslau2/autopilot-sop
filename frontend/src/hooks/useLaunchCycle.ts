@@ -35,6 +35,24 @@ export async function deleteCycle(sessionId: string, name?: string): Promise<boo
 }
 
 /**
+ * Stop a running/paused cycle but KEEP it: cancels the backend orchestrator +
+ * agent tasks and archives the run so it stays reviewable. Returns true if the
+ * user confirmed and it was terminated.
+ */
+export async function terminateCycle(sessionId: string, name?: string): Promise<boolean> {
+  const label = name || sessionId.slice(0, 8);
+  if (!window.confirm(`Stop cycle "${label}"? It will be halted but kept (archived) so you can still review it.`)) {
+    return false;
+  }
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}/terminate`, { method: 'POST' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Creates a cycle and navigates to its run view.
  * - Demo mode: single instance at /pipeline/demo (no backend call).
  * - Live mode: POST /api/sessions, then navigate to /pipeline/:id.
@@ -42,7 +60,7 @@ export async function deleteCycle(sessionId: string, name?: string): Promise<boo
 export function useLaunchCycle() {
   const navigate = useNavigate();
 
-  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string; entity?: string }) => {
+  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string; entity?: string; uploadId?: string }) => {
     if (demoMode) {
       navigate('/pipeline/demo', { state: { goal, name } });
       return;
@@ -51,7 +69,7 @@ export function useLaunchCycle() {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, name, parent_id: opts?.parentId ?? '', entity: opts?.entity ?? '' }),
+        body: JSON.stringify({ goal, name, parent_id: opts?.parentId ?? '', entity: opts?.entity ?? '', data_upload_id: opts?.uploadId ?? '' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { session_id } = await res.json();

@@ -8,12 +8,48 @@ export interface ReportData {
   status: string;
   elapsedSec: number;
   stepCount: number;
+  execSummary?: string;
   kpis: { label: string; value: string }[];
-  decisions: { question: string; answer: string }[];
+  decisions: { question: string; answer: string; rationale?: string }[];
   finance: { agent: string; task: string; result: string; metrics: [string, string][] }[];
   risk: { agent: string; task: string; result: string; metrics: [string, string][] }[];
   riskLogs: string[];
   activity: { agent: string; task: string; result: string; records: number; metrics: [string, string][] }[];
+}
+
+/**
+ * Heuristic 3-sentence "what happened + what I recommend" — used as the demo /
+ * offline fallback when the LLM exec-summary endpoint isn't available.
+ */
+export function heuristicExecSummary(r: ReportData): string {
+  const kv = Object.fromEntries(r.kpis.map(k => [k.label, k.value]));
+  const otif = kv['OTIF Forecast'];
+  const fa = kv['Forecast Accuracy'];
+  const cap = kv['Capacity Utilisation'];
+  const wos = kv['Weeks of Supply'];
+  const ebit = kv['Plan Δ EBIT'];
+
+  const kpiBits = [
+    otif && otif !== '—' ? `OTIF ${otif}` : null,
+    fa && fa !== '—' ? `forecast accuracy ${fa}` : null,
+    cap && cap !== '—' ? `capacity utilisation ${cap}` : null,
+  ].filter(Boolean).join(', ');
+
+  const s1 = `The cycle ran ${r.stepCount} agent task${r.stepCount === 1 ? '' : 's'} across demand, supply, optimisation and risk${kpiBits ? `, landing at ${kpiBits}` : ''}.`;
+
+  const d = r.decisions[0];
+  const s2 = d
+    ? `The key human decision — ${d.question.replace(/\s+/g, ' ').slice(0, 120)} — was resolved as "${(d.answer || 'pending').slice(0, 80)}".`
+    : 'No human decision checkpoint was required during this cycle.';
+
+  const capNum = cap ? parseFloat(cap) : NaN;
+  let rec: string;
+  if (ebit && /^[+]/.test(ebit)) rec = `The optimised plan protects ${ebit} EBIT vs. the unconstrained baseline — recommend approving and locking the plan.`;
+  else if (!Number.isNaN(capNum) && capNum >= 92) rec = `Capacity is running hot (${cap}); recommend pre-clearing overtime or alternate routing before committing.`;
+  else if (wos && wos !== '—') rec = `Weeks of supply at ${wos} is within the target band — recommend approving with standard monitoring.`;
+  else rec = 'Recommend reviewing the financial and risk sign-off below before approving the plan.';
+
+  return `${s1} ${s2} ${rec}`;
 }
 
 function agentName(id: string): string {
@@ -57,6 +93,7 @@ export function buildReport(S: SimState, meta: { name: string; goal: string }): 
     .map(s => ({
       question: s.question?.text ?? '',
       answer: (s.output as { answer?: string } | null)?.answer ?? '',
+      rationale: (s.output as { rationale?: string } | null)?.rationale ?? '',
     }))
     .filter(d => d.question);
 
@@ -88,6 +125,11 @@ export function reportToMarkdown(r: ReportData): string {
   L.push(`# Executive S&OP Report — ${r.name}`);
   L.push('');
   L.push(`*Generated ${r.generatedAt} · status: ${r.status} · ${r.elapsedSec.toFixed(1)}s · ${r.stepCount} agent tasks*`);
+  if (r.execSummary) {
+    L.push('');
+    L.push('## Executive Summary');
+    L.push(`> ${r.execSummary}`);
+  }
   if (r.goal) {
     L.push('');
     L.push('## Goal');
@@ -108,6 +150,7 @@ export function reportToMarkdown(r: ReportData): string {
     for (const d of r.decisions) {
       L.push(`- **Decision:** ${d.question}`);
       if (d.answer) L.push(`  - **Chosen:** ${d.answer}`);
+      if (d.rationale) L.push(`  - **Rationale:** ${d.rationale}`);
     }
   }
 
@@ -157,7 +200,7 @@ export function reportToHtml(r: ReportData): string {
 
   const decisions = r.decisions.length ? `
     <h2>Key Decisions</h2>
-    ${r.decisions.map(d => `<div class="dec"><div class="q">${esc(d.question)}</div>${d.answer ? `<div class="a">↳ ${esc(d.answer)}</div>` : ''}</div>`).join('')}` : '';
+    ${r.decisions.map(d => `<div class="dec"><div class="q">${esc(d.question)}</div>${d.answer ? `<div class="a">↳ ${esc(d.answer)}</div>` : ''}${d.rationale ? `<div class="r" style="font-size:12px;color:#6b7280;font-style:italic;margin-top:3px;">“${esc(d.rationale)}”</div>` : ''}</div>`).join('')}` : '';
 
   const block = (title: string, rows: { task: string; result: string; metrics: [string, string][] }[], extra = '') => {
     if (!rows.length && !extra) return '';
@@ -187,6 +230,7 @@ export function reportToHtml(r: ReportData): string {
   h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: #5b6472; border-bottom: 1px solid #e3e6ea; padding-bottom: 6px; margin: 28px 0 12px; }
   .sub { color: #6b7280; font-size: 12.5px; margin-bottom: 18px; }
   .goal { background: #f6f7f9; border: 1px solid #e3e6ea; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; white-space: pre-wrap; color: #374151; }
+  .exec { background: #eef4ff; border: 1px solid #cdddff; border-left: 4px solid #2f6bff; border-radius: 8px; padding: 12px 16px; font-size: 13.5px; line-height: 1.55; color: #1f2937; margin: 4px 0 8px; }
   .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
   .kpi { border: 1px solid #e3e6ea; border-radius: 8px; padding: 12px; text-align: center; }
   .kpi-v { font-size: 20px; font-weight: 700; }
@@ -209,6 +253,7 @@ export function reportToHtml(r: ReportData): string {
 </style></head><body>
   <h1>Executive S&amp;OP Report — ${esc(r.name)}</h1>
   <div class="sub">Generated ${esc(r.generatedAt)} · status: ${esc(r.status)} · ${r.elapsedSec.toFixed(1)}s · ${r.stepCount} agent tasks</div>
+  ${r.execSummary ? `<div class="exec">${esc(r.execSummary)}</div>` : ''}
   ${r.goal ? `<h2>Goal</h2><div class="goal">${esc(r.goal.trim())}</div>` : ''}
   <h2>Executive KPIs</h2>
   <div class="kpis">${kpiCards}</div>

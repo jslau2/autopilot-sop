@@ -1,7 +1,68 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AgentIcon from '../components/AgentIcon';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
+import { useDemoMode } from '../hooks/useDemoMode';
+
+type FbSummary = {
+  total: number; up: number; down: number; satisfaction: number | null;
+  by_agent: { agent_id: string; up: number; down: number }[];
+  recent_comments: { agent_id: string; rating: string; comment: string; target_label: string }[];
+};
+
+/**
+ * Real in-app feedback rolled up for governance. Pulls /api/feedback/summary
+ * (live mode) and renders only when there's data — sits above the (illustrative)
+ * historical analytics so genuine 👍/👎 signal is visible to governance.
+ */
+function LiveFeedbackSummary({ agentId }: { agentId: string }) {
+  const [demoMode] = useDemoMode();
+  const [sum, setSum] = useState<FbSummary | null>(null);
+
+  useEffect(() => {
+    if (demoMode) { setSum(null); return; }
+    let alive = true;
+    fetch('/api/feedback/summary')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (alive) setSum(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [demoMode, agentId]);
+
+  if (!sum || !sum.total) return null;
+  const mine = sum.by_agent.find(a => a.agent_id === agentId);
+  const comments = sum.recent_comments.filter(c => c.agent_id === agentId).slice(0, 4);
+
+  return (
+    <div className="fb-block" style={{ borderLeft: '3px solid var(--accent)' }}>
+      <div className="fb-block-hd">
+        <span className="fb-block-icon">🗳️</span>
+        <span className="fb-block-title">Live User Feedback (real signal)</span>
+      </div>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'baseline', margin: '6px 0 4px' }}>
+        <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+          All agents: <strong style={{ color: 'var(--text-1)' }}>{sum.satisfaction ?? '—'}%</strong> positive
+          <span style={{ color: 'var(--text-3)' }}> ({sum.up}👍 / {sum.down}👎, n={sum.total})</span>
+        </span>
+        {mine && (
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+            {AGENTS[agentId]?.name ?? agentId}: <strong style={{ color: 'var(--text-1)' }}>{mine.up}👍 / {mine.down}👎</strong>
+          </span>
+        )}
+      </div>
+      {comments.length > 0 && (
+        <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--text-2)' }}>
+          {comments.map((c, i) => (
+            <li key={i} style={{ marginBottom: 3 }}>
+              {c.rating === 'up' ? '👍' : '👎'} {c.comment}
+              {c.target_label ? <span style={{ color: 'var(--text-3)' }}> — {c.target_label}</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const MONTHS = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
 const METRIC_COLORS: Record<string, string> = {
@@ -281,6 +342,7 @@ export default function AgentManager({ embedded = false }: { embedded?: boolean 
           <div className="rp-body">
             {rpTab === 'performance' && (
               <>
+                <LiveFeedbackSummary agentId={selected.id} />
                 <div className="fb-block">
                   <div className="fb-block-hd">
                     <span className="fb-block-icon">📋</span>

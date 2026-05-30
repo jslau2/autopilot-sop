@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 type Pos = { left: number; top: number };
@@ -49,6 +50,12 @@ export default function PlannerChat() {
   const [pos, setPos] = useState<Pos>(loadPos);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // When viewing a specific run, the chat becomes that run's own thread
+  // (stored server-side). Otherwise it's the global localStorage thread.
+  const { pathname } = useLocation();
+  const runMatch = pathname.match(/^\/pipeline\/([^/]+)/);
+  const threadId = runMatch && runMatch[1] !== 'demo' ? runMatch[1] : null;
+
   // Drag bookkeeping
   const posRef = useRef(pos);
   const dragRef = useRef<{ startX: number; startY: number; baseLeft: number; baseTop: number; moved: boolean } | null>(null);
@@ -66,14 +73,33 @@ export default function PlannerChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading, open]);
 
-  // Persist chat history so it survives refresh / navigation.
+  // Persist the GLOBAL chat history locally (run threads live server-side).
   useEffect(() => {
+    if (threadId) return;
     try { localStorage.setItem(HIST_KEY, JSON.stringify(messages.slice(-50))); } catch { /* ignore */ }
-  }, [messages]);
+  }, [messages, threadId]);
+
+  // Load the run's server-side thread when opening on a run page (or switching runs).
+  useEffect(() => {
+    if (!open || demoMode) return;
+    if (threadId) {
+      fetch(`/api/sessions/${threadId}/chat`)
+        .then(r => (r.ok ? r.json() : { messages: [] }))
+        .then(d => setMessages(d.messages ?? []))
+        .catch(() => setMessages([]));
+    } else {
+      setMessages(loadMessages());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, threadId, demoMode]);
 
   const clearChat = () => {
     setMessages([]);
-    try { localStorage.removeItem(HIST_KEY); } catch { /* ignore */ }
+    if (threadId) {
+      fetch(`/api/sessions/${threadId}/chat`, { method: 'DELETE' }).catch(() => {});
+    } else {
+      try { localStorage.removeItem(HIST_KEY); } catch { /* ignore */ }
+    }
   };
 
   // Keep the button on-screen when the viewport changes.
@@ -117,14 +143,38 @@ export default function PlannerChat() {
     setInput('');
     setLoading(true);
     try {
-      const res = await fetch('/api/chat', {
+      const url = threadId ? `/api/sessions/${threadId}/chat/stream` : '/api/chat/stream';
+      const body = threadId ? { content: text } : { messages: next };
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setMessages(m => [...m, { role: 'assistant', content: data.reply || '(no response)' }]);
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      // Stream tokens into a growing assistant bubble for a live-typing feel.
+      setMessages(m => [...m, { role: 'assistant', content: '' }]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setMessages(m => {
+          const copy = m.slice();
+          copy[copy.length - 1] = { role: 'assistant', content: acc };
+          return copy;
+        });
+      }
+      if (!acc) {
+        setMessages(m => {
+          const copy = m.slice();
+          copy[copy.length - 1] = { role: 'assistant', content: '(no response)' };
+          return copy;
+        });
+      }
     } catch {
       setMessages(m => [...m, {
         role: 'assistant',
@@ -215,7 +265,7 @@ export default function PlannerChat() {
             </span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Planner Agent</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>S&amp;OP planning assistant</div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{threadId ? 'This run’s thread' : 'S&OP planning assistant'}</div>
             </div>
             {!demoMode && messages.length > 0 && (
               <button

@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { SimState } from '../types';
 import { buildReport, reportToMarkdown, reportToHtml } from '../lib/report';
+import { useExecSummary } from '../hooks/useExecSummary';
+import FeedbackControl from './FeedbackControl';
 
 function download(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -21,15 +23,32 @@ function slug(s: string): string {
  * live — the report is built entirely from the current session state.
  */
 export default function ReportModal({
-  S, name, goal, onClose,
+  S, name, goal, onClose, sessionId, demoMode,
 }: {
   S: SimState; name: string; goal: string; onClose: () => void;
+  sessionId?: string; demoMode?: boolean;
 }) {
-  const report = useMemo(() => buildReport(S, { name, goal }), [S, name, goal]);
+  const baseReport = useMemo(() => buildReport(S, { name, goal }), [S, name, goal]);
+  const { summary, source, loading } = useExecSummary(baseReport, { sessionId, demoMode });
+  const report = useMemo(() => ({ ...baseReport, execSummary: summary }), [baseReport, summary]);
   const html = useMemo(() => reportToHtml(report), [report]);
   const base = slug(name);
 
   const onMarkdown = () => download(`sop-report-${base}.md`, reportToMarkdown(report), 'text/markdown');
+
+  const [shareMsg, setShareMsg] = useState('');
+  const onShare = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/share`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      const { path } = await res.json();
+      const url = `${window.location.origin}${path}`;
+      try { await navigator.clipboard.writeText(url); setShareMsg('✓ Link copied'); }
+      catch { setShareMsg(url); }
+    } catch { setShareMsg('✗ Could not create link'); }
+    setTimeout(() => setShareMsg(''), 4000);
+  };
 
   const onPrint = () => {
     const w = window.open('', '_blank', 'width=900,height=1000');
@@ -67,6 +86,11 @@ export default function ReportModal({
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Executive Report</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{name} · preview below</div>
           </div>
+          {sessionId && !demoMode && (
+            <button className="cfg-toolbar-btn" onClick={onShare} title="Create a read-only shareable link">
+              {shareMsg || '🔗 Share link'}
+            </button>
+          )}
           <button className="cfg-toolbar-btn" onClick={onMarkdown}>⤓ Markdown</button>
           <button
             onClick={onPrint}
@@ -82,11 +106,40 @@ export default function ReportModal({
           >×</button>
         </div>
 
+        <div style={{
+          padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
+          background: 'oklch(0.55 0.18 260 / 0.08)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: 'oklch(0.78 0.16 260)' }}>
+              ✦ EXECUTIVE SUMMARY
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text-3)' }}>
+              {loading ? 'generating…' : source === 'llm' ? 'AI-generated' : 'auto-generated'}
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--text-1)' }}>{summary}</p>
+        </div>
+
         <iframe
           title="Report preview"
           srcDoc={html}
           style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
         />
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          padding: '10px 18px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>How useful was this plan / run?</span>
+          <FeedbackControl
+            sessionId={sessionId}
+            target="run"
+            targetLabel={name}
+            demoMode={demoMode}
+            compact
+          />
+        </div>
       </div>
     </div>
   );
