@@ -21,7 +21,7 @@ export interface DashboardContextValue {
   paused: boolean;
   manualPause: boolean;
   setManualPause: (v: boolean) => void;
-  answerQuestion: (answer: string) => void;
+  answerQuestion: (answer: string, rationale?: string) => void;
   terminateSession: () => void;
   showTour: boolean;
   setShowTour: (v: boolean) => void;

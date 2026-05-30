@@ -10,7 +10,7 @@ export interface ReportData {
   stepCount: number;
   execSummary?: string;
   kpis: { label: string; value: string }[];
-  decisions: { question: string; answer: string }[];
+  decisions: { question: string; answer: string; rationale?: string }[];
   finance: { agent: string; task: string; result: string; metrics: [string, string][] }[];
   risk: { agent: string; task: string; result: string; metrics: [string, string][] }[];
   riskLogs: string[];
@@ -93,6 +93,7 @@ export function buildReport(S: SimState, meta: { name: string; goal: string }): 
     .map(s => ({
       question: s.question?.text ?? '',
       answer: (s.output as { answer?: string } | null)?.answer ?? '',
+      rationale: (s.output as { rationale?: string } | null)?.rationale ?? '',
     }))
     .filter(d => d.question);
 
@@ -149,6 +150,7 @@ export function reportToMarkdown(r: ReportData): string {
     for (const d of r.decisions) {
       L.push(`- **Decision:** ${d.question}`);
       if (d.answer) L.push(`  - **Chosen:** ${d.answer}`);
+      if (d.rationale) L.push(`  - **Rationale:** ${d.rationale}`);
     }
   }
 
@@ -198,7 +200,7 @@ export function reportToHtml(r: ReportData): string {
 
   const decisions = r.decisions.length ? `
     <h2>Key Decisions</h2>
-    ${r.decisions.map(d => `<div class="dec"><div class="q">${esc(d.question)}</div>${d.answer ? `<div class="a">↳ ${esc(d.answer)}</div>` : ''}</div>`).join('')}` : '';
+    ${r.decisions.map(d => `<div class="dec"><div class="q">${esc(d.question)}</div>${d.answer ? `<div class="a">↳ ${esc(d.answer)}</div>` : ''}${d.rationale ? `<div class="r" style="font-size:12px;color:#6b7280;font-style:italic;margin-top:3px;">“${esc(d.rationale)}”</div>` : ''}</div>`).join('')}` : '';
 
   const block = (title: string, rows: { task: string; result: string; metrics: [string, string][] }[], extra = '') => {
     if (!rows.length && !extra) return '';

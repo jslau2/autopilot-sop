@@ -75,6 +75,7 @@ class StartSession(BaseModel):
 
 class AnswerBody(BaseModel):
     answer: str
+    rationale: str = ""
 
 
 class SuggestNameBody(BaseModel):
@@ -772,7 +773,7 @@ async def submit_answer(session_id: str, body: AnswerBody):
             detail="No pending question found for this session.",
         )
 
-    await session.set_answer(body.answer)
+    await session.set_answer(body.answer, body.rationale)
 
     return {
         "session_id": session_id,
@@ -780,6 +781,15 @@ async def submit_answer(session_id: str, body: AnswerBody):
         "answer": body.answer,
         "status": session.status,
     }
+
+
+@app.get("/api/sessions/{session_id}/decisions")
+async def get_decisions(session_id: str):
+    """Audit trail of human decisions for a run (with KPI snapshots)."""
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    return {"session_id": session_id, "decisions": session.decisions}
 
 
 async def _stop_session_tasks(session: SessionState) -> None:
