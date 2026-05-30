@@ -21,9 +21,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   `data/templates.ts`. A `TemplateGallery` sits at the top of Home and a compact
   template chip-row appears inside the launch modal — each seeds the goal + name
   so users never face a blank canvas.
-- [ ] **Conversational kickoff** — extend the actionable chat so a natural-
-  language brief ("Plan Q4 with +10% growth and Supplier X delayed 4 weeks")
-  configures and launches a cycle.
+- [x] **Conversational kickoff** — a `KickoffBar` (top of Home + the pipeline
+  landing) takes a plain-English brief and launches a cycle. Live mode expands
+  the brief into a structured goal + name via `POST /api/sessions/kickoff`
+  (LLM, JSON; falls back to the brief verbatim); demo seeds the launch modal.
+  Example prompts included. (The chat's `start_cycle` tool still works too.)
 - [x] **Auto-generated executive summary** — LLM 3-sentence "what happened +
   what I recommend" via `POST /api/sessions/{id}/exec-summary` (with a Python
   heuristic fallback when the model is offline). Shown as a banner at the top of

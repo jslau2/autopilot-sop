@@ -18,6 +18,7 @@ import DecisionLogModal from '../components/DecisionLogModal';
 import ValueDashboardModal from '../components/ValueDashboardModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import KickoffBar from '../components/KickoffBar';
 import AppShell from '../components/AppShell';
 import type { KPIs } from '../types';
 
@@ -64,6 +65,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
   const navigate = useNavigate();
   const launch = useLaunchCycle();
   const [showLaunch, setShowLaunch] = useState(false);
+  const [kickoffBrief, setKickoffBrief] = useState<string | undefined>(undefined);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
 
   useEffect(() => {
@@ -98,6 +100,13 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
             boxShadow: `0 4px 18px ${accent.replace(')', ' / 0.4)')}`,
           }}
         >+ New Cycle</button>
+
+        <div style={{ width: '100%', maxWidth: 620 }}>
+          <KickoffBar
+            demoMode={demoMode}
+            onDemoSeed={(brief) => { setKickoffBrief(brief); setShowLaunch(true); }}
+          />
+        </div>
 
         {!demoMode && sessions.length > 0 && (
           <div style={{ width: '100%', maxWidth: 620, marginTop: 8 }}>
@@ -150,8 +159,9 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
       {showLaunch && (
         <LaunchConfig
           demoMode={demoMode}
-          onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { entity }); }}
+          initialGoal={kickoffBrief}
+          onClose={() => { setShowLaunch(false); setKickoffBrief(undefined); }}
+          onLaunch={(goal, name, entity) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity }); }}
         />
       )}
     </div>
