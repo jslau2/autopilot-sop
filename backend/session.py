@@ -33,6 +33,7 @@ class SessionState:
     created_at: float = field(default_factory=time.time)
     elapsed_final: float | None = None   # set when terminal; freezes elapsed()
     current_planner_step: str = ""        # latest planner step — deps source for dispatched agents
+    decisions: list = field(default_factory=list)  # audit trail of human decisions
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
     bg_task: Any = None
@@ -159,8 +160,20 @@ class SessionState:
         self.human_answer_event.clear()
         return self.answer_text or ""
 
-    async def set_answer(self, answer: str) -> None:
-        """Store answer, signal event, clear pending question, resume session."""
+    async def set_answer(self, answer: str, rationale: str = "") -> None:
+        """Store answer, record it in the decision log, resume session."""
+        # Record the decision (audit trail) with a KPI snapshot at decision time.
+        q = self.pending_question or {}
+        self.decisions.append({
+            "ts": self.now_ts(),
+            "elapsed": round(self.elapsed(), 1),
+            "step_id": q.get("step_id", ""),
+            "question": q.get("text", ""),
+            "options": q.get("options", []),
+            "answer": answer,
+            "rationale": rationale,
+            "kpis_at_decision": dict(self.kpis),
+        })
         self.answer_text = answer
         self.pending_question = None
         self.status = "running"
@@ -168,7 +181,7 @@ class SessionState:
         await self.emit({
             "type": "answer",
             "agent": "human",
-            "message": f"Human answered: {answer}",
+            "message": f"Human answered: {answer}" + (f" — {rationale}" if rationale else ""),
         })
 
     async def done(self, summary: str = "") -> None:

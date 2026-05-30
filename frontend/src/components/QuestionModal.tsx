@@ -2,18 +2,20 @@ import { useState } from 'react';
 
 interface QuestionModalProps {
   question: { stepId: string; text: string };
-  onAnswer: (answer: string) => void;
+  onAnswer: (answer: string, rationale?: string) => void;
   onTerminate: () => void;
 }
 
 export default function QuestionModal({ question, onAnswer, onTerminate }: QuestionModalProps) {
   const [text, setText] = useState('');
+  const [rationale, setRationale] = useState('');
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onAnswer(text.trim());
+    onAnswer(text.trim(), rationale.trim());
     setText('');
+    setRationale('');
   };
 
   return (
@@ -32,6 +34,16 @@ export default function QuestionModal({ question, onAnswer, onTerminate }: Quest
               onChange={e => setText(e.target.value)}
               placeholder="State your decision (e.g. Option A — approve overtime)…"
               autoFocus
+            />
+            <input
+              value={rationale}
+              onChange={e => setRationale(e.target.value)}
+              placeholder="Rationale (optional, captured in the decision log)…"
+              style={{
+                width: '100%', boxSizing: 'border-box', marginBottom: 10,
+                background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 6,
+                padding: '8px 11px', fontSize: 12.5, color: 'var(--text-1)', outline: 'none',
+              }}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button

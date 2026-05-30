@@ -71,12 +71,12 @@ export function useSimulation(speed: number = 0.5) {
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  const answerQuestion = useCallback((answer: string) => {
+  const answerQuestion = useCallback((answer: string, rationale = '') => {
     const q = S.pendingQuestion;
     if (!q) return;
     const step = S.steps[q.stepId];
     if (step) {
-      step.output = { answer };
+      step.output = { answer, rationale };
       step.status = 'done';
       step.endT = S.elapsedT;
     }

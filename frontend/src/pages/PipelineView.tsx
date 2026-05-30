@@ -14,6 +14,7 @@ import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import ReportModal from '../components/ReportModal';
 import ExecSummaryBanner from '../components/ExecSummaryBanner';
+import DecisionLogModal from '../components/DecisionLogModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import AppShell from '../components/AppShell';
@@ -270,6 +271,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [viewMode, setViewMode] = useState<'swimlane' | 'timeline'>('swimlane');
   const [showConfig, setShowConfig] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showDecisions, setShowDecisions] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
@@ -411,6 +413,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               )}
               <button className="cfg-toolbar-btn" onClick={() => setShowConfig(true)}>⚙ Capacity Config</button>
               <button className="cfg-toolbar-btn" onClick={() => setShowReport(true)} title="Export an executive report (Markdown / PDF)">⤓ Report</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowDecisions(true)} title="Decision log / audit trail">🗒 Decisions</button>
               <button
                 className="cfg-toolbar-btn"
                 title="What-if — branch this cycle with tweaked constraints"
@@ -466,6 +469,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         )}
         {showConfig && <CapacityConfigModal onClose={() => setShowConfig(false)} />}
         {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowReport(false)} />}
+        {showDecisions && <DecisionLogModal S={S} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowDecisions(false)} />}
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}

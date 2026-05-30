@@ -44,8 +44,13 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   watch KPIs re-estimate live (lightweight estimate, not a full re-run).
 
 ### Trust & sellability — what closes the deal
-- [ ] **Decision log / audit trail** — every human decision with rationale,
-  timestamp, and resulting KPI impact. Governance/compliance + trust.
+- [x] **Decision log / audit trail** — every human decision is recorded with
+  its options, chosen answer, an optional **rationale** (new field in the
+  decision modal), timestamp/elapsed, and a **KPI snapshot at decision time**.
+  Stored on the session (`decisions`, persisted), exposed via
+  `GET /api/sessions/{id}/decisions`, and shown in a 🗒 Decisions modal (pipeline
+  toolbar). Demo derives the log from answered question steps. Rationale also
+  flows into the exported report.
 - [ ] **Explainability + data lineage ("Why?")** — any KPI/recommendation
   traces back to agent reasoning AND the source row (SAP table / supplier feed).
 - [ ] **ROI / value dashboard** — quantify each run's worth ("protected $340k
