@@ -86,7 +86,7 @@ def _resolve_name(session_id: str) -> str:
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Autopilot S&OP Backend", version="1.0.0")
+app = FastAPI(title="Autopilot S&OP Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
