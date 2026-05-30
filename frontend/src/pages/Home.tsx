@@ -7,6 +7,8 @@ import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
+import TemplateGallery from '../components/TemplateGallery';
+import type { ScenarioTemplate } from '../data/templates';
 
 type LiveSession = {
   session_id: string;
@@ -73,6 +75,10 @@ export default function Home() {
     setLaunchSeed({ goal: s.goal, name: `${s.name} (what-if)`, parentId: s.session_id, scenarioOf: s.name });
     setShowLaunch(true);
   };
+  const useTemplate = (t: ScenarioTemplate) => {
+    setLaunchSeed({ goal: t.goal, name: t.name });
+    setShowLaunch(true);
+  };
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(0);
   const launch = useLaunchCycle();
@@ -113,6 +119,8 @@ export default function Home() {
               : '⚡ Live mode — real Azure OpenAI agents'} · switch in the top bar
           </p>
         </div>
+
+        <TemplateGallery onPick={useTemplate} />
 
         <div className="sessions-panel">
           <div className="sp-header">

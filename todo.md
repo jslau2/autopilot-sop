@@ -16,9 +16,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   `uploads.py`); demo parses client-side. "▶ Plan on this data" launches a cycle
   seeded with the data summary so the agents plan on the user's numbers
   (`data_upload_id` folded into the goal). Excel → asks for CSV export (todo).
-- [ ] **Scenario gallery / templates** — one-click starts (Demand surge,
-  Supplier disruption, New product launch, Cost-down quarter). Removes the
-  blank-canvas problem; shows range instantly.
+- [x] **Scenario gallery / templates** — five one-click templates (Standard
+  cycle, Demand Surge, Supplier Disruption, New Product Launch, Cost-down) in
+  `data/templates.ts`. A `TemplateGallery` sits at the top of Home and a compact
+  template chip-row appears inside the launch modal — each seeds the goal + name
+  so users never face a blank canvas.
 - [ ] **Conversational kickoff** — extend the actionable chat so a natural-
   language brief ("Plan Q4 with +10% growth and Supplier X delayed 4 weeks")
   configures and launches a cycle.
