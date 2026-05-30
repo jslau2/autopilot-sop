@@ -39,8 +39,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   demo (built-in scenarios) and live (`/api/sessions`, entity-scoped). Entry
   points: Home "⇄ Compare" + pipeline toolbar "⇄ Compare" (deep-links the
   current run). Supersedes the simpler "Run comparison" below.
-- [ ] **Scheduled / recurring autonomous runs** — "run the weekly S&OP every
-  Monday 6am and ping me." The literal autopilot promise; big stickiness.
+- [x] **Scheduled / recurring autonomous runs** — `/schedules` page + a backend
+  scheduler (`scheduler.py`, persisted) with hourly/daily/weekly cadences. A
+  startup background loop launches due schedules autonomously (new runs appear in
+  the cycles list and fire alerts). CRUD + pause/resume + "▶ Run now" via
+  `/api/schedules`. The literal autopilot promise. (Live mode; demo shows a
+  notice.)
 - [x] **Alerts & notifications** — global `NotificationCenter` (bell + toasts,
   mounted app-wide) polls `GET /api/notifications`, which derives alerts from
   live session state (run paused for a decision, OTIF below target, capacity
