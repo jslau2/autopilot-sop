@@ -81,8 +81,39 @@ loop.
 ### Data & outputs
 - **Data Sources** — the ERP/external feeds powering the plan (SAP S/4HANA,
   Supplier Portal, Tooling Register, …) with **live data preview**.
+- **Run it on YOUR data** — drop a CSV/TSV export in the sidebar; it's parsed +
+  profiled (SKUs, demand, inventory, plants, period) and the agents plan on your
+  real numbers.
 - **Executive report export** — one click to **Markdown** or **PDF**: KPIs, key
   decisions, financial sign-off, risk register, and agent activity summary.
+- **Auto executive summary** — a 3-sentence "what happened + what I recommend"
+  on every finished run (and atop the report).
+- **Shareable links** — a read-only `/share/:token` snapshot of any run.
+
+### Decide, compare, and prove value
+- **Scenario comparison** — side-by-side of up to 3 cycles: KPI deltas,
+  best-per-metric, and a recommended plan.
+- **Interactive what-if simulator** — drag demand / capacity / lead-time and
+  watch KPIs re-estimate live; launch the tweak as a linked what-if run.
+- **ROI / value dashboard** — EBIT, revenue protected, savings, OTIF uplift, and
+  an annualised value for each run.
+- **Explainability ("Why?")** — click any KPI to trace it to the agents,
+  reasoning, and source systems behind it.
+- **Decision log / audit trail** — every human decision with rationale,
+  timestamp, and a KPI snapshot.
+- **Approvals workflow** — Finance / Operations / Demand sign-off on the plan.
+
+### Autopilot, alerts & feedback
+- **Scheduled runs** — recurring autonomous cycles (hourly/daily/weekly).
+- **Alerts & notifications** — toast + bell (and optional Slack/Teams webhook)
+  when a run pauses for a decision or a KPI breaches threshold.
+- **In-app feedback** — 👍/👎 + comment on any agent output or whole run, rolled
+  up into the Agents Hub governance view.
+- **Conversational kickoff & templates** — start from a plain-English brief or a
+  one-click scenario template.
+- **Per-session chat threads + streaming** — the planner chat scopes to the run
+  you're viewing and streams replies token-by-token.
+- **Token / cost tracking** — live token usage + estimated cost per run.
 
 ---
 
