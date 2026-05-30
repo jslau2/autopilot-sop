@@ -48,8 +48,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   alert opens that run. Optional **Slack/Teams webhook** (`notifications.py`,
   stdlib, best-effort) configurable from the bell, with a "Send test". Closes
   "Decision notifications" below.
-- [ ] **Interactive what-if sliders** — drag capacity / lead-time / demand% and
-  watch KPIs re-estimate live (lightweight estimate, not a full re-run).
+- [x] **Interactive what-if sliders** — 🎚 Simulate modal (pipeline toolbar):
+  drag demand %, capacity %, and supplier lead-time and watch OTIF / capacity /
+  weeks-of-supply / Δ EBIT re-estimate live via a transparent directional model
+  (`lib/whatif.ts`, not a full re-run). "Launch as a what-if run" hands the
+  adjusted constraints to the branch flow. Works in demo + live.
 
 ### Trust & sellability — what closes the deal
 - [x] **Decision log / audit trail** — every human decision is recorded with
