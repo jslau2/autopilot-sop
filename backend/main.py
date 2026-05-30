@@ -1070,6 +1070,33 @@ async def get_shared(token: str):
     return _share_snapshot(sessions[session_id])
 
 
+import os as _os
+# Price per 1M tokens (USD). Defaults reflect a small/nano deployment; override
+# with AZURE_PRICE_INPUT / AZURE_PRICE_OUTPUT (USD per 1M tokens).
+PRICE_INPUT_PER_M = float(_os.getenv("AZURE_PRICE_INPUT", "0.05"))
+PRICE_OUTPUT_PER_M = float(_os.getenv("AZURE_PRICE_OUTPUT", "0.40"))
+
+
+def _usage_payload(s: SessionState) -> dict:
+    u = s.usage
+    cost = (u["prompt_tokens"] / 1_000_000 * PRICE_INPUT_PER_M
+            + u["completion_tokens"] / 1_000_000 * PRICE_OUTPUT_PER_M)
+    return {
+        **u,
+        "est_cost_usd": round(cost, 6),
+        "price_input_per_m": PRICE_INPUT_PER_M,
+        "price_output_per_m": PRICE_OUTPUT_PER_M,
+    }
+
+
+@app.get("/api/sessions/{session_id}/usage")
+async def get_usage(session_id: str):
+    session = sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    return _usage_payload(session)
+
+
 @app.get("/api/sessions/{session_id}/decisions")
 async def get_decisions(session_id: str):
     """Audit trail of human decisions for a run (with KPI snapshots)."""

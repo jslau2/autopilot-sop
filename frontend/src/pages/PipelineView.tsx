@@ -19,6 +19,7 @@ import ValueDashboardModal from '../components/ValueDashboardModal';
 import WhatIfModal from '../components/WhatIfModal';
 import ExplainModal from '../components/ExplainModal';
 import ApprovalsModal from '../components/ApprovalsModal';
+import UsageChip from '../components/UsageChip';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import KickoffBar from '../components/KickoffBar';
@@ -463,6 +464,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                 onClick={() => setShowTour(true)}
                 style={{ width: 'auto', padding: '4px 10px', borderRadius: 5, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
               >↺ Tour</button>
+              {!demoMode && <UsageChip sessionId={sessionId} active={S.sessionStatus !== 'done'} />}
               <div className={`status-pill ${statusClass}`}>{statusLabel}</div>
               <span className="elapsed-time mono">{S.elapsedT.toFixed(1)}s</span>
             </div>
