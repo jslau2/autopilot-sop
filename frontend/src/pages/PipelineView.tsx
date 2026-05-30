@@ -418,6 +418,12 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   setShowLaunch(true);
                 }}
               >⎇ What-if</button>
+              <Link
+                className="cfg-toolbar-btn"
+                to={demoMode ? '/compare' : `/compare?ids=${sessionId}`}
+                title="Compare this cycle with others side-by-side"
+                style={{ textDecoration: 'none' }}
+              >⇄ Compare</Link>
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
               </button>

@@ -24,10 +24,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   intelligence.
 
 ### Daily-use practicality — why they come back
-- [ ] **Scenario comparison dashboard** — side-by-side of 2–3 cycles
-  (baseline vs what-if): KPI deltas, cost/margin/OTIF trade-offs, a
-  "recommended" highlight. The #1 S&OP-manager feature; pairs with what-if
-  branching. (Supersedes the simpler "Run comparison" below.)
+- [x] **Scenario comparison dashboard** — `/compare` page: pick up to 3 cycles
+  (baseline vs what-if), side-by-side KPI table with deltas vs baseline,
+  best-per-metric markers, and a composite "★ Recommended" highlight. Works in
+  demo (built-in scenarios) and live (`/api/sessions`, entity-scoped). Entry
+  points: Home "⇄ Compare" + pipeline toolbar "⇄ Compare" (deep-links the
+  current run). Supersedes the simpler "Run comparison" below.
 - [ ] **Scheduled / recurring autonomous runs** — "run the weekly S&OP every
   Monday 6am and ping me." The literal autopilot promise; big stickiness.
 - [ ] **Alerts & notifications** — toast + optional email/Slack/Teams webhook
@@ -55,9 +57,8 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
 ## High-leverage (finish the sessions / concurrency story)
 
-- [ ] **Run comparison** — pick two cycles, show side-by-side KPIs, the human
-  decision each made, and plan deltas. Fulfills the original reason for session
-  persistence ("refer back to previous runs for comparing").
+- [x] **Run comparison** — done as the **Scenario comparison dashboard** above
+  (`/compare`): side-by-side KPIs, per-cycle key decision, and plan deltas.
 - [ ] **Decision notifications** — toast + badge when any *background* cycle
   pauses for a human decision, so the human-in-the-loop checkpoint reaches you
   even when you're on another page or in another run.
