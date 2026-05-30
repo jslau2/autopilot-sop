@@ -8,6 +8,7 @@ import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import TemplateGallery from '../components/TemplateGallery';
+import KickoffBar from '../components/KickoffBar';
 import type { ScenarioTemplate } from '../data/templates';
 
 type LiveSession = {
@@ -118,6 +119,13 @@ export default function Home() {
               ? '🎭 Demo mode — scripted simulation, no backend'
               : '⚡ Live mode — real Azure OpenAI agents'} · switch in the top bar
           </p>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <KickoffBar
+            demoMode={demoMode}
+            onDemoSeed={(brief) => { setLaunchSeed({ goal: brief }); setShowLaunch(true); }}
+          />
         </div>
 
         <TemplateGallery onPick={useTemplate} />

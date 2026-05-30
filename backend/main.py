@@ -82,6 +82,11 @@ class SuggestNameBody(BaseModel):
     goal: str = ""
 
 
+class KickoffBody(BaseModel):
+    brief: str = ""
+    entity: str = ""
+
+
 class ChatMessage(BaseModel):
     role: str  # "user" | "assistant"
     content: str
@@ -251,6 +256,56 @@ async def suggest_name(body: SuggestNameBody):
         return {"name": name[:60] or fallback, "source": "llm"}
     except Exception as exc:
         return {"name": fallback, "source": "fallback", "detail": str(exc)}
+
+
+@app.post("/api/sessions/kickoff")
+async def kickoff(body: KickoffBody):
+    """
+    Conversational kickoff: expand a plain-English brief (e.g. "Plan Q4 with +10%
+    growth and Supplier X delayed 4 weeks") into a structured planning goal + a
+    name, then launch the cycle. Falls back to using the brief verbatim if the
+    LLM is unavailable.
+    """
+    brief = (body.brief or "").strip()
+    if not brief:
+        raise HTTPException(status_code=422, detail="Please describe the scenario to plan.")
+
+    goal = brief
+    name = _derive_session_name(brief, "")
+    try:
+        from orchestrator import get_client, DEPLOYMENT
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: get_client().chat.completions.create(
+                model=DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": (
+                        "You turn a planner's plain-English brief into a structured S&OP planning goal for "
+                        "Shimano APAC manufacturing. Output JSON with keys 'name' (≤6 words) and 'goal' "
+                        "(a multi-line goal covering scope, horizon, event/constraints, and targets — keep any "
+                        "numbers the user gave). No commentary, JSON only."
+                    )},
+                    {"role": "user", "content": brief[:1500]},
+                ],
+                temperature=0.4,
+                max_completion_tokens=400,
+                response_format={"type": "json_object"},
+            ),
+        )
+        import json as _json
+        data = _json.loads(resp.choices[0].message.content or "{}")
+        goal = (data.get("goal") or brief).strip()
+        name = (data.get("name") or name).strip()[:60]
+    except Exception:
+        pass  # fall back to verbatim brief
+
+    session_id = str(uuid.uuid4())
+    session = SessionState(session_id=session_id, name=name, goal=goal)
+    session.entity = (body.entity or "").strip()
+    sessions[session_id] = session
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    return {"session_id": session_id, "name": name, "goal": goal, "status": "running"}
 
 
 def _heuristic_exec_summary(s: SessionState) -> str:
