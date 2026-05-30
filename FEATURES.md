@@ -98,7 +98,7 @@ loop.
 5. **Completion** — open **⤓ Report** → export the executive PDF.
 6. **What-if** — hit **⎇ What-if** to branch the run with a tweaked constraint.
 7. **Agent Console** — switch to show the live fleet of agents across runs.
-8. **Agents hub** — tweak a prompt to show the system is configurable.
+8. **Agents Hub** — tweak a prompt to show the system is configurable.
 9. (Optional) **Planner chat** — ask "what's the status of my run?" and let it
    pull context.
 
