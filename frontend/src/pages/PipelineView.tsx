@@ -16,6 +16,7 @@ import ReportModal from '../components/ReportModal';
 import ExecSummaryBanner from '../components/ExecSummaryBanner';
 import DecisionLogModal from '../components/DecisionLogModal';
 import ValueDashboardModal from '../components/ValueDashboardModal';
+import WhatIfModal from '../components/WhatIfModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import KickoffBar from '../components/KickoffBar';
@@ -284,6 +285,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showReport, setShowReport] = useState(false);
   const [showDecisions, setShowDecisions] = useState(false);
   const [showValue, setShowValue] = useState(false);
+  const [showWhatIf, setShowWhatIf] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
@@ -435,6 +437,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
                   setShowLaunch(true);
                 }}
               >⎇ What-if</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowWhatIf(true)} title="Interactive what-if sliders — estimate KPIs live">🎚 Simulate</button>
               <Link
                 className="cfg-toolbar-btn"
                 to={demoMode ? '/compare' : `/compare?ids=${sessionId}`}
@@ -484,6 +487,22 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowReport(false)} />}
         {showDecisions && <DecisionLogModal S={S} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowDecisions(false)} />}
         {showValue && <ValueDashboardModal S={S} name={cycleName} onClose={() => setShowValue(false)} />}
+        {showWhatIf && (
+          <WhatIfModal
+            kpis={S.kpis}
+            onClose={() => setShowWhatIf(false)}
+            onBranch={(note) => {
+              setShowWhatIf(false);
+              setLaunchSeed({
+                goal: `${cycleGoal}\n\n${note}`,
+                name: `${cycleName} (what-if)`,
+                parentId: demoMode ? undefined : sessionId,
+                scenarioOf: cycleName,
+              });
+              setShowLaunch(true);
+            }}
+          />
+        )}
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}
