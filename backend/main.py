@@ -211,6 +211,78 @@ async def suggest_name(body: SuggestNameBody):
         return {"name": fallback, "source": "fallback", "detail": str(exc)}
 
 
+def _heuristic_exec_summary(s: SessionState) -> str:
+    """Offline 3-sentence summary built from session KPIs + decisions."""
+    k = s.kpis
+    bits = []
+    if k.get("otif"): bits.append(f"OTIF {k['otif']}")
+    if k.get("forecastAcc"): bits.append(f"forecast accuracy {k['forecastAcc']}")
+    if k.get("capacityUtil"): bits.append(f"capacity utilisation {k['capacityUtil']}")
+    kpi_str = ", landing at " + ", ".join(bits) if bits else ""
+    n = len([st for st in s.steps.values() if st.get("agent") != "planner"])
+    s1 = f"The cycle ran {n} agent task{'' if n == 1 else 's'} across demand, supply, optimisation and risk{kpi_str}."
+
+    decision = None
+    for ev in s.events:
+        if ev.get("type") == "answer":
+            decision = ev.get("message", "")
+            break
+    s2 = (f"Key human decision recorded: {decision[:140]}." if decision
+          else "No human decision checkpoint was required during this cycle.")
+
+    pd = str(k.get("planDelta") or "")
+    if pd.startswith("+"):
+        s3 = f"The optimised plan protects {pd} EBIT vs. the unconstrained baseline — recommend approving and locking the plan."
+    else:
+        s3 = "Recommend reviewing the financial and risk sign-off before approving the plan."
+    return f"{s1} {s2} {s3}"
+
+
+@app.post("/api/sessions/{session_id}/exec-summary")
+async def exec_summary(session_id: str):
+    """
+    LLM-generated 3-sentence executive summary ("what happened + what I
+    recommend") for a run. Falls back to a heuristic if the model is unavailable.
+    """
+    s = sessions.get(session_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    fallback = _heuristic_exec_summary(s)
+    try:
+        from orchestrator import get_client, DEPLOYMENT
+        decisions = [ev.get("message", "") for ev in s.events if ev.get("type") == "answer"]
+        context = {
+            "goal": (s.goal or "")[:800],
+            "status": s.status,
+            "kpis": s.kpis,
+            "decisions": decisions[:5],
+            "step_count": len(s.steps),
+        }
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: get_client().chat.completions.create(
+                model=DEPLOYMENT,
+                messages=[
+                    {"role": "system", "content": (
+                        "You are the Planner agent. Write a crisp 3-sentence executive summary of an "
+                        "S&OP planning run for a busy supply-chain VP: (1) what happened + headline KPIs, "
+                        "(2) the key human decision (or that none was needed), (3) your clear recommendation. "
+                        "No preamble, no bullet points, exactly 3 sentences."
+                    )},
+                    {"role": "user", "content": json.dumps(context, default=str)},
+                ],
+                temperature=0.4,
+                max_completion_tokens=220,
+            ),
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        return {"summary": text or fallback, "source": "llm" if text else "fallback"}
+    except Exception as exc:
+        return {"summary": fallback, "source": "fallback", "detail": str(exc)}
+
+
 # ---------------------------------------------------------------------------
 # Planner chat — a conversational assistant that can pull session context
 # on demand via tools, and asks the user to clarify when the run is ambiguous.

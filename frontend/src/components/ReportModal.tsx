@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SimState } from '../types';
 import { buildReport, reportToMarkdown, reportToHtml } from '../lib/report';
+import { useExecSummary } from '../hooks/useExecSummary';
 import FeedbackControl from './FeedbackControl';
 
 function download(filename: string, content: string, mime: string) {
@@ -27,7 +28,9 @@ export default function ReportModal({
   S: SimState; name: string; goal: string; onClose: () => void;
   sessionId?: string; demoMode?: boolean;
 }) {
-  const report = useMemo(() => buildReport(S, { name, goal }), [S, name, goal]);
+  const baseReport = useMemo(() => buildReport(S, { name, goal }), [S, name, goal]);
+  const { summary, source, loading } = useExecSummary(baseReport, { sessionId, demoMode });
+  const report = useMemo(() => ({ ...baseReport, execSummary: summary }), [baseReport, summary]);
   const html = useMemo(() => reportToHtml(report), [report]);
   const base = slug(name);
 
@@ -82,6 +85,21 @@ export default function ReportModal({
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 18, padding: 2 }}
             aria-label="Close"
           >×</button>
+        </div>
+
+        <div style={{
+          padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
+          background: 'oklch(0.55 0.18 260 / 0.08)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: 'oklch(0.78 0.16 260)' }}>
+              ✦ EXECUTIVE SUMMARY
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--text-3)' }}>
+              {loading ? 'generating…' : source === 'llm' ? 'AI-generated' : 'auto-generated'}
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--text-1)' }}>{summary}</p>
         </div>
 
         <iframe
