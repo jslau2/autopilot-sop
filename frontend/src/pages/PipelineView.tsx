@@ -13,6 +13,7 @@ import TourOverlay from '../components/TourOverlay';
 import QuestionModal from '../components/QuestionModal';
 import CapacityConfigModal from '../components/CapacityConfigModal';
 import ReportModal from '../components/ReportModal';
+import ExecSummaryBanner from '../components/ExecSummaryBanner';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import AppShell from '../components/AppShell';
@@ -438,6 +439,13 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
           </div>
 
           <KPIBar kpis={S.kpis} />
+
+          {S.sessionStatus === 'done' && (
+            <ExecSummaryBanner
+              S={S} name={cycleName} goal={cycleGoal}
+              sessionId={demoMode ? undefined : sessionId} demoMode={demoMode}
+            />
+          )}
 
           <div className="main-graph">
             {viewMode === 'swimlane' ? <Swimlane /> : <Timeline />}

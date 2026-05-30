@@ -19,9 +19,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
 - [ ] **Conversational kickoff** — extend the actionable chat so a natural-
   language brief ("Plan Q4 with +10% growth and Supplier X delayed 4 weeks")
   configures and launches a cycle.
-- [ ] **Auto-generated executive summary** — an LLM 3-sentence "what happened +
-  what I recommend" at the top of each finished run. Cheap, high perceived
-  intelligence.
+- [x] **Auto-generated executive summary** — LLM 3-sentence "what happened +
+  what I recommend" via `POST /api/sessions/{id}/exec-summary` (with a Python
+  heuristic fallback when the model is offline). Shown as a banner at the top of
+  a finished run (`ExecSummaryBanner`), at the top of the Report modal, and
+  embedded in the exported Markdown/PDF. Demo uses the client-side heuristic.
 
 ### Daily-use practicality — why they come back
 - [x] **Scenario comparison dashboard** — `/compare` page: pick up to 3 cycles
