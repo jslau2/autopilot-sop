@@ -72,8 +72,11 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   $/pt), optimisation savings (scanned from agent metrics), OTIF uplift, plus a
   headline **annualised value**. Transparent, assumption-driven model
   (`lib/value.ts`) with the calculation basis spelled out. Works in demo + live.
-- [ ] **Approvals workflow** — plan sign-off from finance/ops leads with
-  comments; matches how S&OP actually closes.
+- [x] **Approvals workflow** — ✓ Approvals modal (pipeline toolbar): plan
+  sign-off from Finance / Operations / Demand leads with approver + comment.
+  Overall status (pending / approved / rejected) is computed from the latest
+  sign-off per role. Persisted on the session (`approvals`) via
+  `GET/POST /api/sessions/{id}/approvals`; demo keeps local state.
 
 ### Feedback loop
 - [x] **In-app feedback widget** — reusable `FeedbackControl` (👍/👎 + optional

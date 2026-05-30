@@ -18,6 +18,7 @@ import DecisionLogModal from '../components/DecisionLogModal';
 import ValueDashboardModal from '../components/ValueDashboardModal';
 import WhatIfModal from '../components/WhatIfModal';
 import ExplainModal from '../components/ExplainModal';
+import ApprovalsModal from '../components/ApprovalsModal';
 import LaunchConfig, { DEFAULT_GOAL } from '../components/LaunchConfig';
 import DeleteCycleControl from '../components/DeleteCycleControl';
 import KickoffBar from '../components/KickoffBar';
@@ -294,6 +295,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [showValue, setShowValue] = useState(false);
   const [showWhatIf, setShowWhatIf] = useState(false);
   const [explainKey, setExplainKey] = useState<string | null>(null);
+  const [showApprovals, setShowApprovals] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
   const [launchSeed, setLaunchSeed] = useState<{ goal?: string; name?: string; parentId?: string; scenarioOf?: string; uploadId?: string } | null>(null);
   const [parentName, setParentName] = useState('');
@@ -437,6 +439,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               <button className="cfg-toolbar-btn" onClick={() => setShowReport(true)} title="Export an executive report (Markdown / PDF)">⤓ Report</button>
               <button className="cfg-toolbar-btn" onClick={() => setShowDecisions(true)} title="Decision log / audit trail">🗒 Decisions</button>
               <button className="cfg-toolbar-btn" onClick={() => setShowValue(true)} title="ROI / value of this cycle">💰 Value</button>
+              <button className="cfg-toolbar-btn" onClick={() => setShowApprovals(true)} title="Plan approvals / sign-off">✓ Approvals</button>
               <button
                 className="cfg-toolbar-btn"
                 title="What-if — branch this cycle with tweaked constraints"
@@ -496,6 +499,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
         {showDecisions && <DecisionLogModal S={S} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowDecisions(false)} />}
         {showValue && <ValueDashboardModal S={S} name={cycleName} onClose={() => setShowValue(false)} />}
         {explainKey && <ExplainModal S={S} kpiKey={explainKey} onClose={() => setExplainKey(null)} />}
+        {showApprovals && <ApprovalsModal sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowApprovals(false)} />}
         {showWhatIf && (
           <WhatIfModal
             kpis={S.kpis}
