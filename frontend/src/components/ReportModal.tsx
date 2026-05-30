@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SimState } from '../types';
 import { buildReport, reportToMarkdown, reportToHtml } from '../lib/report';
+import FeedbackControl from './FeedbackControl';
 
 function download(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -21,9 +22,10 @@ function slug(s: string): string {
  * live — the report is built entirely from the current session state.
  */
 export default function ReportModal({
-  S, name, goal, onClose,
+  S, name, goal, onClose, sessionId, demoMode,
 }: {
   S: SimState; name: string; goal: string; onClose: () => void;
+  sessionId?: string; demoMode?: boolean;
 }) {
   const report = useMemo(() => buildReport(S, { name, goal }), [S, name, goal]);
   const html = useMemo(() => reportToHtml(report), [report]);
@@ -87,6 +89,20 @@ export default function ReportModal({
           srcDoc={html}
           style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
         />
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          padding: '10px 18px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>How useful was this plan / run?</span>
+          <FeedbackControl
+            sessionId={sessionId}
+            target="run"
+            targetLabel={name}
+            demoMode={demoMode}
+            compact
+          />
+        </div>
       </div>
     </div>
   );

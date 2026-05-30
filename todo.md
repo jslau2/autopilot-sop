@@ -49,9 +49,12 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   comments; matches how S&OP actually closes.
 
 ### Feedback loop
-- [ ] **In-app feedback widget** — 👍/👎 + comment on any agent output and on the
-  whole run, feeding the Agent Manager governance analytics. Users feel heard;
-  you get product signal.
+- [x] **In-app feedback widget** — reusable `FeedbackControl` (👍/👎 + optional
+  comment) on each agent step (Drawer) and the whole run (Report modal). Live
+  mode posts to `/api/feedback` (append-only `feedback_store.py`); demo records
+  locally. `GET /api/feedback/summary` rolls up satisfaction %, per-agent
+  counts, and recent comments, surfaced live in the Agents Hub → Performance &
+  Governance tab.
 - [ ] **Shareable run / report links** — read-only share of a completed cycle or
   its report → collaboration + organic virality.
 

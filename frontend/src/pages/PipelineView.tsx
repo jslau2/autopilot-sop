@@ -457,7 +457,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
           />
         )}
         {showConfig && <CapacityConfigModal onClose={() => setShowConfig(false)} />}
-        {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} onClose={() => setShowReport(false)} />}
+        {showReport && <ReportModal S={S} name={cycleName} goal={cycleGoal} sessionId={demoMode ? undefined : sessionId} demoMode={demoMode} onClose={() => setShowReport(false)} />}
         {showLaunch && (
           <LaunchConfig
             demoMode={demoMode}

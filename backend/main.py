@@ -94,6 +94,15 @@ class AgentConfigBody(BaseModel):
     temperature: float | None = None
 
 
+class FeedbackBody(BaseModel):
+    session_id: str = ""
+    target: str = "run"          # "run" or a step_id
+    target_label: str = ""
+    agent_id: str = ""
+    rating: str = "up"           # "up" | "down"
+    comment: str = ""
+
+
 def _derive_session_name(goal: str, session_id: str) -> str:
     """
     Heuristic fallback name from the goal text: prefer the first non-empty line,
@@ -475,6 +484,27 @@ async def activity():
         "total_sessions": len(sessions),
     }
     return {"agents": agent_list, "runs": sorted(runs, key=lambda r: r["name"]), "totals": totals}
+
+
+# ---------------------------------------------------------------------------
+# In-app feedback (👍 / 👎 + comment) on agent outputs / whole runs
+# ---------------------------------------------------------------------------
+@app.post("/api/feedback")
+async def submit_feedback(body: FeedbackBody):
+    import feedback_store
+    return feedback_store.record(body.model_dump())
+
+
+@app.get("/api/feedback")
+async def get_feedback(session_id: str = ""):
+    import feedback_store
+    return {"feedback": feedback_store.list_feedback(session_id)}
+
+
+@app.get("/api/feedback/summary")
+async def feedback_summary():
+    import feedback_store
+    return feedback_store.summary()
 
 
 @app.get("/api/health")
