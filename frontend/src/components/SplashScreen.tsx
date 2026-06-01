@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AGENTS, AGENT_ORDER } from '../data/agents';
 
 interface Props {
@@ -13,96 +13,22 @@ const RINGS = [
   { radius: 136, period: 2800 },
 ];
 
-// ─── Particles scattered across the background ───────────────────────────────
-const PARTICLES = [
-  { top: '12%', left: '8%',  size: 2, dur: '7s',  delay: '0s'  },
-  { top: '22%', left: '78%', size: 2, dur: '11s', delay: '-3s' },
-  { top: '38%', left: '92%', size: 3, dur: '9s',  delay: '-1s' },
-  { top: '62%', left: '85%', size: 2, dur: '13s', delay: '-5s' },
-  { top: '78%', left: '68%', size: 2, dur: '8s',  delay: '-2s' },
-  { top: '88%', left: '20%', size: 3, dur: '14s', delay: '-7s' },
-  { top: '72%', left: '5%',  size: 2, dur: '10s', delay: '-4s' },
-  { top: '18%', left: '42%', size: 2, dur: '12s', delay: '-6s' },
-  { top: '48%', left: '18%', size: 2, dur: '9s',  delay: '-8s' },
-  { top: '32%', left: '55%', size: 2, dur: '15s', delay: '-9s' },
-  { top: '55%', left: '48%', size: 3, dur: '11s', delay: '-2s' },
-  { top: '8%',  left: '62%', size: 2, dur: '8s',  delay: '-1s' },
-];
-
 const SPLASH_CSS = (() => {
   const pieces: string[] = [`
-    /* ── Shared logo spin ── */
     @keyframes spl-logo-spin {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
     }
-
-    /* ── PLN heartbeat ── */
     @keyframes spl-planner-pulse {
       0%, 100% { box-shadow: 0 0 14px 4px oklch(0.80 0.16 78 / 0.20); }
       50%       { box-shadow: 0 0 28px 10px oklch(0.80 0.16 78 / 0.45); }
     }
     .spl-planner-pulse { animation: spl-planner-pulse 2.2s ease-in-out infinite; }
-
-    /* ── Press-to-start blink ── */
     @keyframes spl-prompt-blink {
       0%, 100% { opacity: 0.9; }
       50%       { opacity: 0.15; }
     }
     .spl-prompt-blink { animation: spl-prompt-blink 1.8s ease-in-out infinite; }
-
-    /* ── PS5 background layers ── */
-
-    /* Diagonal light ray A — primary sweep, cyan-green tinted */
-    @keyframes spl-ray-a {
-      0%, 100% { transform: rotate(-7deg) translateY(0);    opacity: 0.5; }
-      50%       { transform: rotate(-3deg) translateY(-18px); opacity: 1.0; }
-    }
-    .spl-ray-a { animation: spl-ray-a 18s ease-in-out infinite; }
-
-    /* Diagonal light ray B — secondary, blue-shifted */
-    @keyframes spl-ray-b {
-      0%, 100% { transform: rotate(4deg)  translateY(0);    opacity: 0.35; }
-      50%       { transform: rotate(8deg)  translateY(14px); opacity: 0.75; }
-    }
-    .spl-ray-b { animation: spl-ray-b 24s ease-in-out infinite; animation-delay: -9s; }
-
-    /* Diagonal light ray C — thin bright */
-    @keyframes spl-ray-c {
-      0%, 100% { transform: rotate(-14deg) translateY(0);   opacity: 0.25; }
-      50%       { transform: rotate(-10deg) translateY(-8px); opacity: 0.60; }
-    }
-    .spl-ray-c { animation: spl-ray-c 20s ease-in-out infinite; animation-delay: -5s; }
-
-    /* Nebula drift A — upper-left cluster */
-    @keyframes spl-neb-a {
-      0%, 100% { transform: translate(0, 0)       scale(1);    opacity: 0.8; }
-      40%       { transform: translate(22px, -14px) scale(1.08); opacity: 1.0; }
-      70%       { transform: translate(-12px, 16px) scale(0.96); opacity: 0.7; }
-    }
-    .spl-neb-a { animation: spl-neb-a 26s ease-in-out infinite; }
-
-    /* Nebula drift B — lower-right cluster */
-    @keyframes spl-neb-b {
-      0%, 100% { transform: translate(0, 0)        scale(1);    opacity: 0.7; }
-      35%       { transform: translate(-20px, 10px)  scale(1.06); opacity: 0.9; }
-      75%       { transform: translate(14px, -14px)  scale(0.97); opacity: 0.6; }
-    }
-    .spl-neb-b { animation: spl-neb-b 22s ease-in-out infinite; animation-delay: -11s; }
-
-    /* Nebula drift C — mid-area accent */
-    @keyframes spl-neb-c {
-      0%, 100% { transform: translate(0, 0)       scale(1);    opacity: 0.5; }
-      50%       { transform: translate(16px, -20px) scale(1.12); opacity: 0.8; }
-    }
-    .spl-neb-c { animation: spl-neb-c 30s ease-in-out infinite; animation-delay: -15s; }
-
-    /* Star/particle twinkle */
-    @keyframes spl-twinkle {
-      0%, 100% { transform: scale(1);   opacity: 0.25; }
-      50%       { transform: scale(2.2); opacity: 0.85; }
-    }
-    .spl-star { animation: spl-twinkle var(--dur) ease-in-out infinite; animation-delay: var(--delay); }
   `];
 
   SPECIALISTS.forEach((id, i) => {
@@ -125,117 +51,149 @@ const SPLASH_CSS = (() => {
   return pieces.join('\n');
 })();
 
-// ─── PS5-style atmospheric background ────────────────────────────────────────
+// ─── Ribbon definitions ───────────────────────────────────────────────────────
+// yF  = center Y as fraction of screen height
+// amp = vertical oscillation amplitude (px)
+// sp  = oscillation speed multiplier
+// ph  = phase offset (radians)
+// thick = core stroke width (px)
+// a   = max opacity of core line
+const RIBBONS = [
+  { yF: 0.42, amp: 95,  sp: 0.17, ph: 0.0,  thick: 2.0, a: 0.90 }, // primary
+  { yF: 0.46, amp: 82,  sp: 0.21, ph: 1.2,  thick: 1.5, a: 0.65 }, // companion
+  { yF: 0.36, amp: 58,  sp: 0.26, ph: 2.6,  thick: 1.0, a: 0.48 }, // upper thin
+  { yF: 0.60, amp: 72,  sp: 0.16, ph: 0.7,  thick: 1.5, a: 0.42 }, // lower
+  { yF: 0.68, amp: 50,  sp: 0.23, ph: 3.1,  thick: 1.0, a: 0.24 }, // lower subtle
+  { yF: 0.26, amp: 44,  sp: 0.20, ph: 1.9,  thick: 1.0, a: 0.20 }, // upper subtle
+  { yF: 0.52, amp: 38,  sp: 0.29, ph: 4.2,  thick: 0.8, a: 0.18 }, // mid accent
+];
+
+// ─── Canvas-based PS5 atmospheric background ──────────────────────────────────
 function PS5Background({ visible }: { visible: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = window.innerWidth  * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Seed particles once — position, size, twinkle params
+    const particles = Array.from({ length: 80 }, () => ({
+      x:     Math.random() * window.innerWidth,
+      y:     Math.random() * window.innerHeight,
+      r:     0.4 + Math.random() * 1.5,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.20 + Math.random() * 1.0,
+    }));
+
+    let raf: number;
+
+    const tick = (now: number) => {
+      const t = now / 1000;
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // ── Ribbons ────────────────────────────────────────────────────────────
+      RIBBONS.forEach(r => {
+        const T = t * r.sp + r.ph;
+        // Gentle breathing on top of oscillation
+        const breathe = 0.88 + 0.12 * Math.sin(t * 0.7 + r.ph);
+
+        // Four bezier control points that slowly undulate
+        const p0 = { x: -W * 0.06, y: H * r.yF + Math.sin(T * 0.78)          * r.amp };
+        const p1 = { x:  W * 0.28, y: H * r.yF + Math.sin(T * 0.91 + 1.05)   * r.amp * 1.75 };
+        const p2 = { x:  W * 0.72, y: H * r.yF + Math.sin(T * 0.86 + 2.30)   * r.amp * 1.55 };
+        const p3 = { x:  W * 1.06, y: H * r.yF + Math.sin(T * 0.74 + 3.50)   * r.amp * 1.20 };
+
+        // Render: wide atmosphere → soft glow → sharp glow → bright core
+        const passes = [
+          { lw: 80,       alpha: r.a * 0.018 * breathe },
+          { lw: 28,       alpha: r.a * 0.065 * breathe },
+          { lw: 7,        alpha: r.a * 0.230 * breathe },
+          { lw: r.thick,  alpha: r.a         * breathe },
+        ];
+
+        passes.forEach(pass => {
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+          ctx.strokeStyle = `rgba(215, 238, 255, ${pass.alpha})`;
+          ctx.lineWidth   = pass.lw;
+          ctx.lineCap     = 'round';
+          ctx.stroke();
+        });
+      });
+
+      // ── Twinkling star particles ───────────────────────────────────────────
+      particles.forEach(p => {
+        const pulse  = 0.5 + 0.5 * Math.sin(t * p.speed + p.phase);
+        const alpha  = 0.12 + 0.82 * pulse;
+        const radius = p.r * (0.55 + 0.9 * pulse);
+
+        // Radial glow halo
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 8);
+        grad.addColorStop(0,   `rgba(220, 244, 255, ${alpha * 0.75})`);
+        grad.addColorStop(0.35,`rgba(190, 228, 255, ${alpha * 0.30})`);
+        grad.addColorStop(1,   'rgba(150, 200, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius * 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Crisp bright core dot
+        ctx.fillStyle = `rgba(245, 252, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // ── Edge vignette ──────────────────────────────────────────────────────
+      // Two passes: wide soft + tight hard — matches PS5 dark-frame look
+      const cx = W / 2, cy = H / 2;
+      const diag = Math.sqrt(cx * cx + cy * cy);
+
+      const vgSoft = ctx.createRadialGradient(cx, cy, diag * 0.30, cx, cy, diag * 1.10);
+      vgSoft.addColorStop(0, 'rgba(8, 10, 14, 0)');
+      vgSoft.addColorStop(1, 'rgba(8, 10, 14, 0.72)');
+      ctx.fillStyle = vgSoft;
+      ctx.fillRect(0, 0, W, H);
+
+      const vgHard = ctx.createRadialGradient(cx, cy, diag * 0.55, cx, cy, diag * 1.05);
+      vgHard.addColorStop(0, 'rgba(8, 10, 14, 0)');
+      vgHard.addColorStop(1, 'rgba(8, 10, 14, 0.60)');
+      ctx.fillStyle = vgHard;
+      ctx.fillRect(0, 0, W, H);
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return (
-    <div style={{
-      position: 'absolute', inset: 0, overflow: 'hidden',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 2s ease',
-      pointerEvents: 'none',
-    }}>
-      {/* Central ambient radial glow */}
-      <div style={{
-        position: 'absolute',
-        width: '90%', height: '75%',
-        top: '12%', left: '5%',
-        background: 'radial-gradient(ellipse at 55% 45%, oklch(0.72 0.17 162 / 0.07) 0%, oklch(0.60 0.14 220 / 0.04) 40%, transparent 70%)',
-        filter: 'blur(50px)',
-      }} />
-
-      {/* Light ray A — main diagonal sweep (lower-left → upper-right, PS5-style) */}
-      <div className="spl-ray-a" style={{
-        position: 'absolute',
-        width: '220%', height: '3px',
-        top: '44%', left: '-60%',
-        background: 'linear-gradient(90deg, transparent 5%, oklch(0.72 0.17 162 / 0.10) 30%, oklch(0.88 0.10 175 / 0.35) 50%, oklch(0.72 0.17 162 / 0.10) 70%, transparent 95%)',
-        filter: 'blur(8px)',
-      }} />
-      {/* Ray A softer halo */}
-      <div className="spl-ray-a" style={{
-        position: 'absolute',
-        width: '220%', height: '14px',
-        top: 'calc(44% - 5px)', left: '-60%',
-        background: 'linear-gradient(90deg, transparent 5%, oklch(0.72 0.17 162 / 0.04) 30%, oklch(0.80 0.12 170 / 0.12) 50%, oklch(0.72 0.17 162 / 0.04) 70%, transparent 95%)',
-        filter: 'blur(20px)',
-      }} />
-
-      {/* Light ray B — secondary, cooler blue tone */}
-      <div className="spl-ray-b" style={{
-        position: 'absolute',
-        width: '200%', height: '2px',
-        top: '60%', left: '-50%',
-        background: 'linear-gradient(90deg, transparent 8%, oklch(0.62 0.16 240 / 0.08) 35%, oklch(0.75 0.14 210 / 0.28) 50%, oklch(0.62 0.16 240 / 0.08) 65%, transparent 92%)',
-        filter: 'blur(12px)',
-      }} />
-      <div className="spl-ray-b" style={{
-        position: 'absolute',
-        width: '200%', height: '18px',
-        top: 'calc(60% - 8px)', left: '-50%',
-        background: 'linear-gradient(90deg, transparent 8%, oklch(0.62 0.16 240 / 0.03) 35%, oklch(0.70 0.12 220 / 0.09) 50%, oklch(0.62 0.16 240 / 0.03) 65%, transparent 92%)',
-        filter: 'blur(28px)',
-      }} />
-
-      {/* Light ray C — thin bright accent */}
-      <div className="spl-ray-c" style={{
-        position: 'absolute',
-        width: '160%', height: '1px',
-        top: '32%', left: '-30%',
-        background: 'linear-gradient(90deg, transparent 15%, oklch(0.90 0.08 168 / 0.08) 40%, oklch(0.95 0.06 165 / 0.22) 50%, oklch(0.90 0.08 168 / 0.08) 60%, transparent 85%)',
-        filter: 'blur(5px)',
-      }} />
-
-      {/* Nebula A — upper-left, blue-green cloud */}
-      <div className="spl-neb-a" style={{
-        position: 'absolute',
-        width: 380, height: 280,
-        top: '-4%', left: '-2%',
-        background: 'radial-gradient(ellipse at 50% 50%, oklch(0.60 0.16 240 / 0.10) 0%, oklch(0.68 0.14 210 / 0.06) 40%, transparent 70%)',
-        filter: 'blur(40px)',
-      }} />
-
-      {/* Nebula B — lower-right, warm cyan */}
-      <div className="spl-neb-b" style={{
-        position: 'absolute',
-        width: 320, height: 240,
-        bottom: '0%', right: '0%',
-        background: 'radial-gradient(ellipse at 50% 50%, oklch(0.72 0.17 162 / 0.09) 0%, oklch(0.65 0.14 185 / 0.05) 45%, transparent 70%)',
-        filter: 'blur(35px)',
-      }} />
-
-      {/* Nebula C — mid center-right accent */}
-      <div className="spl-neb-c" style={{
-        position: 'absolute',
-        width: 260, height: 200,
-        top: '30%', right: '5%',
-        background: 'radial-gradient(ellipse at 50% 50%, oklch(0.65 0.18 195 / 0.07) 0%, transparent 65%)',
-        filter: 'blur(30px)',
-      }} />
-
-      {/* Star/particle field */}
-      {PARTICLES.map((p, i) => (
-        <div key={i} className="spl-star" style={{
-          position: 'absolute',
-          width: p.size, height: p.size,
-          top: p.top, left: p.left,
-          borderRadius: '50%',
-          background: 'oklch(0.90 0.10 170)',
-          boxShadow: `0 0 ${p.size * 4}px ${p.size + 1}px oklch(0.85 0.12 175 / 0.6)`,
-          '--dur': p.dur,
-          '--delay': p.delay,
-        } as React.CSSProperties} />
-      ))}
-
-      {/* Edge vignette — keeps attention center */}
-      <div style={{
+    <canvas
+      ref={canvasRef}
+      style={{
         position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse 80% 75% at 50% 50%, transparent 45%, oklch(0.09 0.007 245 / 0.75) 100%)',
-      }} />
-    </div>
+        width: '100%', height: '100%',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 2s ease',
+        pointerEvents: 'none',
+      }}
+    />
   );
 }
 
-// ─── Chat bubble with orbit ring ──────────────────────────────────────────────
+// ─── Chat bubble with orbit ring — splash finale ──────────────────────────────
 function ChatBubbleLogo({ large = false }: { large?: boolean }) {
   const size     = large ? 110 : 80;
   const ringR    = large ? 48  : 34;
@@ -283,9 +241,9 @@ export default function SplashScreen({ onComplete }: Props) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('orbit'),    350),
-      setTimeout(() => setPhase('converge'), 3000),
-      setTimeout(() => setPhase('prompt'),   4200),
+      setTimeout(() => setPhase('orbit'),    400),
+      setTimeout(() => setPhase('converge'), 3100),
+      setTimeout(() => setPhase('prompt'),   4300),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -312,7 +270,7 @@ export default function SplashScreen({ onComplete }: Props) {
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg-base)',
+        background: 'oklch(0.07 0.010 245)',
         opacity: phase === 'exit' ? 0 : 1,
         transition: phase === 'exit' ? 'opacity 0.45s ease' : undefined,
         cursor: 'pointer', userSelect: 'none',
@@ -320,7 +278,7 @@ export default function SplashScreen({ onComplete }: Props) {
     >
       <style>{SPLASH_CSS}</style>
 
-      {/* PS5-style atmospheric background — always on */}
+      {/* PS5-style atmospheric canvas background */}
       <PS5Background visible={phase !== 'exit'} />
 
       {/* ── Orbit stage ── */}
@@ -339,9 +297,9 @@ export default function SplashScreen({ onComplete }: Props) {
             width: ring.radius * 2, height: ring.radius * 2,
             marginLeft: -ring.radius, marginTop: -ring.radius,
             borderRadius: '50%',
-            border: '1px solid oklch(0.30 0.02 200 / 0.55)',
-            opacity: isOrbiting ? 0.7 : 0,
-            transition: isOrbiting ? 'opacity 1s ease' : 'opacity 0.5s ease',
+            border: '1px solid rgba(180, 220, 255, 0.18)',
+            opacity: isOrbiting ? 0.9 : 0,
+            transition: isOrbiting ? 'opacity 1.1s ease' : 'opacity 0.4s ease',
           }} />
         ))}
 
@@ -359,12 +317,12 @@ export default function SplashScreen({ onComplete }: Props) {
                 width: 34, height: 34,
                 marginLeft: -17, marginTop: -17,
                 borderRadius: '50%',
-                background: `${ag.rawColor}1a`,
+                background: `${ag.rawColor}18`,
                 border: `2px solid ${ag.rawColor}`,
                 boxShadow: isOrbiting
                   ? `0 0 8px 2px ${ag.rawColor}55`
                   : isConverging
-                    ? `0 0 16px 5px ${ag.rawColor}88`
+                    ? `0 0 18px 6px ${ag.rawColor}90`
                     : 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 8, fontWeight: 700,
@@ -444,9 +402,9 @@ export default function SplashScreen({ onComplete }: Props) {
       {/* Skip hint during orbit */}
       <div style={{
         position: 'absolute', bottom: 28,
-        fontSize: 10, color: 'var(--text-3)',
+        fontSize: 10, color: 'rgba(180, 210, 255, 0.45)',
         fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-        opacity: isOrbiting ? 0.4 : 0,
+        opacity: isOrbiting ? 1 : 0,
         transition: 'opacity 0.5s ease',
         pointerEvents: 'none',
       }}>
