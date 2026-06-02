@@ -15,7 +15,7 @@ from openai import AzureOpenAI
 logger = logging.getLogger(__name__)
 
 from session import SessionState
-from agent_defs import AGENT_DEFS
+from .agent_defs import AGENT_DEFS
 import mock_data
 
 # ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ async def run_worker_agent(
     )
 
     # Build initial messages — system prompt honors any runtime override.
-    from agent_config import effective_system_prompt, effective_temperature
+    from .agent_config import effective_system_prompt, effective_temperature
     messages: list[dict] = [
         {"role": "system", "content": effective_system_prompt(agent_id)},
         {

@@ -16,8 +16,8 @@ from openai import AzureOpenAI
 logger = logging.getLogger(__name__)
 
 from session import SessionState
-from agent_defs import AGENT_DEFS
-from workers import run_worker_agent
+from .agent_defs import AGENT_DEFS
+from .workers import run_worker_agent
 
 # ---------------------------------------------------------------------------
 # Azure OpenAI client — lazy init so missing creds don't break imports
@@ -39,7 +39,7 @@ DEPLOYMENT = os.environ["AZURE_OPENAI_DEPLOYMENT"]
 PLANNER_DEF = AGENT_DEFS["planner"]
 PLANNER_TOOLS = PLANNER_DEF["tools"]
 PLANNER_SYSTEM_PROMPT = PLANNER_DEF["system_prompt"]
-from agent_config import effective_system_prompt, effective_temperature
+from .agent_config import effective_system_prompt, effective_temperature
 
 
 # ---------------------------------------------------------------------------

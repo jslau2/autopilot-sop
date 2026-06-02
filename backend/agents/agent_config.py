@@ -10,10 +10,10 @@ import json
 import logging
 from pathlib import Path
 
-from agent_defs import AGENT_DEFS
+from .agent_defs import AGENT_DEFS
 
 log = logging.getLogger("agent_config")
-_PATH = Path(__file__).parent / "agent_overrides.json"
+_PATH = Path(__file__).parent.parent / "agent_overrides.json"
 
 # Per-agent default sampling temperature (matches historical hardcoded values).
 _DEFAULT_TEMPS: dict[str, float] = {"planner": 0.3}

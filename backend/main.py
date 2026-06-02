@@ -36,7 +36,7 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 from collections import OrderedDict
 
 from session import SessionState, sessions
-from orchestrator import run_orchestrator
+from agents.orchestrator import run_orchestrator
 from persistence import save_session, delete_session_file
 import mock_data
 import session_store
@@ -298,7 +298,7 @@ async def suggest_name(body: SuggestNameBody):
     """
     fallback = _derive_session_name(body.goal, "")
     try:
-        from orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, DEPLOYMENT
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
@@ -337,7 +337,7 @@ async def kickoff(body: KickoffBody):
     goal = brief
     name = _derive_session_name(brief, "")
     try:
-        from orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, DEPLOYMENT
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
@@ -411,7 +411,7 @@ async def exec_summary(session_id: str):
 
     fallback = _heuristic_exec_summary(s)
     try:
-        from orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, DEPLOYMENT
         decisions = [ev.get("message", "") for ev in s.events if ev.get("type") == "answer"]
         context = {
             "goal": (s.goal or "")[:800],
@@ -597,7 +597,7 @@ def _run_context_note(session) -> str:
 
 async def _run_chat(messages: list[dict], session=None) -> str:
     """Run the bounded planner tool-calling loop over `messages`, return the reply."""
-    from orchestrator import get_client, DEPLOYMENT
+    from agents.orchestrator import get_client, DEPLOYMENT
     loop = asyncio.get_event_loop()
     for _ in range(5):
         resp = await loop.run_in_executor(
@@ -656,7 +656,7 @@ _STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 async def planner_chat_stream(body: ChatBody):
     """Streaming variant of /api/chat — streams the reply text as it's produced."""
     try:
-        from orchestrator import get_client, DEPLOYMENT  # noqa: F401
+        from agents.orchestrator import get_client, DEPLOYMENT  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
     system = CHAT_SYSTEM_PROMPT
@@ -678,7 +678,7 @@ async def planner_chat_stream(body: ChatBody):
 async def planner_chat(body: ChatBody):
     """Conversational planner assistant with tool access to session data."""
     try:
-        from orchestrator import get_client, DEPLOYMENT  # noqa: F401
+        from agents.orchestrator import get_client, DEPLOYMENT  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
 
@@ -771,13 +771,13 @@ async def delete_conversation(conv_id: str, request: Request):
 # ---------------------------------------------------------------------------
 @app.get("/api/agents")
 async def list_agent_configs():
-    import agent_config
+    from agents import agent_config
     return {"agents": agent_config.list_configs()}
 
 
 @app.get("/api/agents/{agent_id}")
 async def get_agent_config(agent_id: str):
-    import agent_config
+    from agents import agent_config
     cfg = agent_config.get_config(agent_id)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
@@ -786,7 +786,7 @@ async def get_agent_config(agent_id: str):
 
 @app.put("/api/agents/{agent_id}")
 async def update_agent_config(agent_id: str, body: AgentConfigBody):
-    import agent_config
+    from agents import agent_config
     cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
@@ -795,7 +795,7 @@ async def update_agent_config(agent_id: str, body: AgentConfigBody):
 
 @app.post("/api/agents/{agent_id}/reset")
 async def reset_agent_config(agent_id: str):
-    import agent_config
+    from agents import agent_config
     cfg = agent_config.reset_config(agent_id)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
