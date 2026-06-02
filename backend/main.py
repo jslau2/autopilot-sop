@@ -298,12 +298,12 @@ async def suggest_name(body: SuggestNameBody):
     """
     fallback = _derive_session_name(body.goal, "")
     try:
-        from agents.orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, get_deployment
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
             lambda: llm_audit.audited_create(
-                get_client(), agent="suggest-name", model=DEPLOYMENT,
+                get_client(), agent="suggest-name", model=get_deployment(),
                 messages=[
                     {"role": "system", "content": (
                         "You name S&OP planning cycles. Given the goal, reply with a single "
@@ -337,12 +337,12 @@ async def kickoff(body: KickoffBody):
     goal = brief
     name = _derive_session_name(brief, "")
     try:
-        from agents.orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, get_deployment
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
             lambda: llm_audit.audited_create(
-                get_client(), agent="kickoff", model=DEPLOYMENT,
+                get_client(), agent="kickoff", model=get_deployment(),
                 messages=[
                     {"role": "system", "content": (
                         "You turn a planner's plain-English brief into a structured S&OP planning goal for "
@@ -411,7 +411,7 @@ async def exec_summary(session_id: str):
 
     fallback = _heuristic_exec_summary(s)
     try:
-        from agents.orchestrator import get_client, DEPLOYMENT
+        from agents.orchestrator import get_client, get_deployment
         decisions = [ev.get("message", "") for ev in s.events if ev.get("type") == "answer"]
         context = {
             "goal": (s.goal or "")[:800],
@@ -424,7 +424,7 @@ async def exec_summary(session_id: str):
         resp = await loop.run_in_executor(
             None,
             lambda: llm_audit.audited_create(
-                get_client(), session=s, agent="exec-summary", model=DEPLOYMENT,
+                get_client(), session=s, agent="exec-summary", model=get_deployment(),
                 messages=[
                     {"role": "system", "content": (
                         "You are the Planner agent. Write a crisp 3-sentence executive summary of an "
@@ -597,13 +597,13 @@ def _run_context_note(session) -> str:
 
 async def _run_chat(messages: list[dict], session=None) -> str:
     """Run the bounded planner tool-calling loop over `messages`, return the reply."""
-    from agents.orchestrator import get_client, DEPLOYMENT
+    from agents.orchestrator import get_client, get_deployment
     loop = asyncio.get_event_loop()
     for _ in range(5):
         resp = await loop.run_in_executor(
             None,
             lambda msgs=messages: llm_audit.audited_create(
-                get_client(), session=session, agent="chat", model=DEPLOYMENT,
+                get_client(), session=session, agent="chat", model=get_deployment(),
                 messages=msgs,
                 tools=CHAT_TOOLS,
                 tool_choice="auto",
@@ -656,7 +656,7 @@ _STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 async def planner_chat_stream(body: ChatBody):
     """Streaming variant of /api/chat — streams the reply text as it's produced."""
     try:
-        from agents.orchestrator import get_client, DEPLOYMENT  # noqa: F401
+        from agents.orchestrator import get_client, get_deployment  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
     system = CHAT_SYSTEM_PROMPT
@@ -678,7 +678,7 @@ async def planner_chat_stream(body: ChatBody):
 async def planner_chat(body: ChatBody):
     """Conversational planner assistant with tool access to session data."""
     try:
-        from agents.orchestrator import get_client, DEPLOYMENT  # noqa: F401
+        from agents.orchestrator import get_client, get_deployment  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
 

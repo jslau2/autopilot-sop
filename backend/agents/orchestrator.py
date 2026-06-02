@@ -34,7 +34,8 @@ def get_client() -> AzureOpenAI:
         )
     return _client
 
-DEPLOYMENT = os.environ["AZURE_OPENAI_DEPLOYMENT"]
+def get_deployment() -> str:
+    return os.environ["AZURE_OPENAI_DEPLOYMENT"]
 
 PLANNER_DEF = AGENT_DEFS["planner"]
 PLANNER_TOOLS = PLANNER_DEF["tools"]
@@ -235,7 +236,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                     None,
                     lambda: llm_audit.audited_create(
                         get_client(),
-                        session=session, agent="planner", model=DEPLOYMENT,
+                        session=session, agent="planner", model=get_deployment(),
                         messages=messages,
                         tools=PLANNER_TOOLS,
                         tool_choice="auto",

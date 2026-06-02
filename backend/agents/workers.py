@@ -33,7 +33,8 @@ def get_client() -> AzureOpenAI:
         )
     return _client
 
-DEPLOYMENT = os.environ["AZURE_OPENAI_DEPLOYMENT"]
+def get_deployment() -> str:
+    return os.environ["AZURE_OPENAI_DEPLOYMENT"]
 
 # ---------------------------------------------------------------------------
 # Tool dispatch table
@@ -289,7 +290,7 @@ async def run_worker_agent(
                 None,
                 lambda: llm_audit.audited_create(
                     get_client(),
-                    session=session, agent=agent_id, model=DEPLOYMENT,
+                    session=session, agent=agent_id, model=get_deployment(),
                     messages=messages,
                     tools=tools if tools else None,
                     tool_choice="auto" if tools else None,
