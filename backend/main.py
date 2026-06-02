@@ -1262,13 +1262,13 @@ async def get_shared(token: str):
 
 
 def _usage_payload(s: SessionState) -> dict:
-    # Single source of truth for pricing lives in llm_audit.
     u = s.usage
-    cost = llm_audit.cost_of(u["prompt_tokens"], u["completion_tokens"])
+    cost = llm_audit.cost_of(u["prompt_tokens"], u["completion_tokens"], u.get("cached_tokens", 0))
     return {
         **u,
         "est_cost_usd": round(cost, 6),
         "price_input_per_m": llm_audit.PRICE_INPUT_PER_M,
+        "price_cached_input_per_m": llm_audit.PRICE_CACHED_INPUT_PER_M,
         "price_output_per_m": llm_audit.PRICE_OUTPUT_PER_M,
     }
 

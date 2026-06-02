@@ -29,14 +29,15 @@ DB_FILE = Path(__file__).parent / "llm_audit.db"
 JSON_LEGACY = Path(__file__).parent / "llm_audit.json"
 
 # Price per 1M tokens (USD). Override with AZURE_PRICE_INPUT / AZURE_PRICE_OUTPUT.
-PRICE_INPUT_PER_M = float(os.getenv("AZURE_PRICE_INPUT", "0.05"))
-PRICE_OUTPUT_PER_M = float(os.getenv("AZURE_PRICE_OUTPUT", "0.40"))
+PRICE_INPUT_PER_M = float(os.getenv("AZURE_PRICE_INPUT", "0.20"))
+PRICE_CACHED_INPUT_PER_M = float(os.getenv("AZURE_PRICE_CACHED_INPUT", "0.02"))
+PRICE_OUTPUT_PER_M = float(os.getenv("AZURE_PRICE_OUTPUT", "1.25"))
 
 # Raw-row retention. Lifetime totals are never lost; only the per-call rows
 # (used for breakdowns + the recent trail) are trimmed beyond this window.
 RETENTION_DAYS = int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "90"))
 
-_LIFETIME_KEYS = ("prompt_tokens", "completion_tokens", "total_tokens", "calls", "errors", "cost_usd")
+_LIFETIME_KEYS = ("prompt_tokens", "completion_tokens", "total_tokens", "cached_tokens", "calls", "errors", "cost_usd")
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
@@ -44,8 +45,11 @@ _inserts_since_prune = 0
 _last_prune = 0.0
 
 
-def cost_of(prompt: int, completion: int) -> float:
-    return prompt / 1_000_000 * PRICE_INPUT_PER_M + completion / 1_000_000 * PRICE_OUTPUT_PER_M
+def cost_of(prompt: int, completion: int, cached: int = 0) -> float:
+    uncached = max(0, prompt - cached)
+    return (uncached / 1_000_000 * PRICE_INPUT_PER_M
+            + cached / 1_000_000 * PRICE_CACHED_INPUT_PER_M
+            + completion / 1_000_000 * PRICE_OUTPUT_PER_M)
 
 
 def _connect() -> sqlite3.Connection:
@@ -68,6 +72,7 @@ def _connect() -> sqlite3.Connection:
             prompt_tokens INTEGER DEFAULT 0,
             completion_tokens INTEGER DEFAULT 0,
             total_tokens INTEGER DEFAULT 0,
+            cached_tokens INTEGER DEFAULT 0,
             cost_usd REAL DEFAULT 0,
             ok INTEGER DEFAULT 1,
             error TEXT DEFAULT ''
@@ -78,6 +83,12 @@ def _connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS lifetime (k TEXT PRIMARY KEY, v REAL DEFAULT 0);
         """
     )
+    # Migrate existing DBs that predate the cached_tokens column.
+    try:
+        conn.execute("ALTER TABLE calls ADD COLUMN cached_tokens INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
     for k in _LIFETIME_KEYS:
         conn.execute("INSERT OR IGNORE INTO lifetime(k, v) VALUES(?, 0)", (k,))
     conn.commit()
@@ -145,22 +156,23 @@ def _maybe_prune(conn: sqlite3.Connection) -> None:
 
 
 def record(*, session_id: str = "", session_name: str = "", agent: str = "",
-           model: str = "", prompt: int = 0, completion: int = 0,
+           model: str = "", prompt: int = 0, completion: int = 0, cached: int = 0,
            ok: bool = True, error: str = "") -> None:
     global _inserts_since_prune
     total = int(prompt) + int(completion)
-    cost = cost_of(prompt, completion)
+    cost = cost_of(prompt, completion, cached)
     with _lock:
         conn = _db()
         conn.execute(
-            "INSERT INTO calls(ts,session_id,session_name,agent,model,prompt_tokens,completion_tokens,total_tokens,cost_usd,ok,error)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO calls(ts,session_id,session_name,agent,model,prompt_tokens,completion_tokens,total_tokens,cached_tokens,cost_usd,ok,error)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (time.time(), session_id, session_name, agent or "—", model,
-             int(prompt), int(completion), total, cost, 1 if ok else 0, (error or "")[:200]),
+             int(prompt), int(completion), total, int(cached), cost, 1 if ok else 0, (error or "")[:200]),
         )
         conn.execute("UPDATE lifetime SET v = v + ? WHERE k='prompt_tokens'", (int(prompt),))
         conn.execute("UPDATE lifetime SET v = v + ? WHERE k='completion_tokens'", (int(completion),))
         conn.execute("UPDATE lifetime SET v = v + ? WHERE k='total_tokens'", (total,))
+        conn.execute("UPDATE lifetime SET v = v + ? WHERE k='cached_tokens'", (int(cached),))
         conn.execute("UPDATE lifetime SET v = v + 1 WHERE k='calls'")
         if not ok:
             conn.execute("UPDATE lifetime SET v = v + 1 WHERE k='errors'")
@@ -188,10 +200,12 @@ def audited_create(client, *, agent: str = "", model: str = "",
     usage = getattr(resp, "usage", None)
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion = int(getattr(usage, "completion_tokens", 0) or 0)
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = int(getattr(details, "cached_tokens", 0) or 0)
     if session is not None:
         session.add_usage(usage)
     record(session_id=sid, session_name=sname, agent=agent, model=model,
-           prompt=prompt, completion=completion, ok=True)
+           prompt=prompt, completion=completion, cached=cached, ok=True)
     return resp
 
 
@@ -203,10 +217,12 @@ def summary(recent_limit: int = 100) -> dict:
             "prompt_tokens": int(life.get("prompt_tokens", 0)),
             "completion_tokens": int(life.get("completion_tokens", 0)),
             "total_tokens": int(life.get("total_tokens", 0)),
+            "cached_tokens": int(life.get("cached_tokens", 0)),
             "calls": int(life.get("calls", 0)),
             "errors": int(life.get("errors", 0)),
             "cost_usd": round(life.get("cost_usd", 0.0), 6),
             "price_input_per_m": PRICE_INPUT_PER_M,
+            "price_cached_input_per_m": PRICE_CACHED_INPUT_PER_M,
             "price_output_per_m": PRICE_OUTPUT_PER_M,
             "retention_days": RETENTION_DAYS,
             "window_calls": conn.execute("SELECT COUNT(*) c FROM calls").fetchone()["c"],
@@ -228,7 +244,8 @@ def summary(recent_limit: int = 100) -> dict:
             {"ts": r["ts"], "session_id": r["session_id"], "session_name": r["session_name"],
              "agent": r["agent"], "model": r["model"], "prompt_tokens": r["prompt_tokens"],
              "completion_tokens": r["completion_tokens"], "total_tokens": r["total_tokens"],
-             "cost_usd": round(r["cost_usd"], 6), "ok": bool(r["ok"]), "error": r["error"]}
+             "cached_tokens": r["cached_tokens"], "cost_usd": round(r["cost_usd"], 6),
+             "ok": bool(r["ok"]), "error": r["error"]}
             for r in conn.execute(
                 "SELECT * FROM calls ORDER BY id DESC LIMIT ?", (recent_limit,))
         ]

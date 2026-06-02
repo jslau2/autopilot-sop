@@ -30,11 +30,11 @@ def get_client() -> AzureOpenAI:
         _client = AzureOpenAI(
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            api_version=os.environ["AZURE_OPENAI_API_VERSION"],
         )
     return _client
 
-DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+DEPLOYMENT = os.environ["AZURE_OPENAI_DEPLOYMENT"]
 
 PLANNER_DEF = AGENT_DEFS["planner"]
 PLANNER_TOOLS = PLANNER_DEF["tools"]

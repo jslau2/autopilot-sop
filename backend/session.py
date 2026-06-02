@@ -36,7 +36,7 @@ class SessionState:
     decisions: list = field(default_factory=list)  # audit trail of human decisions
     approvals: list = field(default_factory=list)   # plan sign-offs (approvals workflow)
     usage: dict = field(default_factory=lambda: {
-        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "calls": 0,
+        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cached_tokens": 0, "calls": 0,
     })
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
@@ -56,6 +56,8 @@ class SessionState:
             self.usage["prompt_tokens"] += int(getattr(usage, "prompt_tokens", 0) or 0)
             self.usage["completion_tokens"] += int(getattr(usage, "completion_tokens", 0) or 0)
             self.usage["total_tokens"] += int(getattr(usage, "total_tokens", 0) or 0)
+            details = getattr(usage, "prompt_tokens_details", None)
+            self.usage["cached_tokens"] += int(getattr(details, "cached_tokens", 0) or 0)
             self.usage["calls"] += 1
         except Exception:
             pass

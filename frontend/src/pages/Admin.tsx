@@ -5,13 +5,13 @@ import { useDemoMode } from '../hooks/useDemoMode';
 
 interface Totals {
   prompt_tokens: number; completion_tokens: number; total_tokens: number;
-  calls: number; errors: number; cost_usd: number;
-  price_input_per_m: number; price_output_per_m: number;
+  cached_tokens: number; calls: number; errors: number; cost_usd: number;
+  price_input_per_m: number; price_cached_input_per_m: number; price_output_per_m: number;
   retention_days?: number; window_calls?: number;
 }
 interface AgentRow { agent: string; calls: number; total_tokens: number; cost_usd: number; }
 interface SessionRow { session_id: string; name: string; calls: number; total_tokens: number; cost_usd: number; }
-interface CallRow { ts: number; session_id: string; session_name: string; agent: string; model: string; prompt_tokens: number; completion_tokens: number; total_tokens: number; cost_usd: number; ok: boolean; error: string; }
+interface CallRow { ts: number; session_id: string; session_name: string; agent: string; model: string; prompt_tokens: number; completion_tokens: number; total_tokens: number; cached_tokens: number; cost_usd: number; ok: boolean; error: string; }
 interface Usage { totals: Totals; by_agent: AgentRow[]; by_session: SessionRow[]; recent: CallRow[]; }
 
 function fmtTok(n: number): string {
@@ -70,8 +70,8 @@ export default function Admin() {
             <>
               {/* Headline totals */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
-                <Card label="Total tokens" value={fmtTok(t.total_tokens)} sub={`${fmtTok(t.prompt_tokens)} in · ${fmtTok(t.completion_tokens)} out`} accent="oklch(0.68 0.17 255)" />
-                <Card label="Estimated cost" value={fmtCost(t.cost_usd)} sub={`$${t.price_input_per_m}/$${t.price_output_per_m} per 1M`} accent="oklch(0.76 0.15 150)" />
+                <Card label="Total tokens" value={fmtTok(t.total_tokens)} sub={`${fmtTok(t.prompt_tokens)} in (${fmtTok(t.cached_tokens)} cached) · ${fmtTok(t.completion_tokens)} out`} accent="oklch(0.68 0.17 255)" />
+                <Card label="Estimated cost" value={fmtCost(t.cost_usd)} sub={`$${t.price_input_per_m} in · $${t.price_cached_input_per_m} cached · $${t.price_output_per_m} out / 1M`} accent="oklch(0.76 0.15 150)" />
                 <Card label="API calls" value={String(t.calls)} sub={`${t.errors} error${t.errors === 1 ? '' : 's'}`} accent="oklch(0.80 0.16 78)" />
                 <Card label="Avg tokens / call" value={t.calls ? fmtTok(Math.round(t.total_tokens / t.calls)) : '—'} sub="across all agents" accent="oklch(0.74 0.15 320)" />
               </div>
@@ -91,7 +91,7 @@ export default function Admin() {
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
-                      <tr>{['When', 'Run', 'Agent', 'In', 'Out', 'Total', 'Cost', ''].map(h => (
+                      <tr>{['When', 'Run', 'Agent', 'In', 'Cached', 'Out', 'Total', 'Cost', ''].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}</tr>
                     </thead>
@@ -102,6 +102,7 @@ export default function Admin() {
                           <td style={tdStyle}>{c.session_name || (c.session_id ? c.session_id.slice(0, 8) : '—')}</td>
                           <td style={{ ...tdStyle, color: 'var(--text-1)', fontWeight: 600 }}>{c.agent}</td>
                           <td style={tdStyle}>{c.prompt_tokens.toLocaleString()}</td>
+                          <td style={{ ...tdStyle, color: c.cached_tokens > 0 ? 'oklch(0.74 0.15 150)' : 'var(--text-3)' }}>{c.cached_tokens > 0 ? c.cached_tokens.toLocaleString() : '—'}</td>
                           <td style={tdStyle}>{c.completion_tokens.toLocaleString()}</td>
                           <td style={{ ...tdStyle, color: 'var(--text-1)' }}>{c.total_tokens.toLocaleString()}</td>
                           <td style={tdStyle}>{fmtCost(c.cost_usd)}</td>
