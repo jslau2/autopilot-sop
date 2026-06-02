@@ -310,7 +310,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
   const [parentName, setParentName] = useState('');
   const [showTour, setShowTour] = useState(() => !localStorage.getItem('sop-tour-done'));
   const closeTour = () => { localStorage.setItem('sop-tour-done', '1'); setShowTour(false); };
-  const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') === '1');
+  const [focusMode, setFocusMode] = useState(() => localStorage.getItem('sop-focus-mode') !== '0');
   const toggleFocus = () => setFocusMode(f => { localStorage.setItem('sop-focus-mode', f ? '0' : '1'); return !f; });
 
   // Resolve the cycle name + goal for the breadcrumb/report (nav state, then backend).
