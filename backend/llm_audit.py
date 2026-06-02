@@ -29,8 +29,9 @@ DB_FILE = Path(__file__).parent / "llm_audit.db"
 JSON_LEGACY = Path(__file__).parent / "llm_audit.json"
 
 # Price per 1M tokens (USD). Override with AZURE_PRICE_INPUT / AZURE_PRICE_OUTPUT.
-PRICE_INPUT_PER_M = float(os.getenv("AZURE_PRICE_INPUT", "0.05"))
-PRICE_OUTPUT_PER_M = float(os.getenv("AZURE_PRICE_OUTPUT", "0.40"))
+PRICE_INPUT_PER_M = float(os.getenv("AZURE_PRICE_INPUT", "0.20"))
+PRICE_CACHED_INPUT_PER_M = float(os.getenv("AZURE_PRICE_CACHED_INPUT", "0.02"))
+PRICE_OUTPUT_PER_M = float(os.getenv("AZURE_PRICE_OUTPUT", "1.25"))
 
 # Raw-row retention. Lifetime totals are never lost; only the per-call rows
 # (used for breakdowns + the recent trail) are trimmed beyond this window.
@@ -44,8 +45,11 @@ _inserts_since_prune = 0
 _last_prune = 0.0
 
 
-def cost_of(prompt: int, completion: int) -> float:
-    return prompt / 1_000_000 * PRICE_INPUT_PER_M + completion / 1_000_000 * PRICE_OUTPUT_PER_M
+def cost_of(prompt: int, completion: int, cached: int = 0) -> float:
+    uncached = max(0, prompt - cached)
+    return (uncached / 1_000_000 * PRICE_INPUT_PER_M
+            + cached / 1_000_000 * PRICE_CACHED_INPUT_PER_M
+            + completion / 1_000_000 * PRICE_OUTPUT_PER_M)
 
 
 def _connect() -> sqlite3.Connection:
@@ -145,11 +149,11 @@ def _maybe_prune(conn: sqlite3.Connection) -> None:
 
 
 def record(*, session_id: str = "", session_name: str = "", agent: str = "",
-           model: str = "", prompt: int = 0, completion: int = 0,
+           model: str = "", prompt: int = 0, completion: int = 0, cached: int = 0,
            ok: bool = True, error: str = "") -> None:
     global _inserts_since_prune
     total = int(prompt) + int(completion)
-    cost = cost_of(prompt, completion)
+    cost = cost_of(prompt, completion, cached)
     with _lock:
         conn = _db()
         conn.execute(
@@ -188,10 +192,12 @@ def audited_create(client, *, agent: str = "", model: str = "",
     usage = getattr(resp, "usage", None)
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion = int(getattr(usage, "completion_tokens", 0) or 0)
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = int(getattr(details, "cached_tokens", 0) or 0)
     if session is not None:
         session.add_usage(usage)
     record(session_id=sid, session_name=sname, agent=agent, model=model,
-           prompt=prompt, completion=completion, ok=True)
+           prompt=prompt, completion=completion, cached=cached, ok=True)
     return resp
 
 
@@ -207,6 +213,7 @@ def summary(recent_limit: int = 100) -> dict:
             "errors": int(life.get("errors", 0)),
             "cost_usd": round(life.get("cost_usd", 0.0), 6),
             "price_input_per_m": PRICE_INPUT_PER_M,
+            "price_cached_input_per_m": PRICE_CACHED_INPUT_PER_M,
             "price_output_per_m": PRICE_OUTPUT_PER_M,
             "retention_days": RETENTION_DAYS,
             "window_calls": conn.execute("SELECT COUNT(*) c FROM calls").fetchone()["c"],
