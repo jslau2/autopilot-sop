@@ -196,34 +196,39 @@ def _derive_session_name(goal: str, session_id: str) -> str:
 async def event_generator(session: SessionState):
     """
     Yields SSE-formatted events.
-    First replays all existing events (for reconnections), then streams new ones.
-    Sends keepalive comments every 15 seconds.
-    Stops when session is done/error and the queue is empty.
-    """
-    # Replay existing events for clients that connect after start
-    for evt in list(session.events):
-        yield f"data: {json.dumps(evt)}\n\n"
 
+    Streams from session.events via an index cursor (the complete, ordered log),
+    which covers both replay-on-connect and live tailing with no duplicates. The
+    event_queue is used only as a low-latency wakeup signal — its contents would
+    otherwise overlap the replayed snapshot and double-send early events.
+    Sends keepalive comments every 15 seconds; stops when the session is terminal
+    and the log is fully flushed.
+    """
+    idx = 0
     last_keepalive = time.time()
 
     while True:
+        # Flush any events appended since we last looked.
+        while idx < len(session.events):
+            yield f"data: {json.dumps(session.events[idx])}\n\n"
+            idx += 1
+
+        # Stop once the session is complete and everything has been sent.
+        if session.status in ("done", "error") and idx >= len(session.events):
+            break
+
         try:
-            evt = await asyncio.wait_for(session.event_queue.get(), timeout=1.0)
-            yield f"data: {json.dumps(evt)}\n\n"
-
-            # Stop streaming once session is complete and queue is drained
-            if session.status in ("done", "error") and session.event_queue.empty():
-                break
-
+            # Wait for a wakeup (new event) — drain the signal queue without
+            # yielding from it (events are sourced from session.events above).
+            await asyncio.wait_for(session.event_queue.get(), timeout=1.0)
+            while not session.event_queue.empty():
+                session.event_queue.get_nowait()
         except asyncio.TimeoutError:
             # Send keepalive to prevent proxy/browser from closing connection
             if time.time() - last_keepalive > 15:
                 yield ": keepalive\n\n"
                 last_keepalive = time.time()
 
-            # Check if we should stop
-            if session.status in ("done", "error") and session.event_queue.empty():
-                break
 
 
 # ---------------------------------------------------------------------------
