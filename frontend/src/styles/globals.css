@@ -38,6 +38,7 @@
   --toolbar-h:   46px;
   --kpibar-h:    52px;
   --eventbar-h:  160px;
+  --eventbar-collapsed-h: 30px;   /* matches HEADER_H in EventStream.tsx */
   --radius:      7px;
 }
 
@@ -143,7 +144,9 @@ input, textarea, select { font-family: inherit; }
 .kpi-sub { font-size: 9px; color: var(--text-3); }
 
 /* ─── Graph area ────────────────────────────── */
-.main-graph { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); }
+/* padding-bottom reserves room for the collapsed event-stream overlay so the
+   swimlane's horizontal scrollbar and last lane stay visible above it. */
+.main-graph { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); padding-bottom: var(--eventbar-collapsed-h, 30px); }
 
 /* ─── Swimlane ──────────────────────────────── */
 .swimlane-root { display: flex; flex: 1; overflow: hidden; height: 100%; }

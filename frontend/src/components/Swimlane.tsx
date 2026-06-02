@@ -139,6 +139,15 @@ export default function Swimlane() {
   const { steps, stepsArr, elapsedT, setSelectedStepId, activeAgents } = useDashboard();
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
+
+  // Keep the label column locked to the graph's vertical scroll so the two
+  // never drift apart (the graph's scrollbar is the single driver).
+  const syncLabelsScroll = useCallback(() => {
+    if (labelsRef.current && scrollRef.current) {
+      labelsRef.current.scrollTop = scrollRef.current.scrollTop;
+    }
+  }, []);
 
   // Show only the lanes in scope for this run: the planner, the run's active
   // agents, and any agent that actually produced a step (defensive). When the
@@ -206,7 +215,7 @@ export default function Swimlane() {
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {/* Agent labels */}
-        <div className="swim-labels" style={{ width: LABEL_W, flexShrink: 0, overflowY: 'auto' }}>
+        <div ref={labelsRef} className="swim-labels" style={{ width: LABEL_W, flexShrink: 0, overflowY: 'hidden' }}>
           {laneOrder.map((agentId) => {
             const agent = AGENTS[agentId];
             const status = getAgentStatus(steps, agentId);
@@ -225,7 +234,7 @@ export default function Swimlane() {
         </div>
 
         {/* Scrollable graph area */}
-        <div ref={scrollRef} className="swim-scroll" style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
+        <div ref={scrollRef} onScroll={syncLabelsScroll} className="swim-scroll" style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
           <div style={{ position: 'relative', width: totalWidth, height: laneOrder.length * LANE_H }}>
             {/* Lane backgrounds */}
             {laneOrder.map((agentId, i) => (
