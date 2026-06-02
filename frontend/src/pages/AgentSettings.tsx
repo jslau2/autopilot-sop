@@ -298,13 +298,11 @@ export default function AgentSettings({ embedded = false }: { embedded?: boolean
   const toggleEnabled = (agentId: string) => {
     const next = !(enabledMap[agentId] ?? true);
     setEnabledMap(prev => ({ ...prev, [agentId]: next }));
-    if (!demoMode) {
-      fetch(`/api/agents/${agentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: next }),
-      }).catch(() => {});
-    }
+    fetch(`/api/agents/${agentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: next }),
+    }).catch(() => {});
   };
 
   const agentList = AGENT_ORDER.filter(id => activeTab === 'all' || AGENT_DATA[id]?.promptEval?.revision === 'Revision Needed');

@@ -50,6 +50,10 @@ ALL_SPECIALIST_IDS: list[str] = [
 def _build_planner_tools(enabled_ids: list[str]) -> list[dict]:
     import copy
     tools = copy.deepcopy(PLANNER_TOOLS)
+    if not enabled_ids:
+        # No agents to dispatch — strip dispatch_agent and wait_for_agents so
+        # the LLM receives a valid schema and calls complete_session directly.
+        return [t for t in tools if t.get("function", {}).get("name") not in ("dispatch_agent", "wait_for_agents")]
     for tool in tools:
         fn = tool.get("function", {})
         if fn.get("name") == "dispatch_agent":
