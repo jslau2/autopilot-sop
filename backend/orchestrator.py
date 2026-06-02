@@ -50,15 +50,26 @@ ALL_SPECIALIST_IDS: list[str] = [
 def _build_planner_tools(enabled_ids: list[str]) -> list[dict]:
     import copy
     tools = copy.deepcopy(PLANNER_TOOLS)
+
+    # ask_human only makes sense when demand ran AND at least one supply/capacity
+    # agent ran — otherwise there is no data to make a decision about.
+    supply_agents = {"spi", "capacity", "inventory", "tooling"}
+    can_ask_human = "demand" in enabled_ids and bool(supply_agents & set(enabled_ids))
+
     if not enabled_ids:
-        # No agents to dispatch — strip dispatch_agent and wait_for_agents so
-        # the LLM receives a valid schema and calls complete_session directly.
-        return [t for t in tools if t.get("function", {}).get("name") not in ("dispatch_agent", "wait_for_agents")]
-    for tool in tools:
-        fn = tool.get("function", {})
-        if fn.get("name") == "dispatch_agent":
-            fn["parameters"]["properties"]["agent_id"]["enum"] = list(enabled_ids)
-    return tools
+        # Nothing to dispatch — give the LLM only complete_session.
+        strip = {"dispatch_agent", "wait_for_agents", "ask_human"}
+    else:
+        strip = set() if can_ask_human else {"ask_human"}
+
+    filtered = [t for t in tools if t.get("function", {}).get("name") not in strip]
+
+    if enabled_ids:
+        for tool in filtered:
+            fn = tool.get("function", {})
+            if fn.get("name") == "dispatch_agent":
+                fn["parameters"]["properties"]["agent_id"]["enum"] = list(enabled_ids)
+    return filtered
 
 
 def _build_planner_prompt(enabled_ids: list[str]) -> str:
@@ -66,15 +77,30 @@ def _build_planner_prompt(enabled_ids: list[str]) -> str:
     if set(enabled_ids) == set(ALL_SPECIALIST_IDS):
         return base
     disabled = [aid for aid in ALL_SPECIALIST_IDS if aid not in enabled_ids]
-    note = (
-        "\n\nIMPORTANT — RUN CONFIGURATION OVERRIDE:\n"
-        f"Active agents for this run: {', '.join(enabled_ids) if enabled_ids else 'none'}.\n"
-        f"Disabled agents (do NOT dispatch): {', '.join(disabled)}.\n"
-        "Adapt the playbook: skip any phase where all agents are disabled. "
-        "Only dispatch agents from the active list above. "
-        "After all active agents complete and you have reviewed their results, "
-        "call complete_session immediately — do not wait for or mention disabled agents."
-    )
+    supply_agents = {"spi", "capacity", "inventory", "tooling"}
+    can_ask_human = "demand" in enabled_ids and bool(supply_agents & set(enabled_ids))
+
+    if not enabled_ids:
+        note = (
+            "\n\nIMPORTANT — RUN CONFIGURATION OVERRIDE:\n"
+            "NO specialist agents are active for this run.\n"
+            "Do NOT call ask_human. Do NOT attempt to dispatch any agents.\n"
+            "Call complete_session immediately with default KPIs."
+        )
+    else:
+        human_note = (
+            "" if can_ask_human
+            else " Do NOT call ask_human — insufficient agent context for a decision."
+        )
+        note = (
+            "\n\nIMPORTANT — RUN CONFIGURATION OVERRIDE:\n"
+            f"Active agents for this run: {', '.join(enabled_ids)}.\n"
+            f"Disabled agents (do NOT dispatch): {', '.join(disabled)}.\n"
+            "Adapt the playbook: skip any phase where all agents are disabled. "
+            "Only dispatch agents from the active list above. "
+            "After all active agents complete, call complete_session immediately."
+            + human_note
+        )
     return base + note
 
 
