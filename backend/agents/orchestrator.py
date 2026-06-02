@@ -230,6 +230,8 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
         "planner",
         f"Active agents this cycle ({len(active_ids)}): {', '.join(active_ids)}",
     )
+    # Structured event so the UI can hide lanes for agents not in this run.
+    await session.emit({"type": "active_agents", "agents": active_ids})
 
     # Initial planner message — system prompt + the dynamically generated playbook.
     messages: list[dict] = [

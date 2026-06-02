@@ -392,6 +392,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     terminateSession,
     showTour,
     setShowTour,
+    activeAgents: S.activeAgents ?? [],
   };
 
   const inner = (

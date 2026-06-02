@@ -161,6 +161,13 @@ export function useLiveSession(sessionId?: string) {
         break;
       }
 
+      case 'active_agents': {
+        // Which specialist agents are in scope for this run — used to hide
+        // disabled / out-of-scope lanes in the swimlane.
+        S.activeAgents = (evt.agents as string[]) ?? [];
+        break;
+      }
+
       case 'error': {
         S.events.push({ ts: nowTs(), type: 'log', agent: evt.agent as string,
           message: `⚠ ${evt.message}`, stepId: null });

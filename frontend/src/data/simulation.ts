@@ -168,5 +168,6 @@ export function createInitialState(): SimState {
     postOffset: 0,
     nextPreIdx: 0,
     nextPostIdx: 0,
+    activeAgents: [],
   };
 }

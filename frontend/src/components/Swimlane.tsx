@@ -76,14 +76,15 @@ interface ConnectorsProps {
   steps: Record<string, Step>;
   pxPerSec: number;
   elapsedT: number;
+  laneOrder: string[];
 }
 
-function Connectors({ stepsArr, steps, pxPerSec, elapsedT }: ConnectorsProps) {
+function Connectors({ stepsArr, steps, pxPerSec, elapsedT, laneOrder }: ConnectorsProps) {
   const paths: React.ReactNode[] = [];
 
   for (const step of stepsArr) {
     if (!step.deps || step.deps.length === 0) continue;
-    const toLaneIdx = AGENT_ORDER.indexOf(step.agent);
+    const toLaneIdx = laneOrder.indexOf(step.agent);
     if (toLaneIdx < 0) continue;
     const toX = step.startT * pxPerSec;
     const toY = toLaneIdx * LANE_H + LANE_H / 2;
@@ -92,7 +93,7 @@ function Connectors({ stepsArr, steps, pxPerSec, elapsedT }: ConnectorsProps) {
     for (const depId of step.deps) {
       const dep = steps[depId];
       if (!dep) continue;
-      const fromLaneIdx = AGENT_ORDER.indexOf(dep.agent);
+      const fromLaneIdx = laneOrder.indexOf(dep.agent);
       if (fromLaneIdx < 0) continue;
       const fromX = (dep.endT ?? elapsedT) * pxPerSec;
       const fromY = fromLaneIdx * LANE_H + LANE_H / 2;
@@ -135,9 +136,16 @@ const zoomBtnStyle: React.CSSProperties = {
 };
 
 export default function Swimlane() {
-  const { steps, stepsArr, elapsedT, setSelectedStepId } = useDashboard();
+  const { steps, stepsArr, elapsedT, setSelectedStepId, activeAgents } = useDashboard();
   const [pxPerSec, setPxPerSec] = useState(DEFAULT_PX_PER_SEC);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Show only the lanes in scope for this run: the planner, the run's active
+  // agents, and any agent that actually produced a step (defensive). When the
+  // active set is unknown (demo / legacy runs), fall back to showing all lanes.
+  const laneOrder = (activeAgents && activeAgents.length)
+    ? AGENT_ORDER.filter(id => id === 'planner' || activeAgents.includes(id) || stepsArr.some(s => s.agent === id))
+    : AGENT_ORDER;
 
   const maxT = Math.max(...stepsArr.map(s => s.endT ?? elapsedT), elapsedT, 1);
   const cursorX = elapsedT * pxPerSec;
@@ -199,7 +207,7 @@ export default function Swimlane() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {/* Agent labels */}
         <div className="swim-labels" style={{ width: LABEL_W, flexShrink: 0, overflowY: 'auto' }}>
-          {AGENT_ORDER.map((agentId) => {
+          {laneOrder.map((agentId) => {
             const agent = AGENTS[agentId];
             const status = getAgentStatus(steps, agentId);
             return (
@@ -218,9 +226,9 @@ export default function Swimlane() {
 
         {/* Scrollable graph area */}
         <div ref={scrollRef} className="swim-scroll" style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
-          <div style={{ position: 'relative', width: totalWidth, height: AGENT_ORDER.length * LANE_H }}>
+          <div style={{ position: 'relative', width: totalWidth, height: laneOrder.length * LANE_H }}>
             {/* Lane backgrounds */}
-            {AGENT_ORDER.map((agentId, i) => (
+            {laneOrder.map((agentId, i) => (
               <div key={agentId} style={{
                 position: 'absolute', left: 0, right: 0,
                 top: i * LANE_H, height: LANE_H,
@@ -230,7 +238,7 @@ export default function Swimlane() {
             ))}
 
             {/* Dependency connectors — rendered below cards */}
-            <Connectors stepsArr={stepsArr} steps={steps} pxPerSec={pxPerSec} elapsedT={elapsedT} />
+            <Connectors stepsArr={stepsArr} steps={steps} pxPerSec={pxPerSec} elapsedT={elapsedT} laneOrder={laneOrder} />
 
             {/* Time cursor */}
             <div style={{
@@ -240,7 +248,7 @@ export default function Swimlane() {
 
             {/* Step cards */}
             {stepsArr.map(step => {
-              const laneIdx = AGENT_ORDER.indexOf(step.agent);
+              const laneIdx = laneOrder.indexOf(step.agent);
               if (laneIdx < 0) return null;
               return (
                 <StepCard
