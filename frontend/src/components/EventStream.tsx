@@ -30,14 +30,26 @@ function loadPref(): { collapsed: boolean; height: number } {
 export default function EventStream() {
   const { events } = useDashboard();
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [pref, setPref] = useState(loadPref);
   const { collapsed, height } = pref;
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  const panelH = collapsed ? HEADER_H : height;
 
   // Persist collapse/height across runs.
   useEffect(() => {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(pref)); } catch { /* ignore */ }
   }, [pref]);
+
+  // Publish the panel's live height to .main-area so the swimlane can reserve
+  // exactly that much room — keeping its horizontal scrollbar above the overlay
+  // whether collapsed, expanded, or mid-drag.
+  useEffect(() => {
+    const area = panelRef.current?.closest('.main-area') as HTMLElement | null;
+    area?.style.setProperty('--eventbar-cur-h', `${panelH}px`);
+    return () => { area?.style.removeProperty('--eventbar-cur-h'); };
+  }, [panelH]);
 
   // Auto-scroll to newest while expanded.
   useEffect(() => {
@@ -72,17 +84,15 @@ export default function EventStream() {
 
   const toggle = () => setPref(p => ({ ...p, collapsed: !p.collapsed }));
 
-  const panelH = collapsed ? HEADER_H : height;
-
   return (
     <div
+      ref={panelRef}
       className="event-bar event-bar--overlay"
       style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
         height: panelH,
         zIndex: 40,
         boxShadow: '0 -8px 24px oklch(0.04 0.01 250 / 0.45)',
-        transition: dragRef.current ? 'none' : 'height 0.18s ease',
       }}
     >
       {/* Drag handle (top edge) — hidden when collapsed */}
