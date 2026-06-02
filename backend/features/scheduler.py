@@ -9,13 +9,15 @@ creation); this module just holds + persists the definitions.
 
 import json
 import logging
+import sqlite3
+import threading
 import time
 import uuid
 from pathlib import Path
 
 log = logging.getLogger("scheduler")
 
-SCHEDULES_FILE = Path(__file__).parent.parent / "schedules.json"
+DB_FILE = Path(__file__).parent.parent / "app.db"
 
 CADENCE_SECONDS = {
     "hourly": 3600,
@@ -23,13 +25,43 @@ CADENCE_SECONDS = {
     "weekly": 604800,
 }
 
-# in-memory registry
+# in-memory registry (source of truth at runtime; mirrored into the schedules table)
 schedules: dict[str, dict] = {}
+
+_lock = threading.Lock()
+_conn: sqlite3.Connection | None = None
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schedules (id TEXT PRIMARY KEY, data TEXT DEFAULT '{}')"
+    )
+    conn.commit()
+    return conn
+
+
+def _db() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        _conn = _connect()
+    return _conn
 
 
 def _save() -> None:
     try:
-        SCHEDULES_FILE.write_text(json.dumps(schedules))
+        with _lock:
+            conn = _db()
+            conn.execute("DELETE FROM schedules")
+            conn.executemany(
+                "INSERT INTO schedules (id, data) VALUES (?, ?)",
+                [(sid, json.dumps(s)) for sid, s in schedules.items()],
+            )
+            conn.commit()
     except Exception:
         log.exception("write schedules")
 
@@ -37,8 +69,9 @@ def _save() -> None:
 def load() -> None:
     global schedules
     try:
-        if SCHEDULES_FILE.exists():
-            schedules = json.loads(SCHEDULES_FILE.read_text())
+        with _lock:
+            rows = _db().execute("SELECT id, data FROM schedules").fetchall()
+        schedules = {r["id"]: json.loads(r["data"] or "{}") for r in rows}
     except Exception:
         log.exception("read schedules")
         schedules = {}

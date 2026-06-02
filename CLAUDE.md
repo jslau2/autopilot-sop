@@ -70,8 +70,11 @@ Backend:
   `PUT /api/conversations/{id}/messages` (auto-titles from the first user message).
 - Feature modules: `feedback_store.py` (👍/👎), `uploads.py` (run-on-your-data),
   `notifications.py` (alerts + webhook), `shares.py` (read-only links),
-  `scheduler.py` (recurring runs). All write JSON next to the backend
-  (gitignored). `SessionState` also carries `decisions`, `approvals`, and `usage`.
+  `scheduler.py` (recurring runs). These (plus `agents/agent_config.py`'s
+  per-agent overrides) all persist to one shared SQLite db, `backend/app.db`
+  (gitignored) — each module owns its own table(s) + connection (WAL, lazy
+  connect), mirroring `session_store`/`chat_store`. `uploads.py` stays in-memory.
+  `SessionState` also carries `decisions`, `approvals`, and `usage`.
 
 Frontend:
 - `src/data/agents.ts` — agent display names/colors. NB: `rawColor` holds actual

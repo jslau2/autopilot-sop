@@ -8,6 +8,7 @@ them to a webhook (Slack/Teams/email-relay) — best-effort, stdlib only.
 
 import json
 import logging
+import sqlite3
 import threading
 import time
 import urllib.request
@@ -15,7 +16,30 @@ from pathlib import Path
 
 log = logging.getLogger("notifications")
 
-CONFIG_FILE = Path(__file__).parent.parent / "notify_config.json"
+DB_FILE = Path(__file__).parent.parent / "app.db"
+
+_lock = threading.Lock()
+_conn: sqlite3.Connection | None = None
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notify_config (k TEXT PRIMARY KEY, v TEXT DEFAULT '{}')"
+    )
+    conn.commit()
+    return conn
+
+
+def _db() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        _conn = _connect()
+    return _conn
 
 # KPI thresholds for "breach" alerts.
 OTIF_TARGET = 96.0       # % — below this is a warning
@@ -64,8 +88,10 @@ def compute_alerts(sessions: dict) -> list[dict]:
 # --- webhook config -------------------------------------------------------
 def get_config() -> dict:
     try:
-        if CONFIG_FILE.exists():
-            return json.loads(CONFIG_FILE.read_text())
+        with _lock:
+            r = _db().execute("SELECT v FROM notify_config WHERE k='config'").fetchone()
+        if r is not None:
+            return json.loads(r["v"] or "{}")
     except Exception:
         log.exception("read notify config")
     return {"webhook_url": "", "enabled": False}
@@ -78,7 +104,13 @@ def set_config(webhook_url: str | None, enabled: bool | None) -> dict:
     if enabled is not None:
         cfg["enabled"] = bool(enabled)
     try:
-        CONFIG_FILE.write_text(json.dumps(cfg))
+        with _lock:
+            conn = _db()
+            conn.execute(
+                "INSERT OR REPLACE INTO notify_config (k, v) VALUES ('config', ?)",
+                (json.dumps(cfg),),
+            )
+            conn.commit()
     except Exception:
         log.exception("write notify config")
     return cfg

@@ -4,43 +4,65 @@ from __future__ import annotations
 Lightweight append-only store for in-app user feedback (👍 / 👎 + comment) on
 agent outputs and whole runs. Feeds the Agent Manager governance analytics.
 
-Persisted as a single JSON array in backend/feedback.json (gitignored).
+Persisted in the shared backend/app.db (gitignored), one row per feedback entry.
 """
 
-import json
 import logging
+import sqlite3
+import threading
 import time
 import uuid
 from pathlib import Path
 
 log = logging.getLogger("feedback")
 
-FEEDBACK_FILE = Path(__file__).parent.parent / "feedback.json"
+DB_FILE = Path(__file__).parent.parent / "app.db"
+
+_lock = threading.Lock()
+_conn: sqlite3.Connection | None = None
 
 
-def _load() -> list[dict]:
-    try:
-        if FEEDBACK_FILE.exists():
-            data = json.loads(FEEDBACK_FILE.read_text())
-            if isinstance(data, list):
-                return data
-    except Exception:
-        log.exception("Failed to read feedback store")
-    return []
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id TEXT PRIMARY KEY,
+            ts REAL DEFAULT 0,
+            session_id TEXT DEFAULT '',
+            target TEXT DEFAULT 'run',
+            target_label TEXT DEFAULT '',
+            agent_id TEXT DEFAULT '',
+            rating TEXT DEFAULT 'up',
+            comment TEXT DEFAULT ''
+        )
+        """
+    )
+    conn.commit()
+    return conn
 
 
-def _save(items: list[dict]) -> None:
-    try:
-        tmp = FEEDBACK_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(items))
-        tmp.replace(FEEDBACK_FILE)
-    except Exception:
-        log.exception("Failed to write feedback store")
+def _db() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        _conn = _connect()
+    return _conn
+
+
+def _row(r: sqlite3.Row) -> dict:
+    return {
+        "id": r["id"], "ts": r["ts"], "session_id": r["session_id"],
+        "target": r["target"], "target_label": r["target_label"],
+        "agent_id": r["agent_id"], "rating": r["rating"], "comment": r["comment"],
+    }
 
 
 def record(entry: dict) -> dict:
     """Append a feedback entry, stamping id + timestamp. Returns the stored row."""
-    items = _load()
     row = {
         "id": uuid.uuid4().hex[:12],
         "ts": time.time(),
@@ -51,21 +73,35 @@ def record(entry: dict) -> dict:
         "rating": "down" if entry.get("rating") == "down" else "up",
         "comment": (entry.get("comment") or "")[:1000],
     }
-    items.append(row)
-    _save(items)
+    try:
+        with _lock:
+            conn = _db()
+            conn.execute(
+                "INSERT INTO feedback (id,ts,session_id,target,target_label,agent_id,rating,comment)"
+                " VALUES (:id,:ts,:session_id,:target,:target_label,:agent_id,:rating,:comment)",
+                row,
+            )
+            conn.commit()
+    except Exception:
+        log.exception("Failed to write feedback store")
     return row
 
 
 def list_feedback(session_id: str = "") -> list[dict]:
-    items = _load()
-    if session_id:
-        items = [r for r in items if r.get("session_id") == session_id]
-    return sorted(items, key=lambda r: r.get("ts", 0), reverse=True)
+    with _lock:
+        conn = _db()
+        if session_id:
+            rows = conn.execute(
+                "SELECT * FROM feedback WHERE session_id=? ORDER BY ts DESC", (session_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM feedback ORDER BY ts DESC").fetchall()
+    return [_row(r) for r in rows]
 
 
 def summary() -> dict:
     """Aggregate counts for governance analytics."""
-    items = _load()
+    items = list_feedback()
     up = sum(1 for r in items if r.get("rating") == "up")
     down = sum(1 for r in items if r.get("rating") == "down")
     by_agent: dict[str, dict] = {}
@@ -81,7 +117,7 @@ def summary() -> dict:
             "target_label": r.get("target_label", ""),
             "ts": r.get("ts"),
         }
-        for r in sorted(items, key=lambda r: r.get("ts", 0), reverse=True)
+        for r in items  # already sorted ts desc
         if r.get("comment")
     ][:20]
     total = up + down

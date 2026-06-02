@@ -2,18 +2,23 @@ from __future__ import annotations
 
 """
 Per-agent runtime config overrides (system prompt, temperature) edited from the
-Agent Settings page. Persisted to agent_overrides.json (gitignored) so they
+Agent Settings page. Persisted to the shared backend/app.db (gitignored) so they
 survive restarts. The orchestrator and workers read the *effective* values.
+
+The in-memory `_overrides` dict is the source of truth at runtime; `_save()`
+mirrors it into the `agent_overrides` table.
 """
 
 import json
 import logging
+import sqlite3
+import threading
 from pathlib import Path
 
 from .agent_defs import AGENT_DEFS
 
 log = logging.getLogger("agent_config")
-_PATH = Path(__file__).parent.parent / "agent_overrides.json"
+DB_FILE = Path(__file__).parent.parent / "app.db"
 
 # Per-agent default sampling temperature (matches historical hardcoded values).
 _DEFAULT_TEMPS: dict[str, float] = {"planner": 0.3}
@@ -21,12 +26,36 @@ _FALLBACK_TEMP = 0.2
 
 _overrides: dict[str, dict] = {}
 
+_lock = threading.Lock()
+_conn: sqlite3.Connection | None = None
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS agent_overrides (agent_id TEXT PRIMARY KEY, data TEXT DEFAULT '{}')"
+    )
+    conn.commit()
+    return conn
+
+
+def _db() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        _conn = _connect()
+    return _conn
+
 
 def _load() -> None:
     global _overrides
     try:
-        if _PATH.exists():
-            _overrides = json.loads(_PATH.read_text())
+        with _lock:
+            rows = _db().execute("SELECT agent_id, data FROM agent_overrides").fetchall()
+        _overrides = {r["agent_id"]: json.loads(r["data"] or "{}") for r in rows}
     except Exception:
         log.exception("Failed to load agent overrides")
         _overrides = {}
@@ -34,7 +63,14 @@ def _load() -> None:
 
 def _save() -> None:
     try:
-        _PATH.write_text(json.dumps(_overrides, indent=2))
+        with _lock:
+            conn = _db()
+            conn.execute("DELETE FROM agent_overrides")
+            conn.executemany(
+                "INSERT INTO agent_overrides (agent_id, data) VALUES (?, ?)",
+                [(aid, json.dumps(o)) for aid, o in _overrides.items()],
+            )
+            conn.commit()
     except Exception:
         log.exception("Failed to save agent overrides")
 
