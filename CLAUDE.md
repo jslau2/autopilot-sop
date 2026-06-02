@@ -123,6 +123,7 @@ persist to disk and survive restarts; in-flight sessions are memory-only.
 - Keep **Azure creds in `backend/.env` only** (gitignored) — never commit.
 - `backend/sessions/` is gitignored.
 - Commit only when asked; branch off main for larger work; open a draft PR.
+- When creating a new Git branch, use a meaningful, descriptive feature name (for example: `feature/demand-forecast-tuning`).
 
 ## Backlog
 See `todo.md` (run comparison, live multi-session/user Console, report export,
