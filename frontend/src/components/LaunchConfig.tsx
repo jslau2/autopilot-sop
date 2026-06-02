@@ -79,11 +79,17 @@ export default function LaunchConfig({
     if (!nameTouched) setName(suggestName(v));
   };
 
+  // The agent picker is shown only in live mode once enabled agents are known.
+  const pickerActive = !demoMode && enabledAgents.length > 0;
+  // A run needs at least one specialist — block launch if all are deselected.
+  const noneSelected = pickerActive && selected.length === 0;
+
   const launch = () => {
-    if (!goal.trim()) return;
-    // Only send an explicit subset when the user narrowed it; otherwise pass []
-    // so the backend runs all enabled agents (Planner decides what to skip).
-    const narrowed = !demoMode && enabledAgents.length > 0 && selected.length < enabledAgents.length;
+    if (!goal.trim() || noneSelected) return;
+    // Send an explicit subset only when narrowed to *some* (not all) agents;
+    // when all are selected, pass [] so the backend runs all enabled (Planner
+    // decides what to skip).
+    const narrowed = pickerActive && selected.length < enabledAgents.length;
     onLaunch(goal, name.trim(), entity, narrowed ? selected : []);
   };
 
@@ -299,15 +305,17 @@ export default function LaunchConfig({
         {/* Launch button */}
         <button
           onClick={launch}
-          disabled={!goal.trim()}
+          disabled={!goal.trim() || noneSelected}
+          title={noneSelected ? 'Select at least one agent to run' : undefined}
           style={{
             padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
-            background: accentColor, color: '#fff', border: 'none', cursor: 'pointer',
-            opacity: goal.trim() ? 1 : 0.5, transition: 'opacity 0.15s',
+            background: accentColor, color: '#fff', border: 'none',
+            cursor: (!goal.trim() || noneSelected) ? 'not-allowed' : 'pointer',
+            opacity: (goal.trim() && !noneSelected) ? 1 : 0.5, transition: 'opacity 0.15s',
             boxShadow: `0 4px 16px ${accentColor.replace(')', ' / 0.35)')}`,
           }}
         >
-          {demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
+          {noneSelected ? 'Select at least one agent' : demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
         </button>
       </div>
     </div>
