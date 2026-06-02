@@ -60,6 +60,9 @@ export function useLiveSession(sessionId?: string) {
   function applyEvent(evt: Record<string, unknown>) {
     const t = relTime(evt);
     if (t > S.elapsedT) S.elapsedT = t;
+    // Use the server's timestamp (carried on every event) so replayed history
+    // shows the real event times, not the burst time of the SSE replay.
+    const ts = (typeof evt.ts === 'string' && evt.ts) ? evt.ts : nowTs();
 
     switch (evt.type) {
 
@@ -80,7 +83,7 @@ export function useLiveSession(sessionId?: string) {
           dataSource: (evt.data_source as string) || undefined,
         };
         S.steps[step.id] = step;
-        S.events.push({ ts: nowTs(), type: 'start', agent: step.agent,
+        S.events.push({ ts, type: 'start', agent: step.agent,
           message: `▶ ${step.label}`, stepId: step.id });
         break;
       }
@@ -94,13 +97,13 @@ export function useLiveSession(sessionId?: string) {
           step.metrics = (evt.metrics as Record<string, string>) ?? null;
           step.records = (evt.records as number) ?? 0;
         }
-        S.events.push({ ts: nowTs(), type: 'done', agent: evt.agent as string,
+        S.events.push({ ts, type: 'done', agent: evt.agent as string,
           message: `✓ ${evt.message}`, stepId: evt.step_id as string });
         break;
       }
 
       case 'log': {
-        S.events.push({ ts: nowTs(), type: 'log', agent: evt.agent as string,
+        S.events.push({ ts, type: 'log', agent: evt.agent as string,
           message: evt.message as string, stepId: null });
         break;
       }
@@ -135,7 +138,7 @@ export function useLiveSession(sessionId?: string) {
         S.pendingQuestion = { stepId, text: evt.text as string };
         S.paused = true;
         S.sessionStatus = 'paused';
-        S.events.push({ ts: nowTs(), type: 'question', agent: step.agent,
+        S.events.push({ ts, type: 'question', agent: step.agent,
           message: '⏸ Pipeline paused — decision required', stepId });
         break;
       }
@@ -145,7 +148,7 @@ export function useLiveSession(sessionId?: string) {
         S.pendingQuestion = null;
         S.paused = false;
         if (S.sessionStatus === 'paused') S.sessionStatus = 'running';
-        S.events.push({ ts: nowTs(), type: 'answer', agent: 'user',
+        S.events.push({ ts, type: 'answer', agent: 'user',
           message: `↳ ${evt.message ?? 'Decision recorded'}`, stepId: null });
         break;
       }
@@ -155,14 +158,34 @@ export function useLiveSession(sessionId?: string) {
         S.done = true;
         S.paused = false;
         const summary = (evt.summary as string) ?? 'Planning cycle complete';
-        S.events.push({ ts: nowTs(), type: 'done', agent: 'planner',
+        S.events.push({ ts, type: 'done', agent: 'planner',
           message: `✓ ${summary}`, stepId: null });
         esRef.current?.close();
         break;
       }
 
+      case 'active_agents': {
+        // Which specialist agents are in scope for this run — used to hide
+        // disabled / out-of-scope lanes in the swimlane.
+        S.activeAgents = (evt.agents as string[]) ?? [];
+        break;
+      }
+
+      case 'run_paused': {
+        S.userPaused = true;
+        S.events.push({ ts, type: 'log', agent: 'user',
+          message: '⏸ Run paused — will park at the next safe checkpoint', stepId: null });
+        break;
+      }
+
+      case 'run_resumed': {
+        S.userPaused = false;
+        S.events.push({ ts, type: 'log', agent: 'user', message: '▶ Run resumed', stepId: null });
+        break;
+      }
+
       case 'error': {
-        S.events.push({ ts: nowTs(), type: 'log', agent: evt.agent as string,
+        S.events.push({ ts, type: 'log', agent: evt.agent as string,
           message: `⚠ ${evt.message}`, stepId: null });
         break;
       }
@@ -241,6 +264,22 @@ export function useLiveSession(sessionId?: string) {
     }
   }, []);
 
+  const pauseSession = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    S.userPaused = true;   // optimistic — server confirms via run_paused event
+    setTick(t => t + 1);
+    fetch(`/api/sessions/${sessionIdRef.current}/pause`, { method: 'POST' })
+      .catch(() => { S.userPaused = false; setTick(t => t + 1); });
+  }, []);
+
+  const resumeSession = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    S.userPaused = false;  // optimistic — server confirms via run_resumed event
+    setTick(t => t + 1);
+    fetch(`/api/sessions/${sessionIdRef.current}/resume`, { method: 'POST' })
+      .catch(() => { S.userPaused = true; setTick(t => t + 1); });
+  }, []);
+
   const setManualPause = useCallback((v: boolean) => {
     S.manualPause = v;
     setTick(t => t + 1);
@@ -251,5 +290,5 @@ export function useLiveSession(sessionId?: string) {
   // useLaunchCycle (POST + navigate), and connection is by sessionId above.
   const startSession = useCallback((_goal: string) => { /* no-op */ }, []);
 
-  return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause };
+  return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause, pauseSession, resumeSession };
 }

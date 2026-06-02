@@ -38,6 +38,7 @@
   --toolbar-h:   46px;
   --kpibar-h:    52px;
   --eventbar-h:  160px;
+  --eventbar-collapsed-h: 30px;   /* matches HEADER_H in EventStream.tsx */
   --radius:      7px;
 }
 
@@ -73,7 +74,7 @@ input, textarea, select { font-family: inherit; }
 
 /* ─── Shell ─────────────────────────────────── */
 .app { display: flex; height: 100vh; overflow: hidden; }
-.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
 
 /* ─── Sidebar ───────────────────────────────── */
 .sidebar { width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; overflow: hidden; }
@@ -143,7 +144,10 @@ input, textarea, select { font-family: inherit; }
 .kpi-sub { font-size: 9px; color: var(--text-3); }
 
 /* ─── Graph area ────────────────────────────── */
-.main-graph { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); }
+/* padding-bottom reserves room for the event-stream overlay's *current* height
+   (published as --eventbar-cur-h by EventStream) so the swimlane's horizontal
+   scrollbar and last lane always stay visible above it. */
+.main-graph { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg-base); padding-bottom: var(--eventbar-cur-h, var(--eventbar-collapsed-h, 30px)); }
 
 /* ─── Swimlane ──────────────────────────────── */
 .swimlane-root { display: flex; flex: 1; overflow: hidden; height: 100%; }

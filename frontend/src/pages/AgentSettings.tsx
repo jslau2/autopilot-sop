@@ -280,10 +280,46 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
 export default function AgentSettings({ embedded = false }: { embedded?: boolean } = {}) {
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'flagged'>('all');
+  const [demoMode] = useDemoMode();
+
+  // Live mode: which agents are turned on (hard gate for orchestration) and
+  // which are allowed to be disabled (the planner never can).
+  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
+  const [canDisableMap, setCanDisableMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (demoMode) return;
+    fetch('/api/agents')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d?.agents) return;
+        const en: Record<string, boolean> = {};
+        const cd: Record<string, boolean> = {};
+        for (const a of d.agents) {
+          en[a.id] = a.enabled !== false;
+          cd[a.id] = a.can_disable !== false;
+        }
+        setEnabledMap(en);
+        setCanDisableMap(cd);
+      })
+      .catch(() => { /* keep all-enabled default */ });
+  }, [demoMode]);
+
+  const toggleEnabled = (id: string) => {
+    const next = !(enabledMap[id] ?? true);
+    setEnabledMap(m => ({ ...m, [id]: next }));   // optimistic
+    fetch(`/api/agents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: next }),
+    }).catch(() => setEnabledMap(m => ({ ...m, [id]: !next })));  // revert on failure
+  };
 
   const agentList = AGENT_ORDER.filter(id => activeTab === 'all' || AGENT_DATA[id]?.promptEval?.revision === 'Revision Needed');
 
-  const totalActive = AGENT_ORDER.length;
+  const totalActive = demoMode
+    ? AGENT_ORDER.length
+    : AGENT_ORDER.filter(id => enabledMap[id] !== false).length;
   const flagged = AGENT_ORDER.filter(id => AGENT_DATA[id]?.promptEval?.revision === 'Revision Needed').length;
 
   return (
@@ -356,19 +392,45 @@ export default function AgentSettings({ embedded = false }: { embedded?: boolean
               : data.promptEval.verdict === 'Successfully Meets' ? 'eval-meets'
               : 'eval-revision';
             const revCls = data.promptEval.revision === 'Revision Needed' ? 'eval-revision' : 'eval-no-rev';
+            const enabled = enabledMap[agentId] !== false;
+            const canDisable = canDisableMap[agentId] ?? (agentId !== 'planner');
 
             return (
-              <div key={agentId} className="settings-agent-card">
+              <div key={agentId} className="settings-agent-card" style={!demoMode && !enabled ? { opacity: 0.55 } : undefined}>
                 <div className="ac-top-bar" style={{ background: agent.color }} />
                 <div className="ac-header">
                   <div className="ac-icon-wrap">
-                    <AgentIcon color={agent.color} status="running" size={34} />
+                    <AgentIcon color={agent.color} status={!demoMode && !enabled ? 'idle' : 'running'} size={34} />
                   </div>
                   <div className="ac-titles">
                     <div className="ac-name">{agent.name}</div>
                     <div className="ac-sub">{agent.sub}</div>
                   </div>
-                  <div className={`ac-status-dot ${data.status === 'active' ? 'active' : 'idle'}`} />
+                  {demoMode ? (
+                    <div className={`ac-status-dot ${data.status === 'active' ? 'active' : 'idle'}`} />
+                  ) : (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      aria-label={enabled ? `Disable ${agent.name}` : `Enable ${agent.name}`}
+                      title={!canDisable ? 'The orchestrator is always on' : enabled ? 'Enabled — click to turn off' : 'Disabled — click to turn on'}
+                      disabled={!canDisable}
+                      onClick={() => canDisable && toggleEnabled(agentId)}
+                      style={{
+                        width: 34, height: 19, borderRadius: 19, border: 'none', padding: 0,
+                        cursor: canDisable ? 'pointer' : 'not-allowed', flexShrink: 0, position: 'relative',
+                        background: enabled ? agent.color : 'var(--border-s)',
+                        opacity: canDisable ? 1 : 0.5, transition: 'background 0.15s',
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: 2, left: enabled ? 17 : 2, width: 15, height: 15,
+                        borderRadius: '50%', background: '#fff', transition: 'left 0.15s',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      }} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="ac-profile">

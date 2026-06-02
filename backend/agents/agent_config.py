@@ -59,6 +59,21 @@ def effective_temperature(agent_id: str) -> float:
     return float(t) if isinstance(t, (int, float)) else _default_temp(agent_id)
 
 
+def effective_enabled(agent_id: str) -> bool:
+    """Whether an agent is turned on. Defaults to True; the planner is never
+    disable-able (it is the orchestrator itself)."""
+    if agent_id == "planner":
+        return True
+    o = _overrides.get(agent_id, {})
+    return bool(o.get("enabled", True))
+
+
+def enabled_specialists() -> list[str]:
+    """Enabled specialist agent ids (everything except the planner), in the
+    canonical AGENT_DEFS order."""
+    return [a for a in AGENT_DEFS if a != "planner" and effective_enabled(a)]
+
+
 def get_config(agent_id: str) -> dict | None:
     d = AGENT_DEFS.get(agent_id)
     if not d:
@@ -68,11 +83,14 @@ def get_config(agent_id: str) -> dict | None:
         "id": agent_id,
         "name": d.get("name"),
         "data_source": d.get("data_source", ""),
+        "phase": d.get("phase"),
         "tools": [t.get("function", t).get("name") for t in d.get("tools", [])],
         "system_prompt": effective_system_prompt(agent_id),
         "default_system_prompt": d.get("system_prompt", ""),
         "temperature": effective_temperature(agent_id),
         "default_temperature": _default_temp(agent_id),
+        "enabled": effective_enabled(agent_id),
+        "can_disable": agent_id != "planner",
         "overridden": bool(o),
     }
 
@@ -81,10 +99,21 @@ def list_configs() -> list[dict]:
     return [get_config(a) for a in AGENT_DEFS]
 
 
-def set_config(agent_id: str, system_prompt: str | None = None, temperature: float | None = None) -> dict | None:
+def set_config(
+    agent_id: str,
+    system_prompt: str | None = None,
+    temperature: float | None = None,
+    enabled: bool | None = None,
+) -> dict | None:
     if agent_id not in AGENT_DEFS:
         return None
     o = _overrides.setdefault(agent_id, {})
+    if enabled is not None and agent_id != "planner":
+        # Only persist the override when it differs from the default (enabled).
+        if enabled:
+            o.pop("enabled", None)
+        else:
+            o["enabled"] = False
     if system_prompt is not None:
         sp = system_prompt.strip()
         default_sp = AGENT_DEFS[agent_id].get("system_prompt", "").strip()

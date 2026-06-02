@@ -47,6 +47,8 @@ export interface SimState {
   postOffset: number;
   nextPreIdx: number;
   nextPostIdx: number;
+  activeAgents?: string[];   // specialist agents in scope for this run (live mode); empty = show all
+  userPaused?: boolean;      // live mode: user pressed Pause; orchestrator parked, resumable
 }
 
 export interface Agent {

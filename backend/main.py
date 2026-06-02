@@ -117,6 +117,7 @@ class StartSession(BaseModel):
     parent_id: str = ""
     entity: str = ""
     data_upload_id: str = ""   # attach a previously uploaded dataset
+    agents: list[str] | None = None   # optional per-run subset of specialist agents to run
 
 
 class AnswerBody(BaseModel):
@@ -131,6 +132,7 @@ class SuggestNameBody(BaseModel):
 class KickoffBody(BaseModel):
     brief: str = ""
     entity: str = ""
+    agents: list[str] | None = None   # optional per-run subset of specialist agents to run
 
 
 class ScheduleBody(BaseModel):
@@ -157,6 +159,7 @@ class ChatBody(BaseModel):
 class AgentConfigBody(BaseModel):
     system_prompt: str | None = None
     temperature: float | None = None
+    enabled: bool | None = None
 
 
 class ApprovalBody(BaseModel):
@@ -193,34 +196,39 @@ def _derive_session_name(goal: str, session_id: str) -> str:
 async def event_generator(session: SessionState):
     """
     Yields SSE-formatted events.
-    First replays all existing events (for reconnections), then streams new ones.
-    Sends keepalive comments every 15 seconds.
-    Stops when session is done/error and the queue is empty.
-    """
-    # Replay existing events for clients that connect after start
-    for evt in list(session.events):
-        yield f"data: {json.dumps(evt)}\n\n"
 
+    Streams from session.events via an index cursor (the complete, ordered log),
+    which covers both replay-on-connect and live tailing with no duplicates. The
+    event_queue is used only as a low-latency wakeup signal — its contents would
+    otherwise overlap the replayed snapshot and double-send early events.
+    Sends keepalive comments every 15 seconds; stops when the session is terminal
+    and the log is fully flushed.
+    """
+    idx = 0
     last_keepalive = time.time()
 
     while True:
+        # Flush any events appended since we last looked.
+        while idx < len(session.events):
+            yield f"data: {json.dumps(session.events[idx])}\n\n"
+            idx += 1
+
+        # Stop once the session is complete and everything has been sent.
+        if session.status in ("done", "error") and idx >= len(session.events):
+            break
+
         try:
-            evt = await asyncio.wait_for(session.event_queue.get(), timeout=1.0)
-            yield f"data: {json.dumps(evt)}\n\n"
-
-            # Stop streaming once session is complete and queue is drained
-            if session.status in ("done", "error") and session.event_queue.empty():
-                break
-
+            # Wait for a wakeup (new event) — drain the signal queue without
+            # yielding from it (events are sourced from session.events above).
+            await asyncio.wait_for(session.event_queue.get(), timeout=1.0)
+            while not session.event_queue.empty():
+                session.event_queue.get_nowait()
         except asyncio.TimeoutError:
             # Send keepalive to prevent proxy/browser from closing connection
             if time.time() - last_keepalive > 15:
                 yield ": keepalive\n\n"
                 last_keepalive = time.time()
 
-            # Check if we should stop
-            if session.status in ("done", "error") and session.event_queue.empty():
-                break
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +376,8 @@ async def kickoff(body: KickoffBody):
     session_id = str(uuid.uuid4())
     session = SessionState(session_id=session_id, name=name, goal=goal)
     session.entity = (body.entity or "").strip()
+    if body.agents:
+        session.active_agents = [a for a in body.agents if a]
     sessions[session_id] = session
     session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
     return {"session_id": session_id, "name": name, "goal": goal, "status": "running"}
@@ -788,7 +798,12 @@ async def get_agent_config(agent_id: str):
 @app.put("/api/agents/{agent_id}")
 async def update_agent_config(agent_id: str, body: AgentConfigBody):
     from agents import agent_config
-    cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature)
+    cfg = agent_config.set_config(
+        agent_id,
+        system_prompt=body.system_prompt,
+        temperature=body.temperature,
+        enabled=body.enabled,
+    )
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
     return cfg
@@ -1008,6 +1023,8 @@ def _session_summary(s: SessionState) -> dict:
         "parent_id": s.parent_id,
         "parent_name": _resolve_name(s.parent_id),
         "entity": s.entity,
+        "active_agents": s.active_agents,
+        "user_paused": s.user_paused,
     }
 
 
@@ -1066,6 +1083,8 @@ async def create_session(body: StartSession):
     if body.parent_id and body.parent_id in sessions:
         session.parent_id = body.parent_id
     session.entity = (body.entity or "").strip()
+    if body.agents:
+        session.active_agents = [a for a in body.agents if a]
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
@@ -1120,6 +1139,8 @@ async def get_session(session_id: str):
         "parent_id": session.parent_id,
         "parent_name": _resolve_name(session.parent_id),
         "entity": session.entity,
+        "active_agents": session.active_agents,
+        "user_paused": session.user_paused,
         "event_count": len(session.events),
     }
 
@@ -1154,6 +1175,29 @@ async def submit_answer(session_id: str, body: AnswerBody):
         "answer": body.answer,
         "status": session.status,
     }
+
+
+@app.post("/api/sessions/{session_id}/pause")
+async def pause_session(session_id: str):
+    """User-pause a running session. The orchestrator parks at its next safe
+    checkpoint; the run stays alive and can be resumed anytime (this process)."""
+    session = _get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    if session.status in ("done", "error"):
+        raise HTTPException(status_code=400, detail=f"Session is {session.status}; cannot pause.")
+    ok = await session.pause_run()
+    return {"session_id": session_id, "user_paused": session.user_paused, "changed": ok}
+
+
+@app.post("/api/sessions/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a user-paused session from where it parked."""
+    session = _get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    ok = await session.resume_run()
+    return {"session_id": session_id, "user_paused": session.user_paused, "changed": ok}
 
 
 REQUIRED_APPROVAL_ROLES = ["Finance Lead", "Operations Lead", "Demand Planning"]

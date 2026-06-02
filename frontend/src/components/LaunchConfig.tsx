@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { suggestName } from '../hooks/useLaunchCycle';
 import { useEntity, ALL_ENTITIES } from '../hooks/useEntity';
 import { TEMPLATES } from '../data/templates';
+import { AGENTS } from '../data/agents';
 
 export const DEFAULT_GOAL = `Q3-2026 S&OP Planning Cycle — Shimano APAC Manufacturing
 Scope: 847 SKUs, 12 plants (SPL + SBMB), planning horizon W22–W34 (13 weeks)
@@ -20,7 +21,7 @@ export default function LaunchConfig({
 }: {
   demoMode: boolean;
   onClose: () => void;
-  onLaunch: (goal: string, name: string, entity: string) => void;
+  onLaunch: (goal: string, name: string, entity: string, agents: string[]) => void;
   initialGoal?: string;
   initialName?: string;
   scenarioOf?: string;
@@ -32,6 +33,27 @@ export default function LaunchConfig({
   const [nameTouched, setNameTouched] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const accentColor = demoMode ? 'oklch(0.55 0.18 145)' : 'oklch(0.55 0.18 260)';
+
+  // Live mode: which specialist agents are enabled (selectable for this run).
+  // `selected` is the per-run subset; when it equals the full enabled set we
+  // send nothing (the Planner runs all enabled and skips what's irrelevant).
+  const [enabledAgents, setEnabledAgents] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  useEffect(() => {
+    if (demoMode) return;
+    fetch('/api/agents')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d?.agents) return;
+        const ids = d.agents.filter((a: { id: string; enabled?: boolean }) => a.id !== 'planner' && a.enabled !== false).map((a: { id: string }) => a.id);
+        setEnabledAgents(ids);
+        setSelected(ids);  // default: all enabled selected
+      })
+      .catch(() => { /* picker stays hidden if config can't load */ });
+  }, [demoMode]);
+
+  const toggleAgent = (id: string) =>
+    setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
   // Live mode: ask the LLM for a name based on the goal.
   const suggestViaLLM = async () => {
@@ -57,9 +79,18 @@ export default function LaunchConfig({
     if (!nameTouched) setName(suggestName(v));
   };
 
+  // The agent picker is shown only in live mode once enabled agents are known.
+  const pickerActive = !demoMode && enabledAgents.length > 0;
+  // A run needs at least one specialist — block launch if all are deselected.
+  const noneSelected = pickerActive && selected.length === 0;
+
   const launch = () => {
-    if (!goal.trim()) return;
-    onLaunch(goal, name.trim(), entity);
+    if (!goal.trim() || noneSelected) return;
+    // Send an explicit subset only when narrowed to *some* (not all) agents;
+    // when all are selected, pass [] so the backend runs all enabled (Planner
+    // decides what to skip).
+    const narrowed = pickerActive && selected.length < enabledAgents.length;
+    onLaunch(goal, name.trim(), entity, narrowed ? selected : []);
   };
 
   return (
@@ -216,6 +247,45 @@ export default function LaunchConfig({
           />
         </div>
 
+        {/* Agent selection (live mode) — narrow which specialists run this cycle */}
+        {!demoMode && enabledAgents.length > 0 && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em' }}>
+                AGENTS · {selected.length}/{enabledAgents.length}
+              </label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setSelected(enabledAgents)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)' }}>All</button>
+                <button onClick={() => setSelected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)' }}>None</button>
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 8px' }}>
+              All enabled agents run by default; the Planner skips any irrelevant to the goal. Deselect to force-exclude an agent from this run. (Enable/disable agents globally in Agent Settings.)
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {enabledAgents.map(id => {
+                const ag = AGENTS[id];
+                const on = selected.includes(id);
+                const color = ag?.rawColor ?? accentColor;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => toggleAgent(id)}
+                    aria-pressed={on}
+                    style={{
+                      fontSize: 11, padding: '4px 10px', borderRadius: 16, cursor: 'pointer',
+                      background: on ? color.replace(')', ' / 0.16)') : 'var(--bg-base)',
+                      border: `1px solid ${on ? color.replace(')', ' / 0.6)') : 'var(--border)'}`,
+                      color: on ? 'var(--text-1)' : 'var(--text-3)',
+                      opacity: on ? 1 : 0.6,
+                    }}
+                  >{on ? '✓ ' : ''}{ag?.name ?? id}</button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Scope chips */}
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
@@ -235,15 +305,17 @@ export default function LaunchConfig({
         {/* Launch button */}
         <button
           onClick={launch}
-          disabled={!goal.trim()}
+          disabled={!goal.trim() || noneSelected}
+          title={noneSelected ? 'Select at least one agent to run' : undefined}
           style={{
             padding: '13px 0', borderRadius: 8, fontSize: 14, fontWeight: 700,
-            background: accentColor, color: '#fff', border: 'none', cursor: 'pointer',
-            opacity: goal.trim() ? 1 : 0.5, transition: 'opacity 0.15s',
+            background: accentColor, color: '#fff', border: 'none',
+            cursor: (!goal.trim() || noneSelected) ? 'not-allowed' : 'pointer',
+            opacity: (goal.trim() && !noneSelected) ? 1 : 0.5, transition: 'opacity 0.15s',
             boxShadow: `0 4px 16px ${accentColor.replace(')', ' / 0.35)')}`,
           }}
         >
-          {demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
+          {noneSelected ? 'Select at least one agent' : demoMode ? '▶  Run Simulation' : '⚡  Launch Live Run'}
         </button>
       </div>
     </div>

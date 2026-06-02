@@ -31,10 +31,20 @@ The demo/live toggle is global (top-bar switch); state in `localStorage`
 
 ## Source-of-truth map (don't duplicate into docs — read these)
 Backend:
-- `backend/agent_defs.py` — the 12 agents: id, name, `system_prompt`, `tools`,
-  `data_source`. Adding/with-tools an agent happens here.
-- `backend/orchestrator.py` — Planner loop: dispatches agents, waits, asks the
-  human, completes. Planner tools live here.
+- `backend/agents/agent_defs.py` — the 12 agents: id, name, `phase`,
+  `system_prompt`, `tools`, `data_source`. Adding/with-tools an agent happens
+  here; `phase` (1/2/4/5) drives the generated playbook.
+- `backend/agents/orchestrator.py` — Planner loop: dispatches agents, waits, asks
+  the human, completes. Planner tools live here. The route is **not** hardcoded:
+  at run start it resolves the active agent set and builds the dispatch enum +
+  playbook from it (see `routing.py`).
+- `backend/agents/routing.py` — dynamic routing. `resolve_active_agents` =
+  (per-run subset, if any) ∩ (enabled in Agent Settings); `build_planner_tools`
+  narrows the `dispatch_agent` enum (hard gate); `build_playbook` regenerates the
+  PHASE text from each agent's `phase` (the Phase-3 human checkpoint is
+  conditional on demand/capacity being active). Per-run subset arrives via
+  `agents:[]` on `POST /api/sessions` (or kickoff) → `SessionState.active_agents`;
+  enable/disable is an `enabled` flag in `agent_config` (planner never disable-able).
 - `backend/workers.py` — how each specialist agent runs its tool-use loop.
 - `backend/mock_data.py` — the data/compute behind agent tools + Data Sources
   preview.

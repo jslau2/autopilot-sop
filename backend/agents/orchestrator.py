@@ -41,6 +41,7 @@ PLANNER_DEF = AGENT_DEFS["planner"]
 PLANNER_TOOLS = PLANNER_DEF["tools"]
 PLANNER_SYSTEM_PROMPT = PLANNER_DEF["system_prompt"]
 from .agent_config import effective_system_prompt, effective_temperature
+from .routing import resolve_active_agents, build_planner_tools, build_playbook
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,21 @@ async def _handle_dispatch_agent(session: SessionState, args: dict) -> dict:
     agent_id = args.get("agent_id", "")
     task = args.get("task", "")
     context = args.get("context", "")
+
+    # Hard gate: refuse agents outside this run's active set so the Planner
+    # re-routes instead of dispatching a disabled / out-of-scope agent.
+    active = session.active_agents or []
+    if active and agent_id not in active:
+        await session.emit_log(
+            "planner",
+            f"⚠ Skipped {agent_id}: not active for this cycle "
+            f"(active: {', '.join(active)})",
+        )
+        return {
+            "error": f"Agent '{agent_id}' is not active for this cycle.",
+            "active_agents": active,
+            "status": "rejected",
+        }
 
     task_id = f"{agent_id}-{uuid4().hex[:6]}"
 
@@ -192,6 +208,14 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
     worker agents, waiting for results, asking the human a decision question,
     and completing the session.
     """
+    # Resolve which specialist agents are in scope for THIS run:
+    #   (per-run requested subset, if any) ∩ (agents enabled in settings).
+    # The planner's tools (dispatch_agent enum) and playbook are generated from it.
+    active_ids = resolve_active_agents(session.active_agents or None)
+    session.active_agents = active_ids
+    planner_tools = build_planner_tools(active_ids)
+    playbook = build_playbook(active_ids)
+
     planner_step_id = f"pln-{uuid4().hex[:6]}"
     await session.emit_step_start(
         agent="planner",
@@ -202,17 +226,23 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
     session.current_planner_step = planner_step_id
     await session.emit_log("planner", "Initializing S&OP orchestration cycle")
     await session.emit_log("planner", f"Goal: {goal[:120]}")
+    await session.emit_log(
+        "planner",
+        f"Active agents this cycle ({len(active_ids)}): {', '.join(active_ids)}",
+    )
+    # Structured event so the UI can hide lanes for agents not in this run.
+    await session.emit({"type": "active_agents", "agents": active_ids})
 
-    # Initial planner message
+    # Initial planner message — system prompt + the dynamically generated playbook.
     messages: list[dict] = [
-        {"role": "system", "content": effective_system_prompt("planner")},
+        {"role": "system", "content": effective_system_prompt("planner") + "\n\n" + playbook},
         {
             "role": "user",
             "content": (
                 f"Begin the S&OP planning cycle with this goal:\n\n{goal}\n\n"
-                "Follow the playbook in your system prompt. "
-                "Start by dispatching Phase 1 agents in parallel, then proceed through each phase. "
-                "Remember to ask the human for a decision at the Phase 3 checkpoint."
+                "Follow the agent playbook in your system prompt — dispatch only the agents it "
+                "lists, in the phase order shown, and skip any that are irrelevant to this goal. "
+                "Ask the human for a decision only if the playbook defines a Phase 3 checkpoint."
             ),
         },
     ]
@@ -223,6 +253,11 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
     try:
         for iteration in range(30):
+            # Safe checkpoint: if the user pressed Pause, park here (any
+            # already-dispatched agents have completed via wait_for_agents) until
+            # they resume. This keeps the run alive rather than terminating it.
+            await session.wait_if_paused()
+
             await session.emit_log(
                 "planner",
                 f"Planner iteration {iteration + 1}",
@@ -238,7 +273,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                         get_client(),
                         session=session, agent="planner", model=get_deployment(),
                         messages=messages,
-                        tools=PLANNER_TOOLS,
+                        tools=planner_tools,
                         tool_choice="auto",
                         temperature=effective_temperature("planner"),
                         max_completion_tokens=2048,

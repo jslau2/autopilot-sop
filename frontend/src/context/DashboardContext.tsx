@@ -25,6 +25,7 @@ export interface DashboardContextValue {
   terminateSession: () => void;
   showTour: boolean;
   setShowTour: (v: boolean) => void;
+  activeAgents: string[];   // specialist agents in scope for this run; empty = show all lanes
 }
 
 export const DashboardContext = createContext<DashboardContextValue>({
@@ -50,6 +51,7 @@ export const DashboardContext = createContext<DashboardContextValue>({
   terminateSession: () => {},
   showTour: false,
   setShowTour: () => {},
+  activeAgents: [],
 });
 
 export function useDashboard() {

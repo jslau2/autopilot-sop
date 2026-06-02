@@ -40,7 +40,14 @@ class SessionState:
     })
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
+    active_agents: list = field(default_factory=list)  # specialist agents in scope for this run (resolved at orchestration start)
+    user_paused: bool = False             # user pressed Pause — orchestrator parks at the next safe checkpoint
+    resume_event: asyncio.Event = field(default_factory=asyncio.Event)  # set = running, cleared = paused
     bg_task: Any = None
+
+    def __post_init__(self) -> None:
+        # Runs start un-paused (the orchestrator only blocks when this is cleared).
+        self.resume_event.set()
 
     def now_ts(self) -> str:
         """Returns current time as HH:MM:SS.mmm"""
@@ -201,6 +208,32 @@ class SessionState:
             "agent": "human",
             "message": f"Human answered: {answer}" + (f" — {rationale}" if rationale else ""),
         })
+
+    async def pause_run(self) -> bool:
+        """User-pause: orchestrator parks at its next safe checkpoint. The run
+        stays alive (resumable) — this is NOT a terminate."""
+        if self.status in ("done", "error") or self.user_paused:
+            return False
+        self.user_paused = True
+        self.resume_event.clear()
+        await self.emit({"type": "run_paused", "agent": "user"})
+        await self.emit_log("planner", "⏸ Run paused by user — will park at the next safe checkpoint")
+        return True
+
+    async def resume_run(self) -> bool:
+        """Resume a user-paused run from where it parked."""
+        if not self.user_paused:
+            return False
+        self.user_paused = False
+        self.resume_event.set()
+        await self.emit({"type": "run_resumed", "agent": "user"})
+        await self.emit_log("planner", "▶ Run resumed by user")
+        return True
+
+    async def wait_if_paused(self) -> None:
+        """Orchestrator checkpoint: blocks here while the run is user-paused."""
+        if not self.resume_event.is_set():
+            await self.resume_event.wait()
 
     async def done(self, summary: str = "") -> None:
         """Mark session complete, emit session_complete, and persist to disk."""

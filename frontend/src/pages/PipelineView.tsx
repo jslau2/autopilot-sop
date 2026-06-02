@@ -166,7 +166,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
           demoMode={demoMode}
           initialGoal={kickoffBrief}
           onClose={() => { setShowLaunch(false); setKickoffBrief(undefined); }}
-          onLaunch={(goal, name, entity) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity }); }}
+          onLaunch={(goal, name, entity, agents) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity, agents }); }}
         />
       )}
     </div>
@@ -361,10 +361,10 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
 
   const statusLabel = S.sessionStatus === 'done' ? 'Complete'
     : S.paused ? '⏸ Decision Required'
-    : S.manualPause ? '⏸ Paused'
+    : (S.userPaused || S.manualPause) ? '⏸ Paused'
     : '● Running';
   const statusClass = S.sessionStatus === 'done' ? 'sp-done'
-    : (S.paused || S.manualPause) ? 'sp-paused'
+    : (S.paused || S.manualPause || S.userPaused) ? 'sp-paused'
     : 'sp-running';
 
   const stepsArr = Object.values(S.steps);
@@ -392,6 +392,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
     terminateSession,
     showTour,
     setShowTour,
+    activeAgents: S.activeAgents ?? [],
   };
 
   const inner = (
@@ -467,10 +468,14 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
               {!demoMode && S.sessionStatus !== 'done' && (
                 <button
                   className="cfg-toolbar-btn"
-                  title="Stop this run (halts the agents, keeps the archived record)"
-                  onClick={() => { if (window.confirm('Stop this run? It will be halted but kept (archived) so you can still review it.')) terminateSession(); }}
-                  style={{ color: 'oklch(0.72 0.16 75)', borderColor: 'oklch(0.72 0.16 75 / 0.45)' }}
-                >⛔ Stop</button>
+                  title={S.userPaused
+                    ? 'Resume this run from where it parked'
+                    : 'Pause this run — agents in flight finish, then it parks (resume anytime)'}
+                  onClick={() => { S.userPaused ? liveResult.resumeSession() : liveResult.pauseSession(); }}
+                  style={S.userPaused
+                    ? { color: 'var(--success)', borderColor: 'oklch(0.72 0.17 148 / 0.45)' }
+                    : { color: 'oklch(0.72 0.16 75)', borderColor: 'oklch(0.72 0.16 75 / 0.45)' }}
+                >{S.userPaused ? '▶ Resume' : '⏸ Pause'}</button>
               )}
               <button className="cfg-toolbar-btn" onClick={toggleFocus} title="Toggle distraction-free focus mode">
                 {focusMode ? '⤡ Exit Focus' : '⤢ Focus'}
@@ -541,7 +546,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             initialName={launchSeed?.name}
             scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId }); }}
+            onLaunch={(goal, name, entity, agents) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId, agents }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}
