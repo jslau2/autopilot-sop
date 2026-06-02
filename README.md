@@ -35,7 +35,7 @@ uv run uvicorn main:app --reload --port 8888
 ```powershell
 cd frontend
 npm.cmd install
-npmc.d run dev        # Vite dev server; proxies /api → http://localhost:8888
+npm.cmd run dev        # Vite dev server; proxies /api → http://localhost:8888
 ```
 
 Demo mode needs no backend — toggle **Demo / Live** in the top bar. Live mode
