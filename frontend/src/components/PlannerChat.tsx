@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useDemoMode } from '../hooks/useDemoMode';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 type Pos = { left: number; top: number };
@@ -74,7 +75,8 @@ function loadPos(): Pos {
 
 export default function PlannerChat() {
   const [open, setOpen] = useState(false);
-  const [demoMode, setDemoMode] = useState(true);
+  // Shared demo/live store — reacts live to the top-bar toggle (even while open).
+  const [demoMode] = useDemoMode();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -102,11 +104,7 @@ export default function PlannerChat() {
 
   const setPosBoth = (p: Pos) => { posRef.current = p; setPos(p); };
 
-  // Refresh demo/live each time the panel opens (it can be toggled on Home).
-  const toggleOpen = () => {
-    if (!open) setDemoMode(localStorage.getItem('sop-demo-mode') !== 'false');
-    setOpen(o => !o);
-  };
+  const toggleOpen = () => setOpen(o => !o);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
