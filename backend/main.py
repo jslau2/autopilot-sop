@@ -147,6 +147,7 @@ class ChatMessage(BaseModel):
 
 class ChatBody(BaseModel):
     messages: list[ChatMessage] = []
+    session_id: str = ""   # optional "current run" hint for the global thread
 
 
 class AgentConfigBody(BaseModel):
@@ -581,6 +582,16 @@ async def _chat_dispatch(name: str, args: dict):
     return {"error": f"Unknown tool '{name}'"}
 
 
+def _run_context_note(session) -> str:
+    """A system-prompt addendum telling the assistant which run the user is viewing,
+    so 'this run' / 'the cycle' resolves without fabricating or asking."""
+    return (
+        f"The user is currently viewing run '{session.name}' (session_id: {session.session_id}). "
+        "Default to THIS run when they ask about 'this run' / 'the cycle' — call get_session_context "
+        f"with session_id '{session.session_id}' for its real data."
+    )
+
+
 async def _run_chat(messages: list[dict], session=None) -> str:
     """Run the bounded planner tool-calling loop over `messages`, return the reply."""
     from orchestrator import get_client, DEPLOYMENT
@@ -645,12 +656,16 @@ async def planner_chat_stream(body: ChatBody):
         from orchestrator import get_client, DEPLOYMENT  # noqa: F401
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
-    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+    system = CHAT_SYSTEM_PROMPT
+    hint = _get_session(body.session_id) if body.session_id else None
+    if hint is not None:
+        system = system + "\n\n" + _run_context_note(hint)
+    messages: list[dict] = [{"role": "system", "content": system}]
     for m in body.messages[-20:]:
         if m.role in ("user", "assistant") and m.content:
             messages.append({"role": m.role, "content": m.content})
     try:
-        reply = await _run_chat(messages)
+        reply = await _run_chat(messages, session=hint)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
     return StreamingResponse(_chunk_stream(reply), media_type="text/plain", headers=_STREAM_HEADERS)
@@ -664,12 +679,16 @@ async def planner_chat(body: ChatBody):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat unavailable: {exc}")
 
-    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+    system = CHAT_SYSTEM_PROMPT
+    hint = _get_session(body.session_id) if body.session_id else None
+    if hint is not None:
+        system = system + "\n\n" + _run_context_note(hint)
+    messages: list[dict] = [{"role": "system", "content": system}]
     for m in body.messages[-20:]:  # keep recent history bounded
         if m.role in ("user", "assistant") and m.content:
             messages.append({"role": m.role, "content": m.content})
     try:
-        return {"reply": await _run_chat(messages)}
+        return {"reply": await _run_chat(messages, session=hint)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
 
@@ -697,13 +716,8 @@ async def post_session_chat(session_id: str, body: SessionChatBody):
         raise HTTPException(status_code=422, detail="Empty message")
 
     # Build the LLM context: system prompt + a note about the current run + history.
-    context_note = (
-        f"The user is currently viewing run '{session.name}' (session_id: {session.session_id}). "
-        "Default to THIS run when they ask about 'this run' / 'the cycle' — call get_session_context "
-        f"with session_id '{session.session_id}' for its real data."
-    )
     messages: list[dict] = [
-        {"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + context_note},
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + _run_context_note(session)},
     ]
     for m in session.chat[-20:]:
         if m.get("role") in ("user", "assistant") and m.get("content"):
@@ -733,12 +747,7 @@ async def post_session_chat_stream(session_id: str, body: SessionChatBody):
     if not text:
         raise HTTPException(status_code=422, detail="Empty message")
 
-    context_note = (
-        f"The user is currently viewing run '{session.name}' (session_id: {session.session_id}). "
-        "Default to THIS run when they ask about 'this run' / 'the cycle' — call get_session_context "
-        f"with session_id '{session.session_id}' for its real data."
-    )
-    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + context_note}]
+    messages: list[dict] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT + "\n\n" + _run_context_note(session)}]
     for m in session.chat[-20:]:
         if m.get("role") in ("user", "assistant") and m.get("content"):
             messages.append({"role": m["role"], "content": m["content"]})

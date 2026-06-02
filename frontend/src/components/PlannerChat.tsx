@@ -50,11 +50,19 @@ export default function PlannerChat() {
   const [pos, setPos] = useState<Pos>(loadPos);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // When viewing a specific run, the chat becomes that run's own thread
-  // (stored server-side). Otherwise it's the global localStorage thread.
+  // The chat is ONE continuous global thread by default. When viewing a specific
+  // run the user can *opt in* to that run's own server-side thread via the header
+  // toggle — navigation alone never swaps the conversation out from under them.
   const { pathname } = useLocation();
   const runMatch = pathname.match(/^\/pipeline\/([^/]+)/);
   const threadId = runMatch && runMatch[1] !== 'demo' ? runMatch[1] : null;
+  const [scope, setScope] = useState<'global' | 'run'>('global');
+  const runScope = scope === 'run' && threadId !== null;
+
+  // Leaving a run page drops back to the global thread.
+  useEffect(() => {
+    if (!threadId) setScope('global');
+  }, [threadId]);
 
   // Drag bookkeeping
   const posRef = useRef(pos);
@@ -75,27 +83,30 @@ export default function PlannerChat() {
 
   // Persist the GLOBAL chat history locally (run threads live server-side).
   useEffect(() => {
-    if (threadId) return;
+    if (runScope) return;
     try { localStorage.setItem(HIST_KEY, JSON.stringify(messages.slice(-50))); } catch { /* ignore */ }
-  }, [messages, threadId]);
+  }, [messages, runScope]);
 
-  // Load the run's server-side thread when opening on a run page (or switching runs).
+  // Load the run's server-side thread only when the user opts into run scope.
   useEffect(() => {
-    if (!open || demoMode) return;
-    if (threadId) {
-      fetch(`/api/sessions/${threadId}/chat`)
-        .then(r => (r.ok ? r.json() : { messages: [] }))
-        .then(d => setMessages(d.messages ?? []))
-        .catch(() => setMessages([]));
-    } else {
-      setMessages(loadMessages());
-    }
+    if (!open || demoMode || scope !== 'run' || !threadId) return;
+    fetch(`/api/sessions/${threadId}/chat`)
+      .then(r => (r.ok ? r.json() : { messages: [] }))
+      .then(d => setMessages(d.messages ?? []))
+      .catch(() => setMessages([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, threadId, demoMode]);
+  }, [open, demoMode, scope, threadId]);
+
+  // (Re)load the global thread when opening or switching back to global scope.
+  useEffect(() => {
+    if (!open || demoMode || scope !== 'global') return;
+    setMessages(loadMessages());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, demoMode, scope]);
 
   const clearChat = () => {
     setMessages([]);
-    if (threadId) {
+    if (runScope) {
       fetch(`/api/sessions/${threadId}/chat`, { method: 'DELETE' }).catch(() => {});
     } else {
       try { localStorage.removeItem(HIST_KEY); } catch { /* ignore */ }
@@ -143,8 +154,12 @@ export default function PlannerChat() {
     setInput('');
     setLoading(true);
     try {
-      const url = threadId ? `/api/sessions/${threadId}/chat/stream` : '/api/chat/stream';
-      const body = threadId ? { content: text } : { messages: next };
+      const url = runScope ? `/api/sessions/${threadId}/chat/stream` : '/api/chat/stream';
+      // Global thread: pass the viewed run id as a hint so "this run" resolves
+      // without swapping the conversation. Run thread: server holds the history.
+      const body = runScope
+        ? { content: text }
+        : { messages: next, ...(threadId ? { session_id: threadId } : {}) };
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,9 +278,27 @@ export default function PlannerChat() {
                 <circle cx="12" cy="12" r="3.4" fill="currentColor" />
               </svg>
             </span>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Planner Agent</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{threadId ? 'This run’s thread' : 'S&OP planning assistant'}</div>
+              {threadId && !demoMode ? (
+                <div style={{ display: 'flex', gap: 0, marginTop: 3, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', width: 'fit-content' }}>
+                  {(['global', 'run'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setScope(s)}
+                      title={s === 'global' ? 'One continuous chat across all runs' : 'A separate thread just for this run'}
+                      style={{
+                        border: 'none', cursor: 'pointer', padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        background: scope === s ? ACCENT : 'transparent',
+                        color: scope === s ? 'oklch(0.18 0.03 80)' : 'var(--text-3)',
+                      }}
+                    >{s === 'global' ? 'Global' : 'This run'}</button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>S&OP planning assistant</div>
+              )}
             </div>
             {!demoMode && messages.length > 0 && (
               <button
