@@ -60,6 +60,9 @@ export function useLiveSession(sessionId?: string) {
   function applyEvent(evt: Record<string, unknown>) {
     const t = relTime(evt);
     if (t > S.elapsedT) S.elapsedT = t;
+    // Use the server's timestamp (carried on every event) so replayed history
+    // shows the real event times, not the burst time of the SSE replay.
+    const ts = (typeof evt.ts === 'string' && evt.ts) ? evt.ts : nowTs();
 
     switch (evt.type) {
 
@@ -80,7 +83,7 @@ export function useLiveSession(sessionId?: string) {
           dataSource: (evt.data_source as string) || undefined,
         };
         S.steps[step.id] = step;
-        S.events.push({ ts: nowTs(), type: 'start', agent: step.agent,
+        S.events.push({ ts, type: 'start', agent: step.agent,
           message: `▶ ${step.label}`, stepId: step.id });
         break;
       }
@@ -94,13 +97,13 @@ export function useLiveSession(sessionId?: string) {
           step.metrics = (evt.metrics as Record<string, string>) ?? null;
           step.records = (evt.records as number) ?? 0;
         }
-        S.events.push({ ts: nowTs(), type: 'done', agent: evt.agent as string,
+        S.events.push({ ts, type: 'done', agent: evt.agent as string,
           message: `✓ ${evt.message}`, stepId: evt.step_id as string });
         break;
       }
 
       case 'log': {
-        S.events.push({ ts: nowTs(), type: 'log', agent: evt.agent as string,
+        S.events.push({ ts, type: 'log', agent: evt.agent as string,
           message: evt.message as string, stepId: null });
         break;
       }
@@ -135,7 +138,7 @@ export function useLiveSession(sessionId?: string) {
         S.pendingQuestion = { stepId, text: evt.text as string };
         S.paused = true;
         S.sessionStatus = 'paused';
-        S.events.push({ ts: nowTs(), type: 'question', agent: step.agent,
+        S.events.push({ ts, type: 'question', agent: step.agent,
           message: '⏸ Pipeline paused — decision required', stepId });
         break;
       }
@@ -145,7 +148,7 @@ export function useLiveSession(sessionId?: string) {
         S.pendingQuestion = null;
         S.paused = false;
         if (S.sessionStatus === 'paused') S.sessionStatus = 'running';
-        S.events.push({ ts: nowTs(), type: 'answer', agent: 'user',
+        S.events.push({ ts, type: 'answer', agent: 'user',
           message: `↳ ${evt.message ?? 'Decision recorded'}`, stepId: null });
         break;
       }
@@ -155,7 +158,7 @@ export function useLiveSession(sessionId?: string) {
         S.done = true;
         S.paused = false;
         const summary = (evt.summary as string) ?? 'Planning cycle complete';
-        S.events.push({ ts: nowTs(), type: 'done', agent: 'planner',
+        S.events.push({ ts, type: 'done', agent: 'planner',
           message: `✓ ${summary}`, stepId: null });
         esRef.current?.close();
         break;
@@ -169,7 +172,7 @@ export function useLiveSession(sessionId?: string) {
       }
 
       case 'error': {
-        S.events.push({ ts: nowTs(), type: 'log', agent: evt.agent as string,
+        S.events.push({ ts, type: 'log', agent: evt.agent as string,
           message: `⚠ ${evt.message}`, stepId: null });
         break;
       }
