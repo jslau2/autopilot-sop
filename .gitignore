@@ -15,6 +15,9 @@ backend/sessions.migrated/
 backend/sessions.db
 backend/sessions.db-wal
 backend/sessions.db-shm
+backend/app.db
+backend/app.db-wal
+backend/app.db-shm
 backend/agent_overrides.json
 backend/feedback.json
 backend/notify_config.json
