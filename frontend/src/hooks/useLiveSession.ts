@@ -171,6 +171,19 @@ export function useLiveSession(sessionId?: string) {
         break;
       }
 
+      case 'run_paused': {
+        S.userPaused = true;
+        S.events.push({ ts, type: 'log', agent: 'user',
+          message: '⏸ Run paused — will park at the next safe checkpoint', stepId: null });
+        break;
+      }
+
+      case 'run_resumed': {
+        S.userPaused = false;
+        S.events.push({ ts, type: 'log', agent: 'user', message: '▶ Run resumed', stepId: null });
+        break;
+      }
+
       case 'error': {
         S.events.push({ ts, type: 'log', agent: evt.agent as string,
           message: `⚠ ${evt.message}`, stepId: null });
@@ -251,6 +264,22 @@ export function useLiveSession(sessionId?: string) {
     }
   }, []);
 
+  const pauseSession = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    S.userPaused = true;   // optimistic — server confirms via run_paused event
+    setTick(t => t + 1);
+    fetch(`/api/sessions/${sessionIdRef.current}/pause`, { method: 'POST' })
+      .catch(() => { S.userPaused = false; setTick(t => t + 1); });
+  }, []);
+
+  const resumeSession = useCallback(() => {
+    if (!sessionIdRef.current) return;
+    S.userPaused = false;  // optimistic — server confirms via run_resumed event
+    setTick(t => t + 1);
+    fetch(`/api/sessions/${sessionIdRef.current}/resume`, { method: 'POST' })
+      .catch(() => { S.userPaused = true; setTick(t => t + 1); });
+  }, []);
+
   const setManualPause = useCallback((v: boolean) => {
     S.manualPause = v;
     setTick(t => t + 1);
@@ -261,5 +290,5 @@ export function useLiveSession(sessionId?: string) {
   // useLaunchCycle (POST + navigate), and connection is by sessionId above.
   const startSession = useCallback((_goal: string) => { /* no-op */ }, []);
 
-  return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause };
+  return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause, pauseSession, resumeSession };
 }

@@ -253,6 +253,11 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
 
     try:
         for iteration in range(30):
+            # Safe checkpoint: if the user pressed Pause, park here (any
+            # already-dispatched agents have completed via wait_for_agents) until
+            # they resume. This keeps the run alive rather than terminating it.
+            await session.wait_if_paused()
+
             await session.emit_log(
                 "planner",
                 f"Planner iteration {iteration + 1}",

@@ -169,5 +169,6 @@ export function createInitialState(): SimState {
     nextPreIdx: 0,
     nextPostIdx: 0,
     activeAgents: [],
+    userPaused: false,
   };
 }

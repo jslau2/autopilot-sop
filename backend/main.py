@@ -1139,6 +1139,7 @@ async def get_session(session_id: str):
         "parent_name": _resolve_name(session.parent_id),
         "entity": session.entity,
         "active_agents": session.active_agents,
+        "user_paused": session.user_paused,
         "event_count": len(session.events),
     }
 
@@ -1173,6 +1174,29 @@ async def submit_answer(session_id: str, body: AnswerBody):
         "answer": body.answer,
         "status": session.status,
     }
+
+
+@app.post("/api/sessions/{session_id}/pause")
+async def pause_session(session_id: str):
+    """User-pause a running session. The orchestrator parks at its next safe
+    checkpoint; the run stays alive and can be resumed anytime (this process)."""
+    session = _get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    if session.status in ("done", "error"):
+        raise HTTPException(status_code=400, detail=f"Session is {session.status}; cannot pause.")
+    ok = await session.pause_run()
+    return {"session_id": session_id, "user_paused": session.user_paused, "changed": ok}
+
+
+@app.post("/api/sessions/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a user-paused session from where it parked."""
+    session = _get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    ok = await session.resume_run()
+    return {"session_id": session_id, "user_paused": session.user_paused, "changed": ok}
 
 
 REQUIRED_APPROVAL_ROLES = ["Finance Lead", "Operations Lead", "Demand Planning"]
