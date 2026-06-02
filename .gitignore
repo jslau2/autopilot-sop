@@ -25,6 +25,9 @@ backend/llm_audit.db
 backend/llm_audit.db-wal
 backend/llm_audit.db-shm
 backend/llm_audit.json.migrated
+backend/chat.db
+backend/chat.db-wal
+backend/chat.db-shm
 
 # Misc
 .DS_Store

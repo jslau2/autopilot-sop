@@ -51,6 +51,9 @@ scheduler.load()
 import llm_audit
 llm_audit.load()
 
+import chat_store
+chat_store.init()
+
 # Small LRU of archived sessions hydrated on demand (when a past run is opened),
 # so reopening history doesn't permanently grow memory.
 _HYDRATED_CAP = 32
@@ -692,6 +695,75 @@ async def planner_chat(body: ChatBody):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Chat error: {exc}")
 
+
+# --- Chat conversation history (SQLite, scoped by client id) ----------------
+# No user login yet, so history is scoped to a per-browser UUID the frontend
+# sends in X-Client-Id. Conversations never switch on navigation — the user
+# explicitly picks one from the history list.
+class ConversationCreateBody(BaseModel):
+    title: str = ""
+    run_hint: str = ""
+
+
+class ConversationRenameBody(BaseModel):
+    title: str = ""
+
+
+class ConversationMessagesBody(BaseModel):
+    messages: list[ChatMessage] = []
+    run_hint: str = ""
+
+
+def _client_id(request: Request) -> str:
+    cid = (request.headers.get("X-Client-Id") or "").strip()
+    if not cid:
+        raise HTTPException(status_code=400, detail="Missing X-Client-Id header")
+    return cid
+
+
+@app.get("/api/conversations")
+async def list_conversations(request: Request):
+    return {"conversations": chat_store.list_conversations(_client_id(request))}
+
+
+@app.post("/api/conversations")
+async def create_conversation(request: Request, body: ConversationCreateBody):
+    return chat_store.create(_client_id(request), title=body.title, run_hint=body.run_hint)
+
+
+@app.get("/api/conversations/{conv_id}")
+async def get_conversation(conv_id: str, request: Request):
+    conv = chat_store.get(conv_id, _client_id(request))
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conv
+
+
+@app.put("/api/conversations/{conv_id}/messages")
+async def save_conversation_messages(conv_id: str, request: Request, body: ConversationMessagesBody):
+    msgs = [{"role": m.role, "content": m.content}
+            for m in body.messages if m.role in ("user", "assistant") and m.content]
+    res = chat_store.save_messages(conv_id, _client_id(request), msgs, run_hint=body.run_hint)
+    if res is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return res
+
+
+@app.patch("/api/conversations/{conv_id}")
+async def rename_conversation(conv_id: str, request: Request, body: ConversationRenameBody):
+    title = (body.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Empty title")
+    if not chat_store.rename(conv_id, _client_id(request), title):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"id": conv_id, "title": title[:80]}
+
+
+@app.delete("/api/conversations/{conv_id}")
+async def delete_conversation(conv_id: str, request: Request):
+    if not chat_store.delete(conv_id, _client_id(request)):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------
