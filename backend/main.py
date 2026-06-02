@@ -156,6 +156,7 @@ class ChatBody(BaseModel):
 class AgentConfigBody(BaseModel):
     system_prompt: str | None = None
     temperature: float | None = None
+    enabled: bool | None = None
 
 
 class ApprovalBody(BaseModel):
@@ -324,6 +325,7 @@ async def suggest_name(body: SuggestNameBody):
 
 @app.post("/api/sessions/kickoff")
 async def kickoff(body: KickoffBody):
+    import agent_config
     """
     Conversational kickoff: expand a plain-English brief (e.g. "Plan Q4 with +10%
     growth and Supplier X delayed 4 weeks") into a structured planning goal + a
@@ -368,7 +370,7 @@ async def kickoff(body: KickoffBody):
     session = SessionState(session_id=session_id, name=name, goal=goal)
     session.entity = (body.entity or "").strip()
     sessions[session_id] = session
-    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal, enabled_ids=agent_config.get_enabled_specialist_ids()))
     return {"session_id": session_id, "name": name, "goal": goal, "status": "running"}
 
 
@@ -554,12 +556,13 @@ def _chat_get_session_context(session_id: str) -> dict:
 
 def _chat_start_cycle(goal: str, name: str) -> dict:
     """Create + launch a new session (same as POST /api/sessions)."""
+    import agent_config
     goal = (goal or "").strip() or DEFAULT_GOAL
     session_id = str(uuid.uuid4())
     nm = (name or "").strip() or _derive_session_name(goal, session_id)
     session = SessionState(session_id=session_id, name=nm, goal=goal)
     sessions[session_id] = session
-    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal, enabled_ids=agent_config.get_enabled_specialist_ids()))
     return {"session_id": session_id, "name": nm, "status": "running", "started": True}
 
 
@@ -787,7 +790,7 @@ async def get_agent_config(agent_id: str):
 @app.put("/api/agents/{agent_id}")
 async def update_agent_config(agent_id: str, body: AgentConfigBody):
     import agent_config
-    cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature)
+    cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature, enabled=body.enabled)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
     return cfg
@@ -904,12 +907,13 @@ async def test_webhook():
 # ---------------------------------------------------------------------------
 def _launch_session(goal: str, name: str, entity: str = "") -> str:
     """Create + start a session (shared by the API and the scheduler)."""
+    import agent_config
     session_id = str(uuid.uuid4())
     nm = (name or "").strip() or _derive_session_name(goal, session_id)
     session = SessionState(session_id=session_id, name=nm, goal=goal)
     session.entity = entity
     sessions[session_id] = session
-    session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    session.bg_task = asyncio.create_task(run_orchestrator(session, goal, enabled_ids=agent_config.get_enabled_specialist_ids()))
     return session_id
 
 
@@ -1049,6 +1053,7 @@ async def create_session(body: StartSession):
     Create a new S&OP session and start the autonomous orchestrator in the background.
     Returns the session_id immediately; use the SSE endpoint to stream progress.
     """
+    import agent_config
     session_id = str(uuid.uuid4())
     name = (body.name or "").strip() or _derive_session_name(body.goal, session_id)
 
@@ -1068,7 +1073,7 @@ async def create_session(body: StartSession):
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
-    bg_task = asyncio.create_task(run_orchestrator(session, goal))
+    bg_task = asyncio.create_task(run_orchestrator(session, goal, enabled_ids=agent_config.get_enabled_specialist_ids()))
     session.bg_task = bg_task
 
     return {

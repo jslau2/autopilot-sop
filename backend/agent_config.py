@@ -73,6 +73,7 @@ def get_config(agent_id: str) -> dict | None:
         "default_system_prompt": d.get("system_prompt", ""),
         "temperature": effective_temperature(agent_id),
         "default_temperature": _default_temp(agent_id),
+        "enabled": o.get("enabled", True),
         "overridden": bool(o),
     }
 
@@ -81,7 +82,7 @@ def list_configs() -> list[dict]:
     return [get_config(a) for a in AGENT_DEFS]
 
 
-def set_config(agent_id: str, system_prompt: str | None = None, temperature: float | None = None) -> dict | None:
+def set_config(agent_id: str, system_prompt: str | None = None, temperature: float | None = None, enabled: bool | None = None) -> dict | None:
     if agent_id not in AGENT_DEFS:
         return None
     o = _overrides.setdefault(agent_id, {})
@@ -101,10 +102,23 @@ def set_config(agent_id: str, system_prompt: str | None = None, temperature: flo
             o["temperature"] = t
         else:
             o.pop("temperature", None)
+    if enabled is not None:
+        if enabled is False:
+            o["enabled"] = False
+        else:
+            o.pop("enabled", None)  # True is the default — no need to store it
     if not o:
         _overrides.pop(agent_id, None)
     _save()
     return get_config(agent_id)
+
+
+def get_enabled_specialist_ids() -> list[str]:
+    """Return IDs of all non-planner agents that are currently enabled."""
+    return [
+        aid for aid in AGENT_DEFS
+        if aid != "planner" and _overrides.get(aid, {}).get("enabled", True)
+    ]
 
 
 def reset_config(agent_id: str) -> dict | None:

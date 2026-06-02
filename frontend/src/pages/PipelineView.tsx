@@ -4,6 +4,7 @@ import { DashboardContext } from '../context/DashboardContext';
 import { useSimulation } from '../hooks/useSimulation';
 import { useLiveSession } from '../hooks/useLiveSession';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
+import { ALL_SPECIALIST_IDS } from '../data/simulation';
 import Sidebar from '../components/Sidebar';
 import Swimlane from '../components/Swimlane';
 import Timeline from '../components/Timeline';
@@ -334,20 +335,41 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
       .catch(() => { /* keep fallback */ });
   }, [demoMode, sessionId, location.state]);
 
+  // Fetch enabled agents for demo simulation filtering.
+  const [enabledAgents, setEnabledAgents] = useState<Set<string>>(ALL_SPECIALIST_IDS);
+  const [agentConfigReady, setAgentConfigReady] = useState(!demoMode);
+  useEffect(() => {
+    if (!demoMode) return;
+    fetch('/api/agents')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.agents) {
+          const enabled = new Set<string>(
+            data.agents
+              .filter((a: { id: string; enabled?: boolean }) => a.id !== 'planner' && a.enabled !== false)
+              .map((a: { id: string }) => a.id)
+          );
+          setEnabledAgents(enabled);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAgentConfigReady(true));
+  }, [demoMode]);
+
   // Both hooks always called (Rules of Hooks). Live connects only when not demo.
   const simResult  = useSimulation(demoMode ? 0.5 : 0);
   const liveResult = useLiveSession(demoMode ? undefined : sessionId);
   const { S, answerQuestion, terminateSession, setManualPause, startSession } = demoMode ? simResult : liveResult;
 
-  // Demo: kick off the scripted simulation once on mount.
+  // Demo: kick off the scripted simulation once agent config is loaded.
   const launchedRef = useRef(false);
   useEffect(() => {
-    if (demoMode && !launchedRef.current) {
+    if (demoMode && !launchedRef.current && agentConfigReady) {
       launchedRef.current = true;
       const goal = (location.state as { goal?: string } | null)?.goal ?? DEFAULT_GOAL;
-      startSession(goal);
+      startSession(goal, enabledAgents);
     }
-  }, [demoMode, startSession, location.state]);
+  }, [demoMode, startSession, location.state, agentConfigReady, enabledAgents]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

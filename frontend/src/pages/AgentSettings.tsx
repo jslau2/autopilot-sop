@@ -280,10 +280,36 @@ function SettingsDrawer({ agentId, onClose }: { agentId: string; onClose: () => 
 export default function AgentSettings({ embedded = false }: { embedded?: boolean } = {}) {
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'flagged'>('all');
+  const [demoMode] = useDemoMode();
+  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetch('/api/agents')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data?.agents) return;
+        const map: Record<string, boolean> = {};
+        for (const a of data.agents) map[a.id] = a.enabled !== false;
+        setEnabledMap(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleEnabled = (agentId: string) => {
+    const next = !(enabledMap[agentId] ?? true);
+    setEnabledMap(prev => ({ ...prev, [agentId]: next }));
+    if (!demoMode) {
+      fetch(`/api/agents/${agentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      }).catch(() => {});
+    }
+  };
 
   const agentList = AGENT_ORDER.filter(id => activeTab === 'all' || AGENT_DATA[id]?.promptEval?.revision === 'Revision Needed');
 
-  const totalActive = AGENT_ORDER.length;
+  const totalActive = AGENT_ORDER.filter(id => enabledMap[id] !== false).length;
   const flagged = AGENT_ORDER.filter(id => AGENT_DATA[id]?.promptEval?.revision === 'Revision Needed').length;
 
   return (
@@ -331,7 +357,7 @@ export default function AgentSettings({ embedded = false }: { embedded?: boolean
         <div className="subhdr-right">
           <div className="summary-stat">
             <span className="ss-val">{totalActive}</span>
-            <span className="ss-lbl">Active Agents</span>
+            <span className="ss-lbl">Enabled</span>
           </div>
           <div className="ss-divider" />
           <div className="summary-stat">
@@ -357,18 +383,35 @@ export default function AgentSettings({ embedded = false }: { embedded?: boolean
               : 'eval-revision';
             const revCls = data.promptEval.revision === 'Revision Needed' ? 'eval-revision' : 'eval-no-rev';
 
+            const isEnabled = enabledMap[agentId] !== false;
             return (
-              <div key={agentId} className="settings-agent-card">
-                <div className="ac-top-bar" style={{ background: agent.color }} />
+              <div key={agentId} className="settings-agent-card" style={{ opacity: isEnabled ? 1 : 0.55 }}>
+                <div className="ac-top-bar" style={{ background: isEnabled ? agent.color : 'var(--border)' }} />
                 <div className="ac-header">
                   <div className="ac-icon-wrap">
-                    <AgentIcon color={agent.color} status="running" size={34} />
+                    <AgentIcon color={isEnabled ? agent.color : 'var(--text-3)'} status={isEnabled ? 'running' : 'idle'} size={34} />
                   </div>
                   <div className="ac-titles">
                     <div className="ac-name">{agent.name}</div>
                     <div className="ac-sub">{agent.sub}</div>
                   </div>
-                  <div className={`ac-status-dot ${data.status === 'active' ? 'active' : 'idle'}`} />
+                  <button
+                    onClick={() => toggleEnabled(agentId)}
+                    title={isEnabled ? 'Disable agent' : 'Enable agent'}
+                    style={{
+                      marginLeft: 'auto',
+                      width: 36, height: 20, borderRadius: 10, border: 'none',
+                      background: isEnabled ? agent.color : 'var(--border)',
+                      cursor: 'pointer', flexShrink: 0, position: 'relative',
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%',
+                      background: '#fff', transition: 'left 0.2s',
+                      left: isEnabled ? 19 : 3,
+                    }} />
+                  </button>
                 </div>
 
                 <div className="ac-profile">

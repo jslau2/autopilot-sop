@@ -249,7 +249,7 @@ export function useLiveSession(sessionId?: string) {
 
   // startSession kept for API compatibility; creation now happens in
   // useLaunchCycle (POST + navigate), and connection is by sessionId above.
-  const startSession = useCallback((_goal: string) => { /* no-op */ }, []);
+  const startSession = useCallback((_goal: string, _enabledIds?: Set<string>) => { /* no-op — server uses agent_config */ }, []);
 
   return { tick, S, started, startSession, answerQuestion, terminateSession, setManualPause };
 }

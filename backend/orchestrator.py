@@ -41,6 +41,38 @@ PLANNER_TOOLS = PLANNER_DEF["tools"]
 PLANNER_SYSTEM_PROMPT = PLANNER_DEF["system_prompt"]
 from agent_config import effective_system_prompt, effective_temperature
 
+ALL_SPECIALIST_IDS: list[str] = [
+    "masterdata", "procurement", "demand", "spi", "inventory",
+    "tooling", "capacity", "wip", "optimizer", "finance", "risk",
+]
+
+
+def _build_planner_tools(enabled_ids: list[str]) -> list[dict]:
+    import copy
+    tools = copy.deepcopy(PLANNER_TOOLS)
+    for tool in tools:
+        fn = tool.get("function", {})
+        if fn.get("name") == "dispatch_agent":
+            fn["parameters"]["properties"]["agent_id"]["enum"] = list(enabled_ids)
+    return tools
+
+
+def _build_planner_prompt(enabled_ids: list[str]) -> str:
+    base = effective_system_prompt("planner")
+    if set(enabled_ids) == set(ALL_SPECIALIST_IDS):
+        return base
+    disabled = [aid for aid in ALL_SPECIALIST_IDS if aid not in enabled_ids]
+    note = (
+        "\n\nIMPORTANT — RUN CONFIGURATION OVERRIDE:\n"
+        f"Active agents for this run: {', '.join(enabled_ids) if enabled_ids else 'none'}.\n"
+        f"Disabled agents (do NOT dispatch): {', '.join(disabled)}.\n"
+        "Adapt the playbook: skip any phase where all agents are disabled. "
+        "Only dispatch agents from the active list above. "
+        "After all active agents complete and you have reviewed their results, "
+        "call complete_session immediately — do not wait for or mention disabled agents."
+    )
+    return base + note
+
 
 # ---------------------------------------------------------------------------
 # Tool handlers for the planner
@@ -184,13 +216,20 @@ async def _handle_complete_session(session: SessionState, args: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Main orchestrator
 # ---------------------------------------------------------------------------
-async def run_orchestrator(session: SessionState, goal: str) -> None:
+async def run_orchestrator(session: SessionState, goal: str, enabled_ids: list[str] | None = None) -> None:
     """
     Main orchestration loop.
     The Planner LLM autonomously coordinates the S&OP cycle by dispatching
     worker agents, waiting for results, asking the human a decision question,
     and completing the session.
     """
+    from agent_config import get_enabled_specialist_ids
+    if enabled_ids is None:
+        enabled_ids = get_enabled_specialist_ids()
+
+    active_tools = _build_planner_tools(enabled_ids)
+    active_prompt = _build_planner_prompt(enabled_ids)
+
     planner_step_id = f"pln-{uuid4().hex[:6]}"
     await session.emit_step_start(
         agent="planner",
@@ -201,10 +240,12 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
     session.current_planner_step = planner_step_id
     await session.emit_log("planner", "Initializing S&OP orchestration cycle")
     await session.emit_log("planner", f"Goal: {goal[:120]}")
+    if set(enabled_ids) != set(ALL_SPECIALIST_IDS):
+        await session.emit_log("planner", f"Active agents: {', '.join(enabled_ids) if enabled_ids else 'none (run will complete immediately)'}")
 
     # Initial planner message
     messages: list[dict] = [
-        {"role": "system", "content": effective_system_prompt("planner")},
+        {"role": "system", "content": active_prompt},
         {
             "role": "user",
             "content": (
@@ -237,7 +278,7 @@ async def run_orchestrator(session: SessionState, goal: str) -> None:
                         get_client(),
                         session=session, agent="planner", model=DEPLOYMENT,
                         messages=messages,
-                        tools=PLANNER_TOOLS,
+                        tools=active_tools,
                         tool_choice="auto",
                         temperature=effective_temperature("planner"),
                         max_completion_tokens=2048,

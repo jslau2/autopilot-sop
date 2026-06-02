@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { SimState } from '../types';
-import { PRE_Q1, POST_Q1, createInitialState } from '../data/simulation';
+import { type SimEvent, PRE_Q1, POST_Q1, buildSimulation, ALL_SPECIALIST_IDS, createInitialState } from '../data/simulation';
 
 function nowTs(): string {
   const d = new Date();
@@ -18,6 +18,8 @@ export function useSimulation(speed: number = 0.5) {
     processedPost: Set<number>;
     done: boolean;
     manualPause: boolean;
+    activePre: SimEvent[];
+    activePost: SimEvent[];
   }>({
     ...createInitialState(),
     postOffset: 0,
@@ -25,6 +27,8 @@ export function useSimulation(speed: number = 0.5) {
     processedPost: new Set(),
     done: false,
     manualPause: false,
+    activePre: PRE_Q1,
+    activePost: POST_Q1,
   }).current;
 
   const speedRef = useRef(speed);
@@ -43,7 +47,7 @@ export function useSimulation(speed: number = 0.5) {
         S.elapsedT += dt;
 
         if (S.phase === 'pre') {
-          PRE_Q1.forEach((evt, i) => {
+          S.activePre.forEach((evt, i) => {
             if (!S.processedPre.has(i) && evt.at <= S.elapsedT) {
               S.processedPre.add(i);
               evt.act(S);
@@ -51,7 +55,7 @@ export function useSimulation(speed: number = 0.5) {
           });
         } else {
           S.postOffset += dt;
-          POST_Q1.forEach((evt, i) => {
+          S.activePost.forEach((evt, i) => {
             if (!S.processedPost.has(i) && evt.at <= S.postOffset) {
               S.processedPost.add(i);
               evt.act(S);
@@ -106,7 +110,10 @@ export function useSimulation(speed: number = 0.5) {
     setTick(t => t + 1);
   }, []);
 
-  const startSession = useCallback((_goal: string) => {
+  const startSession = useCallback((_goal: string, enabledIds?: Set<string>) => {
+    const { pre, post } = buildSimulation(enabledIds ?? ALL_SPECIALIST_IDS);
+    S.activePre = pre;
+    S.activePost = post;
     startedRef.current = true;
     setStarted(true);
   }, []);
