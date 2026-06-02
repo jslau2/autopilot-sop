@@ -26,22 +26,16 @@ sign-off — visualized live on a swimlane/timeline.
 ## Getting started
 
 ### Backend
-```bash
+```powershell
 cd backend
-pip install -r requirements.txt
-# create backend/.env with your Azure OpenAI credentials:
-#   AZURE_OPENAI_ENDPOINT=...
-#   AZURE_OPENAI_API_KEY=...
-#   AZURE_OPENAI_DEPLOYMENT=gpt-4o        # optional
-#   AZURE_OPENAI_API_VERSION=2024-02-15-preview  # optional
-uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8888
 ```
 
 ### Frontend
-```bash
+```powershell
 cd frontend
-npm install
-npm run dev        # Vite dev server; proxies /api → http://localhost:8000
+npm.cmd install
+npmc.d run dev        # Vite dev server; proxies /api → http://localhost:8888
 ```
 
 Demo mode needs no backend — toggle **Demo / Live** in the top bar. Live mode
