@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
@@ -378,14 +378,81 @@ function Bubble({ role, content, muted }: { role: 'user' | 'assistant'; content:
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       <div style={{
         maxWidth: '82%', padding: '9px 12px', borderRadius: 11, fontSize: 13, lineHeight: 1.5,
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        wordBreak: 'break-word',
         background: isUser ? 'oklch(0.55 0.18 260)' : 'var(--bg-base)',
         color: isUser ? '#fff' : 'var(--text-1)',
         border: isUser ? 'none' : '1px solid var(--border-subtle)',
         opacity: muted ? 0.6 : 1,
         borderBottomRightRadius: isUser ? 3 : 11,
         borderBottomLeftRadius: isUser ? 11 : 3,
-      }}>{content}</div>
+      }}><Markdown text={content} /></div>
     </div>
   );
+}
+
+// --- Lightweight, dependency-free markdown for chat bubbles -----------------
+// Handles the subset the planner emits: **bold**, *italic*/_italic_, `code`,
+// and bullet/numbered lists. Builds React nodes (never HTML) so it's XSS-safe.
+const INLINE_RE = /(\*\*([^*]+)\*\*|`([^`]+)`|\*([^*]+)\*|_([^_]+)_)/g;
+
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  INLINE_RE.lastIndex = 0;
+  while ((m = INLINE_RE.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    const key = `${keyPrefix}-${i++}`;
+    if (m[2] !== undefined) nodes.push(<strong key={key}>{m[2]}</strong>);
+    else if (m[3] !== undefined) nodes.push(
+      <code key={key} style={{
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.92em',
+        background: 'oklch(0.55 0.02 250 / 0.28)', padding: '1px 4px', borderRadius: 4, wordBreak: 'break-all',
+      }}>{m[3]}</code>,
+    );
+    else nodes.push(<em key={key}>{m[4] ?? m[5]}</em>);
+    last = INLINE_RE.lastIndex;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+function Markdown({ text }: { text: string }) {
+  const blocks: ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+
+  const flush = () => {
+    if (!list) return;
+    const items = list.items;
+    const k = `b${blocks.length}`;
+    const liStyle = { margin: '1px 0' } as const;
+    const ulStyle = { margin: '4px 0', paddingLeft: 18 } as const;
+    blocks.push(
+      list.ordered
+        ? <ol key={k} style={ulStyle}>{items.map((it, j) => <li key={j} style={liStyle}>{renderInline(it, `${k}-${j}`)}</li>)}</ol>
+        : <ul key={k} style={ulStyle}>{items.map((it, j) => <li key={j} style={liStyle}>{renderInline(it, `${k}-${j}`)}</li>)}</ul>,
+    );
+    list = null;
+  };
+
+  for (const line of text.split('\n')) {
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+    const numbered = line.match(/^\s*\d+\.\s+(.*)$/);
+    if (bullet) {
+      if (!list || list.ordered) { flush(); list = { ordered: false, items: [] }; }
+      list.items.push(bullet[1]);
+    } else if (numbered) {
+      if (!list || !list.ordered) { flush(); list = { ordered: true, items: [] }; }
+      list.items.push(numbered[1]);
+    } else if (line.trim() === '') {
+      flush();
+      blocks.push(<div key={`s${blocks.length}`} style={{ height: 6 }} />);
+    } else {
+      flush();
+      blocks.push(<div key={`p${blocks.length}`}>{renderInline(line, `p${blocks.length}`)}</div>);
+    }
+  }
+  flush();
+  return <>{blocks}</>;
 }
