@@ -47,13 +47,21 @@ Backend:
   delegating here (`save_session`/`delete_session_file`). In `main.py`,
   `_get_session(id)` returns the live session or hydrates from the store (LRU).
 - `backend/main.py` — FastAPI routes (sessions CRUD, SSE, chat + streaming,
-  datasource preview, suggest-name, kickoff, exec-summary, decisions, approvals,
-  usage, share, notifications, schedules) + the Planner chat tools (`CHAT_TOOLS`).
+  conversation history CRUD, datasource preview, suggest-name, kickoff,
+  exec-summary, decisions, approvals, usage, share, notifications, schedules) +
+  the Planner chat tools (`CHAT_TOOLS`).
+- `backend/chat_store.py` — SQLite store for planner-chat **conversation
+  history** (`backend/chat.db`, gitignored). One continuous chat that never
+  switches on navigation; the user explicitly picks past conversations. Scoped by
+  `owner` = a per-browser UUID the frontend sends in the `X-Client-Id` header (no
+  login yet — migrates to user email when auth lands). Lists read summary columns;
+  the message thread is a JSON blob hydrated on open. The Planner chat endpoints
+  are stateless — the frontend persists each thread via
+  `PUT /api/conversations/{id}/messages` (auto-titles from the first user message).
 - Feature modules: `feedback_store.py` (👍/👎), `uploads.py` (run-on-your-data),
   `notifications.py` (alerts + webhook), `shares.py` (read-only links),
   `scheduler.py` (recurring runs). All write JSON next to the backend
-  (gitignored). `SessionState` also carries `decisions`, `approvals`, `usage`,
-  and per-run `chat`.
+  (gitignored). `SessionState` also carries `decisions`, `approvals`, and `usage`.
 
 Frontend:
 - `src/data/agents.ts` — agent display names/colors. NB: `rawColor` holds actual
@@ -95,7 +103,10 @@ persist to disk and survive restarts; in-flight sessions are memory-only.
 ## Conventions & gotchas
 - Use `rawColor` (not CSS vars) for any color in SVG attributes.
 - Many UI prefs persist in `localStorage`: `sop-demo-mode`, `sop-focus-mode`,
-  `sop-sidebar-collapsed`, `sop-chat-pos`, `sop-chat-history`, `sop-tour-done`.
+  `sop-sidebar-collapsed`, `sop-chat-pos`, `sop-tour-done`. Chat history is now
+  server-side; `localStorage` only keeps `sop-client-id` (owner UUID) and
+  `sop-chat-active` (last-opened conversation). `sop-chat-history` is legacy —
+  read once on first open to migrate the old single thread, then removed.
 - Keep **Azure creds in `backend/.env` only** (gitignored) — never commit.
 - `backend/sessions/` is gitignored.
 - Commit only when asked; branch off main for larger work; open a draft PR.

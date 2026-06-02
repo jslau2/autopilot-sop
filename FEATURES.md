@@ -111,8 +111,11 @@ loop.
   up into the Agents Hub governance view.
 - **Conversational kickoff & templates** — start from a plain-English brief or a
   one-click scenario template.
-- **Per-session chat threads + streaming** — the planner chat scopes to the run
-  you're viewing and streams replies token-by-token.
+- **Planner chat + streaming + history** — one continuous conversation with the
+  Planner agent that streams replies token-by-token (with markdown), is run-aware
+  (knows which run you're viewing) without ever switching context on navigation,
+  and keeps browsable conversation history (new / resume / rename / delete) scoped
+  per browser.
 - **Token / cost tracking** — live token usage + estimated cost per run.
 
 ---

@@ -6,7 +6,7 @@ SQLite archive for terminal (completed / terminated) sessions.
 Why: previously every archived run was a JSON file and ALL of them were loaded
 into memory at startup — unbounded RAM + slow boot. Here, archived runs live in
 one SQLite DB. Lists read only lightweight summary columns; the heavy run data
-(steps/events/chat) is stored as a JSON blob and hydrated into a SessionState
+(steps/events) is stored as a JSON blob and hydrated into a SessionState
 ONLY when a specific run is opened (lazy load).
 
 A one-time migration folds any existing backend/sessions/*.json into the DB.
@@ -48,7 +48,6 @@ def to_data(s: SessionState) -> dict:
         "decisions": s.decisions,
         "approvals": s.approvals,
         "usage": s.usage,
-        "chat": s.chat,
         "parent_id": s.parent_id,
         "entity": s.entity,
     }
@@ -70,7 +69,6 @@ def from_data(data: dict) -> SessionState:
     s.decisions = data.get("decisions", [])
     s.approvals = data.get("approvals", [])
     s.usage = data.get("usage", s.usage)
-    s.chat = data.get("chat", [])
     s.parent_id = data.get("parent_id", "")
     s.entity = data.get("entity", "")
     # Archived snapshots are terminal so the SSE replay exits cleanly.

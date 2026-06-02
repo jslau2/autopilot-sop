@@ -227,16 +227,26 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   and an estimated USD cost (prices configurable via `AZURE_PRICE_INPUT/OUTPUT`
   per 1M tokens). A live `UsageChip` in the pipeline toolbar shows `tok · $cost`
   (hover for the breakdown). Persisted.
-- [x] **Streaming chat** — `POST /api/chat/stream` and
-  `POST /api/sessions/{id}/chat/stream` stream the reply as a chunked text
-  response; PlannerChat reads the stream and grows the assistant bubble
+- [x] **Streaming chat** — `POST /api/chat/stream` streams the reply as a chunked
+  text response; PlannerChat reads the stream and grows the assistant bubble
   token-by-token for a live-typing feel. (Tool calls are resolved server-side
   first, then the final answer streams.)
-- [x] **Per-session chat threads** — when viewing a run, the planner chat becomes
-  that run's own thread, stored server-side on the session (`chat`, persisted)
-  via `GET/POST/DELETE /api/sessions/{id}/chat`. The thread is auto-scoped to the
-  run (the assistant defaults to its context). Off a run page it stays the global
-  localStorage thread. Chat loop refactored into a shared `_run_chat` helper.
+- [x] **Single global planner chat** — one continuous conversation that never
+  switches context based on navigation. When viewing a run, that run's id is
+  passed as a lightweight hint (`session_id` on `/api/chat[/stream]`) so "this
+  run" resolves to real data — without ever swapping the conversation.
+  (Per-session server-side chat threads were tried and removed: switching the
+  thread on navigation was confusing UX.) Chat loop lives in the shared
+  `_run_chat` helper.
+- [x] **Chat conversation history** — `backend/chat_store.py` (SQLite,
+  `chat.db`) keeps past conversations browsable from a history drawer in
+  PlannerChat: new chat, resume-on-refresh, rename, delete, auto-title (from the
+  first user message). Scoped by `owner` = a per-browser UUID (`X-Client-Id`
+  header / `sop-client-id`) since there's no login yet — history isn't shared
+  across devices/users and migrates to user email when auth lands. CRUD at
+  `/api/conversations[...]`; threads persisted via `PUT .../messages`. The old
+  single-thread `sop-chat-history` is migrated once on first open. **Markdown**
+  in chat bubbles also rendered (dependency-free).
 
 ## Known limitations (by design, document if asked)
 
