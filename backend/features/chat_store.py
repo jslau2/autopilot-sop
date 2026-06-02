@@ -23,7 +23,7 @@ from pathlib import Path
 
 log = logging.getLogger("chat_store")
 
-DB_FILE = Path(__file__).parent / "chat.db"
+DB_FILE = Path(__file__).parent.parent / "chat.db"
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None

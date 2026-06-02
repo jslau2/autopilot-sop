@@ -15,7 +15,7 @@ from pathlib import Path
 
 log = logging.getLogger("scheduler")
 
-SCHEDULES_FILE = Path(__file__).parent / "schedules.json"
+SCHEDULES_FILE = Path(__file__).parent.parent / "schedules.json"
 
 CADENCE_SECONDS = {
     "hourly": 3600,

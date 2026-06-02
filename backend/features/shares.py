@@ -13,7 +13,7 @@ from pathlib import Path
 
 log = logging.getLogger("shares")
 
-SHARES_FILE = Path(__file__).parent / "shares.json"
+SHARES_FILE = Path(__file__).parent.parent / "shares.json"
 
 
 def _load() -> dict:

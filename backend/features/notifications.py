@@ -15,7 +15,7 @@ from pathlib import Path
 
 log = logging.getLogger("notifications")
 
-CONFIG_FILE = Path(__file__).parent / "notify_config.json"
+CONFIG_FILE = Path(__file__).parent.parent / "notify_config.json"
 
 # KPI thresholds for "breach" alerts.
 OTIF_TARGET = 96.0       # % — below this is a warning

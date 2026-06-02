@@ -15,7 +15,7 @@ from pathlib import Path
 
 log = logging.getLogger("feedback")
 
-FEEDBACK_FILE = Path(__file__).parent / "feedback.json"
+FEEDBACK_FILE = Path(__file__).parent.parent / "feedback.json"
 
 
 def _load() -> list[dict]:

@@ -45,13 +45,13 @@ import session_store
 # NOT bulk-loaded into memory at startup (that used to grow RAM with history).
 session_store.init()
 
-import scheduler
+from features import scheduler
 scheduler.load()
 
 import llm_audit
 llm_audit.load()
 
-import chat_store
+from features import chat_store
 chat_store.init()
 
 # Small LRU of archived sessions hydrated on demand (when a past run is opened),
@@ -252,7 +252,7 @@ async def upload_data(request: Request, filename: str = "upload.csv"):
     The file is sent as the raw request body (no multipart dependency); the
     original filename is passed as ?filename=.
     """
-    import uploads as uploads_mod
+    from features import uploads as uploads_mod
     raw = await request.body()
     if len(raw) > 8 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large (max 8 MB).")
@@ -268,14 +268,14 @@ async def upload_data(request: Request, filename: str = "upload.csv"):
 
 @app.get("/api/uploads")
 async def list_uploads():
-    import uploads as uploads_mod
+    from features import uploads as uploads_mod
     return {"uploads": [uploads_mod.public_record(r) for r in
                         sorted(uploads_mod.uploads.values(), key=lambda r: r["uploaded_at"], reverse=True)]}
 
 
 @app.get("/api/uploads/{upload_id}")
 async def get_upload(upload_id: str):
-    import uploads as uploads_mod
+    from features import uploads as uploads_mod
     rec = uploads_mod.uploads.get(upload_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"No upload '{upload_id}'")
@@ -848,19 +848,19 @@ async def activity():
 # ---------------------------------------------------------------------------
 @app.post("/api/feedback")
 async def submit_feedback(body: FeedbackBody):
-    import feedback_store
+    from features import feedback_store
     return feedback_store.record(body.model_dump())
 
 
 @app.get("/api/feedback")
 async def get_feedback(session_id: str = ""):
-    import feedback_store
+    from features import feedback_store
     return {"feedback": feedback_store.list_feedback(session_id)}
 
 
 @app.get("/api/feedback/summary")
 async def feedback_summary():
-    import feedback_store
+    from features import feedback_store
     return feedback_store.summary()
 
 
@@ -874,13 +874,13 @@ class WebhookBody(BaseModel):
 
 @app.get("/api/notifications")
 async def get_notifications():
-    import notifications
+    from features import notifications
     return {"alerts": notifications.compute_alerts(sessions)}
 
 
 @app.get("/api/notifications/webhook")
 async def get_webhook():
-    import notifications
+    from features import notifications
     cfg = notifications.get_config()
     # don't echo the full URL back for safety; just whether it's set
     return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
@@ -888,14 +888,14 @@ async def get_webhook():
 
 @app.put("/api/notifications/webhook")
 async def set_webhook(body: WebhookBody):
-    import notifications
+    from features import notifications
     cfg = notifications.set_config(body.webhook_url, body.enabled)
     return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
 
 
 @app.post("/api/notifications/test")
 async def test_webhook():
-    import notifications
+    from features import notifications
     return notifications.dispatch_webhook("✅ Autopilot S&OP test alert — your webhook is connected.")
 
 
@@ -1056,7 +1056,7 @@ async def create_session(body: StartSession):
     # plan on the user's real numbers.
     goal = body.goal
     if body.data_upload_id:
-        import uploads as uploads_mod
+        from features import uploads as uploads_mod
         rec = uploads_mod.uploads.get(body.data_upload_id)
         if rec:
             goal = f"{body.goal}\n\n--- UPLOADED DATA ---\n{rec['summary']}"
@@ -1243,7 +1243,7 @@ def _share_snapshot(s: SessionState) -> dict:
 
 @app.post("/api/sessions/{session_id}/share")
 async def create_share(session_id: str):
-    import shares
+    from features import shares
     session = _get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
@@ -1253,7 +1253,7 @@ async def create_share(session_id: str):
 
 @app.get("/api/share/{token}")
 async def get_shared(token: str):
-    import shares
+    from features import shares
     session_id = shares.resolve(token)
     session = _get_session(session_id) if session_id else None
     if session is None:
