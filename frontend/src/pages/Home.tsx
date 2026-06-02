@@ -7,7 +7,7 @@ import AppShell from '../components/AppShell';
 import LaunchConfig from '../components/LaunchConfig';
 import { useLaunchCycle } from '../hooks/useLaunchCycle';
 import DeleteCycleControl from '../components/DeleteCycleControl';
-import StopCycleControl from '../components/StopCycleControl';
+import PauseCycleControl from '../components/PauseCycleControl';
 import TemplateGallery from '../components/TemplateGallery';
 import KickoffBar from '../components/KickoffBar';
 import type { ScenarioTemplate } from '../data/templates';
@@ -21,6 +21,7 @@ type LiveSession = {
   created_at: number;
   kpis: Record<string, string | number | null>;
   step_count: number;
+  user_paused?: boolean;
 };
 
 type LaunchSeed = { goal?: string; name?: string; parentId?: string; scenarioOf?: string };
@@ -223,8 +224,8 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <span className={`si-status si-status-${running ? 'running' : 'done'}`}>
-                  {running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
+                <span className={`si-status si-status-${running && !s.user_paused ? 'running' : 'done'}`}>
+                  {s.user_paused ? '⏸ Paused' : running ? '● Running' : s.status === 'paused' ? '⏸ Paused' : '✓ Done'}
                 </span>
                 <span
                   role="button"
@@ -240,10 +241,10 @@ export default function Home() {
                   onMouseOut={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
                 >⎇</span>
                 {(s.status === 'running' || s.status === 'paused') && (
-                  <StopCycleControl
+                  <PauseCycleControl
                     sessionId={s.session_id}
-                    name={s.name}
-                    onStopped={() => setLiveSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, status: 'done' } : x))}
+                    paused={!!s.user_paused}
+                    onToggled={(paused) => setLiveSessions(prev => prev.map(x => x.session_id === s.session_id ? { ...x, user_paused: paused } : x))}
                   />
                 )}
                 <DeleteCycleControl

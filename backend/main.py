@@ -1024,6 +1024,7 @@ def _session_summary(s: SessionState) -> dict:
         "parent_name": _resolve_name(s.parent_id),
         "entity": s.entity,
         "active_agents": s.active_agents,
+        "user_paused": s.user_paused,
     }
 
 
