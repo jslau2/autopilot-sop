@@ -60,7 +60,7 @@ export async function terminateCycle(sessionId: string, name?: string): Promise<
 export function useLaunchCycle() {
   const navigate = useNavigate();
 
-  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string; entity?: string; uploadId?: string }) => {
+  return useCallback(async (demoMode: boolean, goal: string, name: string, opts?: { parentId?: string; entity?: string; uploadId?: string; agents?: string[] }) => {
     if (demoMode) {
       navigate('/pipeline/demo', { state: { goal, name } });
       return;
@@ -69,7 +69,12 @@ export function useLaunchCycle() {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, name, parent_id: opts?.parentId ?? '', entity: opts?.entity ?? '', data_upload_id: opts?.uploadId ?? '' }),
+        body: JSON.stringify({
+          goal, name,
+          parent_id: opts?.parentId ?? '', entity: opts?.entity ?? '', data_upload_id: opts?.uploadId ?? '',
+          // Only send when the user narrowed the set; omit to run all enabled agents.
+          ...(opts?.agents && opts.agents.length ? { agents: opts.agents } : {}),
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { session_id } = await res.json();

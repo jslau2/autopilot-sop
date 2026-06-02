@@ -166,7 +166,7 @@ function PipelineLanding({ demoMode }: { demoMode: boolean }) {
           demoMode={demoMode}
           initialGoal={kickoffBrief}
           onClose={() => { setShowLaunch(false); setKickoffBrief(undefined); }}
-          onLaunch={(goal, name, entity) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity }); }}
+          onLaunch={(goal, name, entity, agents) => { setShowLaunch(false); setKickoffBrief(undefined); launch(demoMode, goal, name, { entity, agents }); }}
         />
       )}
     </div>
@@ -541,7 +541,7 @@ function PipelineRun({ sessionId, demoMode }: { sessionId: string; demoMode: boo
             initialName={launchSeed?.name}
             scenarioOf={launchSeed?.scenarioOf}
             onClose={() => setShowLaunch(false)}
-            onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId }); }}
+            onLaunch={(goal, name, entity, agents) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, uploadId: launchSeed?.uploadId, agents }); }}
           />
         )}
         {showTour && <TourOverlay onClose={closeTour} />}

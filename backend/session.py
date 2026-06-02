@@ -40,6 +40,7 @@ class SessionState:
     })
     parent_id: str = ""                   # set when this run is a what-if branch of another
     entity: str = ""                      # planning entity (plant grouping / region) this run is scoped to
+    active_agents: list = field(default_factory=list)  # specialist agents in scope for this run (resolved at orchestration start)
     bg_task: Any = None
 
     def now_ts(self) -> str:

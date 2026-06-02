@@ -117,6 +117,7 @@ class StartSession(BaseModel):
     parent_id: str = ""
     entity: str = ""
     data_upload_id: str = ""   # attach a previously uploaded dataset
+    agents: list[str] | None = None   # optional per-run subset of specialist agents to run
 
 
 class AnswerBody(BaseModel):
@@ -131,6 +132,7 @@ class SuggestNameBody(BaseModel):
 class KickoffBody(BaseModel):
     brief: str = ""
     entity: str = ""
+    agents: list[str] | None = None   # optional per-run subset of specialist agents to run
 
 
 class ScheduleBody(BaseModel):
@@ -157,6 +159,7 @@ class ChatBody(BaseModel):
 class AgentConfigBody(BaseModel):
     system_prompt: str | None = None
     temperature: float | None = None
+    enabled: bool | None = None
 
 
 class ApprovalBody(BaseModel):
@@ -368,6 +371,8 @@ async def kickoff(body: KickoffBody):
     session_id = str(uuid.uuid4())
     session = SessionState(session_id=session_id, name=name, goal=goal)
     session.entity = (body.entity or "").strip()
+    if body.agents:
+        session.active_agents = [a for a in body.agents if a]
     sessions[session_id] = session
     session.bg_task = asyncio.create_task(run_orchestrator(session, goal))
     return {"session_id": session_id, "name": name, "goal": goal, "status": "running"}
@@ -788,7 +793,12 @@ async def get_agent_config(agent_id: str):
 @app.put("/api/agents/{agent_id}")
 async def update_agent_config(agent_id: str, body: AgentConfigBody):
     from agents import agent_config
-    cfg = agent_config.set_config(agent_id, system_prompt=body.system_prompt, temperature=body.temperature)
+    cfg = agent_config.set_config(
+        agent_id,
+        system_prompt=body.system_prompt,
+        temperature=body.temperature,
+        enabled=body.enabled,
+    )
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
     return cfg
@@ -1008,6 +1018,7 @@ def _session_summary(s: SessionState) -> dict:
         "parent_id": s.parent_id,
         "parent_name": _resolve_name(s.parent_id),
         "entity": s.entity,
+        "active_agents": s.active_agents,
     }
 
 
@@ -1066,6 +1077,8 @@ async def create_session(body: StartSession):
     if body.parent_id and body.parent_id in sessions:
         session.parent_id = body.parent_id
     session.entity = (body.entity or "").strip()
+    if body.agents:
+        session.active_agents = [a for a in body.agents if a]
     sessions[session_id] = session
 
     # Launch orchestrator as a background task
@@ -1120,6 +1133,7 @@ async def get_session(session_id: str):
         "parent_id": session.parent_id,
         "parent_name": _resolve_name(session.parent_id),
         "entity": session.entity,
+        "active_agents": session.active_agents,
         "event_count": len(session.events),
     }
 

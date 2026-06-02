@@ -8,6 +8,7 @@ Each agent has: id, name, system_prompt, tools (OpenAI function calling format),
 AGENT_DEFS: dict[str, dict] = {
     "masterdata": {
         "id": "masterdata",
+        "phase": 1,
         "name": "Master Data Agent",
         "data_source": "SAP MDG / BOM Repository",
         "system_prompt": (
@@ -65,6 +66,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "procurement": {
         "id": "procurement",
+        "phase": 1,
         "name": "Procurement Agent",
         "data_source": "SAP MM / Supplier Portal",
         "system_prompt": (
@@ -128,6 +130,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "demand": {
         "id": "demand",
+        "phase": 1,
         "name": "Demand Planning Agent",
         "data_source": "SAP IBP / Historical Sales",
         "system_prompt": (
@@ -195,6 +198,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "spi": {
         "id": "spi",
+        "phase": 2,
         "name": "Supply-Production Interface Agent",
         "data_source": "SAP PP / Inventory Management",
         "system_prompt": (
@@ -252,6 +256,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "inventory": {
         "id": "inventory",
+        "phase": 2,
         "name": "Inventory Optimization Agent",
         "data_source": "SAP WM / Inventory Analytics",
         "system_prompt": (
@@ -315,6 +320,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "tooling": {
         "id": "tooling",
+        "phase": 2,
         "name": "Tooling & Asset Agent",
         "data_source": "Tooling Asset Register / SAP PM",
         "system_prompt": (
@@ -373,6 +379,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "capacity": {
         "id": "capacity",
+        "phase": 2,
         "name": "Capacity Planning Agent",
         "data_source": "SAP PP-CDS / MES",
         "system_prompt": (
@@ -435,6 +442,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "wip": {
         "id": "wip",
+        "phase": 4,
         "name": "WIP & Order Management Agent",
         "data_source": "SAP PP / MES / Shop Floor",
         "system_prompt": (
@@ -494,6 +502,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "optimizer": {
         "id": "optimizer",
+        "phase": 4,
         "name": "Supply Chain Optimizer Agent",
         "data_source": "Optimization Engine / Scenario Planner",
         "system_prompt": (
@@ -563,6 +572,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "finance": {
         "id": "finance",
+        "phase": 5,
         "name": "Financial Controller Agent",
         "data_source": "SAP FI/CO / Revenue Analytics",
         "system_prompt": (
@@ -642,6 +652,7 @@ AGENT_DEFS: dict[str, dict] = {
     },
     "risk": {
         "id": "risk",
+        "phase": 5,
         "name": "Risk Management Agent",
         "data_source": "Risk Register / ERM System",
         "system_prompt": (
@@ -723,34 +734,10 @@ AGENT_DEFS: dict[str, dict] = {
             "across 12 plants (SPL and SBMB), planning horizon W22–W34 (13 weeks), with targets: "
             "OTIF ≥98%, Gross Margin ≥22%, Weeks of Supply 4–5 wks. "
             "\n\n"
-            "You orchestrate 11 specialist agents in a structured sequence. Follow this playbook:\n"
-            "\n"
-            "PHASE 1 — DATA FOUNDATION (dispatch in parallel):\n"
-            "  • masterdata: Validate BOM records and score data quality\n"
-            "  • procurement: Get supplier ATP and identify component gaps\n"
-            "  • demand: Run forecast model tournament and generate demand plan\n"
-            "\n"
-            "PHASE 2 — SUPPLY & CAPACITY ANALYSIS (dispatch after Phase 1, run in parallel):\n"
-            "  • spi: Reconcile inventory vs. safety stock, identify gaps\n"
-            "  • inventory: Run ABC classification and compute safety stock levels\n"
-            "  • tooling: Assess tooling risks and schedule maintenance\n"
-            "  • capacity: Run capacity plan and identify bottlenecks\n"
-            "\n"
-            "PHASE 3 — CRITICAL DECISION CHECKPOINT:\n"
-            "  • After reviewing demand and capacity results, ask the human ONE critical question.\n"
-            "  • If LightGBM forecasts a demand spike >30% for premium groupsets (W24–W26), ask:\n"
-            '    "DRG-XTR-001 demand spike of +34% detected for W24–W26. With Supplier X at 8-week '
-            "lead time and SPL-L3 at 92% capacity, should we: (A) Accept spike in full and approve "
-            "emergency overtime + air freight ($85K cost), (B) Cap spike at +20% and reallocate "
-            'to W28–W30, or (C) Reject spike and hold baseline forecast?"\n'
-            "\n"
-            "PHASE 4 — WIP & OPTIMIZATION (dispatch after human decision, run in parallel):\n"
-            "  • wip: Prioritize at-risk production orders based on bottleneck and decision\n"
-            "  • optimizer: Run MILP optimization incorporating the human decision\n"
-            "\n"
-            "PHASE 5 — FINAL SIGN-OFF (dispatch after optimization, run in parallel):\n"
-            "  • finance: Compute revenue, margin, and generate financial sign-off\n"
-            "  • risk: Assess all risks and generate risk register\n"
+            "The specific agent playbook for THIS cycle — which specialist agents are active "
+            "and the phase in which to dispatch each — is provided separately below. Always "
+            "follow that playbook, dispatch agents in the phase groups it defines, and NEVER "
+            "dispatch an agent that is not listed in it.\n"
             "\n"
             "After all phases complete, call complete_session with final KPIs:\n"
             "  OTIF: 97.8%, Forecast Accuracy: 94.2%, Capacity Utilization: 84.6%, "
@@ -759,10 +746,13 @@ AGENT_DEFS: dict[str, dict] = {
             "Key rules:\n"
             "  1. Always dispatch agents in parallel groups using dispatch_agent, then wait_for_agents.\n"
             "  2. Pass rich context to each agent including relevant outputs from prior phases.\n"
-            "  3. Ask the human EXACTLY ONCE, at the Phase 3 checkpoint.\n"
-            "  4. Do not proceed to Phase 4 until the human answers.\n"
-            "  5. Keep log messages concise but informative.\n"
-            "  6. After complete_session, do not make any more tool calls."
+            "  3. If the playbook defines a Phase 3 decision checkpoint, ask the human EXACTLY "
+            "ONCE there; if it defines none, do not ask the human at all.\n"
+            "  4. Do not proceed past a decision checkpoint until the human answers.\n"
+            "  5. Not every active agent must run — if the goal makes one irrelevant you may skip "
+            "it, but never dispatch an agent absent from the playbook.\n"
+            "  6. Keep log messages concise but informative.\n"
+            "  7. After complete_session, do not make any more tool calls."
         ),
         "tools": [
             {

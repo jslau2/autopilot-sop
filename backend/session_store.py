@@ -50,6 +50,7 @@ def to_data(s: SessionState) -> dict:
         "usage": s.usage,
         "parent_id": s.parent_id,
         "entity": s.entity,
+        "active_agents": s.active_agents,
     }
 
 
@@ -71,6 +72,7 @@ def from_data(data: dict) -> SessionState:
     s.usage = data.get("usage", s.usage)
     s.parent_id = data.get("parent_id", "")
     s.entity = data.get("entity", "")
+    s.active_agents = data.get("active_agents", [])
     # Archived snapshots are terminal so the SSE replay exits cleanly.
     if s.status not in ("done", "error"):
         s.status = "done"

@@ -376,7 +376,7 @@ export default function Home() {
           initialName={launchSeed?.name}
           scenarioOf={launchSeed?.scenarioOf}
           onClose={() => setShowLaunch(false)}
-          onLaunch={(goal, name, entity) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity }); }}
+          onLaunch={(goal, name, entity, agents) => { setShowLaunch(false); launch(demoMode, goal, name, { parentId: launchSeed?.parentId, entity, agents }); }}
         />
       )}
     </div>
