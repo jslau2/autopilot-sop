@@ -232,11 +232,13 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   response; PlannerChat reads the stream and grows the assistant bubble
   token-by-token for a live-typing feel. (Tool calls are resolved server-side
   first, then the final answer streams.)
-- [x] **Per-session chat threads** — when viewing a run, the planner chat becomes
-  that run's own thread, stored server-side on the session (`chat`, persisted)
-  via `GET/POST/DELETE /api/sessions/{id}/chat`. The thread is auto-scoped to the
-  run (the assistant defaults to its context). Off a run page it stays the global
-  localStorage thread. Chat loop refactored into a shared `_run_chat` helper.
+- [x] **Single global planner chat** — one continuous conversation (global
+  localStorage history) that never switches context based on navigation. When
+  viewing a run, that run's id is passed as a lightweight hint (`session_id` on
+  `/api/chat[/stream]`) so "this run" resolves to real data — without ever
+  swapping the conversation. (Per-session server-side chat threads were tried and
+  removed: switching the thread on navigation was confusing UX.) Chat loop lives
+  in the shared `_run_chat` helper.
 
 ## Known limitations (by design, document if asked)
 
