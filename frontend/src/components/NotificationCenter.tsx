@@ -11,8 +11,31 @@ interface Alert {
   message: string;
 }
 
+interface ChannelState {
+  configured: boolean;          // generic webhook (Slack/Teams)
+  enabled: boolean;
+  telegram_configured: boolean;
+  telegram_enabled: boolean;
+  email_configured: boolean;
+  email_enabled: boolean;
+  smtp_ready: boolean;          // SMTP_HOST set in backend/.env
+}
+
 const POLL_MS = 6000;
 const TOAST_MS = 9000;
+
+const inputStyle: React.CSSProperties = {
+  fontSize: 11, padding: '6px 8px', borderRadius: 6,
+  background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none',
+};
+const primaryBtn: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 6,
+  border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer',
+};
+const ghostBtn: React.CSSProperties = {
+  fontSize: 11, padding: '5px 9px', borderRadius: 6,
+  border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer',
+};
 
 function sevColor(sev: string): string {
   return sev === 'action' ? 'oklch(0.72 0.16 75)' : 'oklch(0.7 0.18 25)';
@@ -37,7 +60,14 @@ export default function NotificationCenter() {
   const acknowledged = useRef<Set<string>>(new Set());
   const [showWebhook, setShowWebhook] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('');
-  const [webhookState, setWebhookState] = useState<{ configured: boolean; enabled: boolean }>({ configured: false, enabled: false });
+  const [tgToken, setTgToken] = useState('');
+  const [tgChat, setTgChat] = useState('');
+  const [emailTo, setEmailTo] = useState('');
+  const [webhookState, setWebhookState] = useState<ChannelState>({
+    configured: false, enabled: false,
+    telegram_configured: false, telegram_enabled: false,
+    email_configured: false, email_enabled: false, smtp_ready: false,
+  });
   const [testMsg, setTestMsg] = useState('');
 
   useEffect(() => {
@@ -45,17 +75,25 @@ export default function NotificationCenter() {
     fetch('/api/notifications/webhook').then(r => r.ok ? r.json() : null).then(d => { if (d) setWebhookState(d); }).catch(() => {});
   }, [demoMode]);
 
-  const saveWebhook = async (enabled: boolean) => {
+  // Patch any subset of the notification config; secrets only sent when typed.
+  const saveConfig = async (patch: Record<string, unknown>) => {
     try {
       const res = await fetch('/api/notifications/webhook', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhook_url: webhookUrl || undefined, enabled }),
+        body: JSON.stringify(patch),
       });
       if (res.ok) setWebhookState(await res.json());
     } catch { /* ignore */ }
   };
+  const saveWebhook = (enabled: boolean) => saveConfig({ webhook_url: webhookUrl || undefined, enabled });
+  const saveTelegram = (enabled: boolean) => saveConfig({
+    telegram_bot_token: tgToken || undefined,
+    telegram_chat_id: tgChat || undefined,
+    telegram_enabled: enabled,
+  });
+  const saveEmail = (enabled: boolean) => saveConfig({ email_to: emailTo || undefined, email_enabled: enabled });
+
   const sendTest = async () => {
-    await saveWebhook(true);
     try {
       const res = await fetch('/api/notifications/test', { method: 'POST' });
       const d = await res.json();
@@ -159,26 +197,78 @@ export default function NotificationCenter() {
               </button>
             ))}
 
-            {/* Webhook config */}
+            {/* Channel config */}
             <div style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 6, paddingTop: 6 }}>
               <button
                 onClick={() => setShowWebhook(s => !s)}
                 style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', padding: '4px 8px' }}
               >
-                ⚙ Webhook (Slack/Teams) {webhookState.configured ? (webhookState.enabled ? '· on' : '· off') : '· not set'} {showWebhook ? '▾' : '▸'}
+                ⚙ Notification channels {showWebhook ? '▾' : '▸'}
               </button>
               {showWebhook && (
-                <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <input
-                    value={webhookUrl}
-                    onChange={e => setWebhookUrl(e.target.value)}
-                    placeholder={webhookState.configured ? '•••• (set) — paste to replace' : 'https://hooks.slack.com/…'}
-                    style={{ fontSize: 11, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-base)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none' }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button onClick={() => saveWebhook(true)} style={{ fontSize: 11, fontWeight: 600, padding: '5px 9px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer' }}>Save & enable</button>
-                    <button onClick={() => saveWebhook(false)} style={{ fontSize: 11, padding: '5px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Disable</button>
-                    <button onClick={sendTest} style={{ fontSize: 11, padding: '5px 9px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Send test</button>
+                <div style={{ padding: '2px 8px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Telegram */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>
+                      Telegram {webhookState.telegram_configured ? (webhookState.telegram_enabled ? '· on' : '· off') : '· not set'}
+                    </div>
+                    <input
+                      value={tgToken}
+                      onChange={e => setTgToken(e.target.value)}
+                      placeholder={webhookState.telegram_configured ? '•••• bot token (set) — paste to replace' : 'Bot token (from @BotFather)'}
+                      style={inputStyle}
+                    />
+                    <input
+                      value={tgChat}
+                      onChange={e => setTgChat(e.target.value)}
+                      placeholder={webhookState.telegram_configured ? '•••• chat id (set) — paste to replace' : 'Chat ID (e.g. 123456789)'}
+                      style={inputStyle}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button onClick={() => saveTelegram(true)} style={primaryBtn}>Save & enable</button>
+                      <button onClick={() => saveTelegram(false)} style={ghostBtn}>Disable</button>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>
+                      Email {webhookState.email_configured ? (webhookState.email_enabled ? '· on' : '· off') : '· not set'}
+                    </div>
+                    <input
+                      value={emailTo}
+                      onChange={e => setEmailTo(e.target.value)}
+                      placeholder="recipient@company.com, …"
+                      style={inputStyle}
+                    />
+                    {!webhookState.smtp_ready && (
+                      <div style={{ fontSize: 10, color: 'oklch(0.72 0.16 75)' }}>Set SMTP_HOST/PORT/USER/PASS/FROM in backend/.env to enable email.</div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button onClick={() => saveEmail(true)} style={primaryBtn}>Save & enable</button>
+                      <button onClick={() => saveEmail(false)} style={ghostBtn}>Disable</button>
+                    </div>
+                  </div>
+
+                  {/* Webhook (Slack/Teams) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>
+                      Webhook (Slack/Teams) {webhookState.configured ? (webhookState.enabled ? '· on' : '· off') : '· not set'}
+                    </div>
+                    <input
+                      value={webhookUrl}
+                      onChange={e => setWebhookUrl(e.target.value)}
+                      placeholder={webhookState.configured ? '•••• (set) — paste to replace' : 'https://hooks.slack.com/…'}
+                      style={inputStyle}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button onClick={() => saveWebhook(true)} style={primaryBtn}>Save & enable</button>
+                      <button onClick={() => saveWebhook(false)} style={ghostBtn}>Disable</button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                    <button onClick={sendTest} style={ghostBtn}>Send test to all enabled</button>
                     {testMsg && <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{testMsg}</span>}
                   </div>
                 </div>

@@ -69,7 +69,8 @@ Backend:
   are stateless — the frontend persists each thread via
   `PUT /api/conversations/{id}/messages` (auto-titles from the first user message).
 - Feature modules: `feedback_store.py` (👍/👎), `uploads.py` (run-on-your-data),
-  `notifications.py` (alerts + webhook), `shares.py` (read-only links),
+  `notifications.py` (alerts + multi-channel relay: webhook/Telegram/email),
+  `shares.py` (read-only links),
   `scheduler.py` (recurring runs). These (plus `agents/agent_config.py`'s
   per-agent overrides) all persist to one shared SQLite db, `backend/app.db`
   (gitignored) — each module owns its own table(s) + connection (WAL, lazy
