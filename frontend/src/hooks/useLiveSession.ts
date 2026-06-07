@@ -199,7 +199,8 @@ export function useLiveSession(sessionId?: string) {
     sessionIdRef.current = sessionId;
     let cancelled = false;
 
-    const es = new EventSource(`/api/sessions/${sessionId}/events`);
+    const apiBase = import.meta.env.VITE_API_URL ?? localStorage.getItem('sop-api-url') ?? '';
+    const es = new EventSource(`${apiBase}/api/sessions/${sessionId}/events`);
     esRef.current = es;
 
     es.onmessage = (e) => {
