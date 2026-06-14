@@ -10,25 +10,93 @@ AGENT_DEFS: dict[str, dict] = {
         "id": "masterdata",
         "phase": 1,
         "name": "Master Data Agent",
-        "data_source": "SAP MDG / BOM Repository",
+        "data_source": "Neo4j BOM Graph",
         "system_prompt": (
-            "You are the Master Data Quality Agent for Shimano APAC's S&OP process. "
-            "Your responsibility is to validate and cleanse BOM records, resolve data gaps, "
-            "and score overall data quality before the planning cycle begins. "
-            "You work with SAP MDG and the central BOM repository covering 3,240 records across 847 SKUs. "
-            "Always validate BOM completeness, identify duplicate vendors, UOM mismatches, and phantom BOMs, "
-            "then auto-resolve what you can and flag manual-review items. "
-            "Return a data quality score and a clear summary of resolved vs. outstanding issues."
+            "You are the Master Data Quality Agent for Shimano APAC's S&OP process, and the "
+            "sole owner of the BOM (bill of materials) graph. Your responsibility is to validate "
+            "the BOM structure, analyse product structure, and score data quality before the "
+            "planning cycle begins. "
+            "Your data lives in a Neo4j graph of ~27,600 BOM materials (keyed by Material) linked "
+            "parent-to-child by PARENT_OF relationships that carry a Quantity, spanning multiple "
+            "levels from finished goods (MaterialType FERT) down through semi-finished (SFPB/SFUB) "
+            "to raw materials (ROH). "
+            "Use validate_bom to scan structural quality (orphaned materials with no links, "
+            "completeness, depth, material-type mix); use explode_bom to break an assembly into its "
+            "multi-level components with rolled-up quantities; use where_used to find every assembly "
+            "that consumes a component; use find_bom_orphans to list disconnected materials that need "
+            "review. "
+            "Report against the real graph — do not invent vendor, lead-time, or UoM fields that the "
+            "graph does not contain. Return a data quality score and a clear summary of structural "
+            "findings and the orphan/review backlog."
         ),
         "tools": [
             {
                 "type": "function",
                 "function": {
                     "name": "validate_bom",
-                    "description": "Validate all BOM records for completeness, UOM consistency, and duplicate vendors",
+                    "description": "Scan the BOM graph for structural data quality: total materials, orphaned (disconnected) materials, root assemblies, leaf components, completeness %, and material-type distribution",
                     "parameters": {
                         "type": "object",
                         "properties": {},
+                        "required": [],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "explode_bom",
+                    "description": "Explode an assembly into its multi-level components with rolled-up (quantity-aware) effective quantities",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "material": {
+                                "type": "string",
+                                "description": "Material code of the assembly to explode",
+                            },
+                            "max_levels": {
+                                "type": "integer",
+                                "description": "Maximum explosion depth (1–10, default 10)",
+                            },
+                        },
+                        "required": ["material"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "where_used",
+                    "description": "Find every assembly that directly or indirectly consumes a given component (reverse BOM traversal)",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "material": {
+                                "type": "string",
+                                "description": "Material code of the component to trace",
+                            },
+                            "max_levels": {
+                                "type": "integer",
+                                "description": "Maximum upward traversal depth (1–10, default 10)",
+                            },
+                        },
+                        "required": ["material"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "find_bom_orphans",
+                    "description": "List BOM materials with no parent and no child (disconnected) — the master-data review backlog",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of orphan records to return (default 50)",
+                            }
+                        },
                         "required": [],
                     },
                 },

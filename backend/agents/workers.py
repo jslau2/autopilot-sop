@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 from session import SessionState
 from .agent_defs import AGENT_DEFS
 import mock_data
+import bom_graph
 
 # ---------------------------------------------------------------------------
 # Azure OpenAI client — lazy init so missing creds don't break imports
@@ -40,8 +41,16 @@ def get_deployment() -> str:
 # Tool dispatch table
 # ---------------------------------------------------------------------------
 TOOL_DISPATCH: dict = {
-    # masterdata
-    "validate_bom": lambda args: mock_data.get_bom_data(),
+    # masterdata — governs the Neo4j BOM graph (live), falls back to mock data
+    "validate_bom": lambda args: bom_graph.validate_bom() or mock_data.get_bom_data(),
+    "explode_bom": lambda args: bom_graph.explode_bom(
+        args.get("material"), args.get("max_levels", 10)
+    ) or {"error": "BOM graph unavailable", "material": args.get("material")},
+    "where_used": lambda args: bom_graph.where_used(
+        args.get("material"), args.get("max_levels", 10)
+    ) or {"error": "BOM graph unavailable", "material": args.get("material")},
+    "find_bom_orphans": lambda args: bom_graph.find_orphans(args.get("limit", 50))
+    or {"error": "BOM graph unavailable"},
     "resolve_bom_gaps": lambda args: {
         "resolved": args.get("gap_count", 0) - 3,
         "remaining": 3,
