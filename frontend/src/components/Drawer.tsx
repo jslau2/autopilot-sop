@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 import { AGENTS } from '../data/agents';
 import { REASONING } from '../data/reasoning';
@@ -168,6 +169,21 @@ export default function Drawer({ stepId, onClose }: DrawerProps) {
               ))}
             </div>
           </div>
+        )}
+
+        {step.agent === 'masterdata' && (
+          <Link
+            to="/bom-explorer"
+            onClick={onClose}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6,
+              fontSize: 12, fontWeight: 600, textDecoration: 'none',
+              color: agent.color, background: agent.color + '14', border: `1px solid ${agent.color}44`,
+            }}
+          >
+            ◆ Visualize BOM graph →
+          </Link>
         )}
 
         <div className="drawer-tabs">

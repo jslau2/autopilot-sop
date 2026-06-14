@@ -5,6 +5,7 @@ import PipelineView from './pages/PipelineView';
 import AgentConsole from './pages/AgentConsole';
 import Agents from './pages/Agents';
 import DataSources from './pages/DataSources';
+import BomExplorer from './pages/BomExplorer';
 import Compare from './pages/Compare';
 import SharePage from './pages/SharePage';
 import Schedules from './pages/Schedules';
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/agents" element={<Agents />} />
         <Route path="/agents/:tab" element={<Agents />} />
         <Route path="/datasources" element={<DataSources />} />
+        <Route path="/bom-explorer" element={<BomExplorer />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/schedules" element={<Schedules />} />

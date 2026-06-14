@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import BomExplorerPanel from '../components/BomExplorerPanel';
 
 interface DataSource {
   id: string;
@@ -13,6 +15,7 @@ interface DataSource {
 }
 
 const SOURCES: DataSource[] = [
+  { id: 'neo4j-bom',       system: 'Neo4j',             module: 'BOM Graph · Product Structure',  description: 'Multi-level bill of materials as a graph — explosion, where-used, orphan detection. Governed by the Master Data agent.', agents: ['Master Data'], records: '27,589 materials · multi-level BOM', status: 'live',      color: 'var(--ag-masterdata)'  },
   { id: 'sap-mdg',         system: 'SAP S/4HANA',       module: 'MDG · BOM Repository',          description: 'Bills of materials, routing configs, master data governance', agents: ['Master Data'],              records: '3,240 BOM records · 847 SKUs',        status: 'live',      color: 'var(--ag-masterdata)'  },
   { id: 'sap-mm',          system: 'SAP S/4HANA',       module: 'MM · Materials Management',      description: 'Purchase orders, supplier master, ATP/CTP positions, GR/GI',   agents: ['Procurement', 'WIP'],      records: '892 components · 47 suppliers',       status: 'live',      color: 'var(--ag-procurement)' },
   { id: 'sap-ibp',         system: 'SAP IBP',            module: 'Integrated Business Planning',   description: 'Historical sales orders, promo calendar, market intelligence',  agents: ['AutoML Forecast'],         records: '104 wks history · 847 SKUs',          status: 'live',      color: 'var(--ag-demand)'      },
@@ -28,6 +31,7 @@ const SOURCES: DataSource[] = [
 ];
 
 const GROUPS = [
+  { label: 'Graph Database',        ids: ['neo4j-bom'] },
   { label: 'SAP ERP Systems',       ids: ['sap-mdg', 'sap-mm', 'sap-ibp', 'sap-pp', 'sap-ppcds', 'sap-wm', 'sap-fico', 'sap-pm'] },
   { label: 'External & Shop Floor', ids: ['supplier-portal', 'mes', 'tooling-register'] },
   { label: 'Risk & Compliance',     ids: ['erm'] },
@@ -165,6 +169,21 @@ function DataPreviewPanel({ src, onClose }: { src: DataSource; onClose: () => vo
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {src.id === 'neo4j-bom' && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                color: src.color, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${src.color}33`,
+              }}>
+                <span>Interactive Graph</span>
+                <Link to="/bom-explorer" onClick={onClose} style={{ fontSize: 10, color: src.color, fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>
+                  Open full BOM Explorer →
+                </Link>
+              </div>
+              <BomExplorerPanel height={360} />
+            </div>
+          )}
           {loading && <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading data…</div>}
           {error && <div style={{ color: 'oklch(0.65 0.2 30)', fontSize: 13 }}>Error: {error}</div>}
           {data && (

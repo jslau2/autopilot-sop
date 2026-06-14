@@ -10,6 +10,7 @@ Provides SSE streaming, session management, and human-in-the-loop answer endpoin
 
 import asyncio
 import json
+import re
 import time
 import uuid
 
@@ -40,6 +41,7 @@ from session import SessionState, sessions
 from agents.orchestrator import run_orchestrator
 from persistence import save_session, delete_session_file
 import mock_data
+import bom_graph
 import session_store
 
 # Archived (terminal) sessions live in SQLite and are hydrated lazily — they are
@@ -127,6 +129,10 @@ class AnswerBody(BaseModel):
 
 class SuggestNameBody(BaseModel):
     goal: str = ""
+
+
+class BomAskBody(BaseModel):
+    question: str = ""
 
 
 class KickoffBody(BaseModel):
@@ -236,6 +242,7 @@ async def event_generator(session: SessionState):
 # ---------------------------------------------------------------------------
 
 _DATASOURCE_PREVIEW = {
+    "neo4j-bom":       lambda: bom_graph.validate_bom() or mock_data.get_bom_data(),
     "sap-mdg":         lambda: mock_data.get_bom_data(),
     "sap-mm":          lambda: mock_data.get_supplier_atp(),
     "sap-ibp":         lambda: mock_data.get_demand_history(),
@@ -297,6 +304,75 @@ async def datasource_preview(source_id: str):
     if fn is None:
         raise HTTPException(status_code=404, detail=f"No preview for '{source_id}'")
     return fn()
+
+
+# ---------------------------------------------------------------------------
+# BOM graph (Neo4j) — interactive visualization endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/bom/search")
+async def bom_search(q: str = "", limit: int = 25):
+    """Lookup BOM materials by code or description for the explorer search box."""
+    result = bom_graph.search_materials(q, limit)
+    if result is None:
+        raise HTTPException(status_code=503, detail="BOM graph unavailable")
+    return result
+
+
+@app.get("/api/bom/graph")
+async def bom_graph_view(material: str, direction: str = "down", levels: int = 10):
+    """Node+edge subgraph for visualizing a material's explosion (down) or where-used (up)."""
+    if not material:
+        raise HTTPException(status_code=422, detail="material is required")
+    result = bom_graph.bom_subgraph(material, direction, levels)
+    if result is None:
+        raise HTTPException(status_code=503, detail="BOM graph unavailable")
+    return result
+
+
+def _extract_cypher(text: str) -> str:
+    """Pull a Cypher statement out of an LLM reply, tolerating ```cypher fences."""
+    t = (text or "").strip()
+    fence = re.search(r"```(?:cypher)?\s*(.+?)```", t, re.S | re.I)
+    if fence:
+        t = fence.group(1).strip()
+    return t.rstrip(";").strip()
+
+
+async def _bom_nl_to_cypher(question: str) -> str:
+    """Translate a natural-language BOM question into a single read-only Cypher query."""
+    from agents.orchestrator import get_client, get_deployment
+    loop = asyncio.get_event_loop()
+    system = (
+        "You translate a natural-language question about a Neo4j BOM graph into ONE read-only Cypher "
+        "query. Output ONLY the Cypher — no prose, no markdown fences. " + _BOM_SCHEMA_HINT
+    )
+    resp = await loop.run_in_executor(
+        None,
+        lambda: llm_audit.audited_create(
+            get_client(), session=None, agent="bom-nl2cypher", model=get_deployment(),
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": question}],
+            temperature=0,
+            max_completion_tokens=400,
+        ),
+    )
+    return _extract_cypher(resp.choices[0].message.content or "")
+
+
+@app.post("/api/bom/ask")
+async def bom_ask(body: BomAskBody):
+    """Natural-language → read-only Cypher → graph/table. Used by the BOM Explorer NL box."""
+    question = (body.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question is required")
+    try:
+        cypher = await _bom_nl_to_cypher(question)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Could not translate question: {exc}")
+    result = bom_graph.run_cypher(cypher)
+    if result is None:
+        raise HTTPException(status_code=503, detail="BOM graph unavailable")
+    result["question"] = question
+    return result
 
 
 @app.post("/api/sessions/suggest-name")
@@ -473,7 +549,24 @@ CHAT_SYSTEM_PROMPT = (
     "You can also ACT on the user's behalf: start_cycle launches a new planning run, and "
     "answer_decision submits a human decision to a run that is paused awaiting one. Only take these "
     "actions when the user clearly asks; for answer_decision, confirm which session and option first "
-    "if there's any ambiguity. After acting, briefly state what you did (include the run name)."
+    "if there's any ambiguity. After acting, briefly state what you did (include the run name).\n\n"
+    "You can also answer questions about the BOM (bill of materials) graph, owned by the Master Data "
+    "agent. Use bom_search to find a material by code/description; bom_explode to break an assembly into "
+    "its multi-level components; bom_where_used to find which assemblies consume a component; bom_quality "
+    "for overall structural data-quality (orphans, completeness, type mix). For open-ended structural "
+    "questions that those don't cover, use bom_query with a READ-ONLY Cypher query (the system rejects any "
+    "write). When you return BOM results, offer the user a link to visualize them at "
+    "/bom-explorer?material=<code> so they can see the graph."
+)
+
+# Shared schema blurb so the chat tool + NL→Cypher endpoint describe the graph identically.
+_BOM_SCHEMA_HINT = (
+    "Neo4j BOM graph schema: (:BOM {Material, MaterialDesc, MaterialType})-[:PARENT_OF {Quantity}]->(:BOM). "
+    "`Material` is the unique key; PARENT_OF goes parent->child (assembly->component). MaterialType values "
+    "include FERT (finished goods), SFUB/SFPB/SFPR (semi-finished), ROH (raw material), plus PROD/SUB/VERP/etc. "
+    "Use only the :BOM label. The query MUST be read-only (MATCH/OPTIONAL MATCH/WHERE/WITH/RETURN/ORDER BY/"
+    "UNWIND/LIMIT only — never CREATE/MERGE/SET/DELETE/REMOVE/DROP/CALL). Always include a LIMIT (<= 200). "
+    "To produce a visualizable graph, RETURN whole paths or nodes+relationships; otherwise RETURN scalar columns."
 )
 
 CHAT_TOOLS = [
@@ -528,7 +621,77 @@ CHAT_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "bom_search",
+            "description": "Find BOM materials by code (substring) or description (case-insensitive).",
+            "parameters": {
+                "type": "object",
+                "properties": {"query": {"type": "string", "description": "Code or description text to search."}},
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bom_explode",
+            "description": "Explode an assembly into its multi-level components (with rolled-up quantities).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "material": {"type": "string", "description": "Material code of the assembly."},
+                    "max_levels": {"type": "integer", "description": "Explosion depth, 1–10 (default 10)."},
+                },
+                "required": ["material"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bom_where_used",
+            "description": "Find every assembly that directly or indirectly consumes a given component.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "material": {"type": "string", "description": "Material code of the component."},
+                    "max_levels": {"type": "integer", "description": "Upward depth, 1–10 (default 10)."},
+                },
+                "required": ["material"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bom_quality",
+            "description": "Structural data-quality summary of the BOM graph (orphans, completeness, type mix).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "bom_query",
+            "description": (
+                "Run a custom READ-ONLY Cypher query against the BOM graph for open-ended / conditional "
+                "questions not covered by the other bom_* tools. The system rejects any non-read query. "
+                + _BOM_SCHEMA_HINT
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"cypher": {"type": "string", "description": "A single read-only Cypher query."}},
+                "required": ["cypher"],
+            },
+        },
+    },
 ]
+
+
+def _explorer_link(material: str | None) -> str:
+    return f"/bom-explorer?material={material}" if material else "/bom-explorer"
 
 
 def _chat_list_sessions() -> list[dict]:
@@ -584,6 +747,31 @@ async def _chat_answer_decision(session_id: str, answer: str) -> dict:
     return {"session_id": session_id, "name": s.name, "answer": answer, "submitted": True}
 
 
+def _unavailable_or(result):
+    """BOM tools return None when Neo4j is down — surface a clear message to the model."""
+    return result if result is not None else {"error": "BOM graph unavailable (Neo4j not reachable)."}
+
+
+def _chat_bom_dispatch(name: str, args: dict):
+    if name == "bom_search":
+        return _unavailable_or(bom_graph.search_materials(args.get("query", ""), 20))
+    if name == "bom_explode":
+        r = bom_graph.explode_bom(args.get("material", ""), args.get("max_levels", 10))
+        if r and r.get("found"):
+            r["explorer_url"] = _explorer_link(args.get("material"))
+        return _unavailable_or(r)
+    if name == "bom_where_used":
+        r = bom_graph.where_used(args.get("material", ""), args.get("max_levels", 10))
+        if r is not None:
+            r["explorer_url"] = _explorer_link(args.get("material"))
+        return _unavailable_or(r)
+    if name == "bom_quality":
+        return _unavailable_or(bom_graph.validate_bom())
+    if name == "bom_query":
+        return _unavailable_or(bom_graph.run_cypher(args.get("cypher", "")))
+    return None
+
+
 async def _chat_dispatch(name: str, args: dict):
     if name == "list_sessions":
         return _chat_list_sessions()
@@ -593,6 +781,8 @@ async def _chat_dispatch(name: str, args: dict):
         return _chat_start_cycle(args.get("goal", ""), args.get("name", ""))
     if name == "answer_decision":
         return await _chat_answer_decision(args.get("session_id", ""), args.get("answer", ""))
+    if name.startswith("bom_"):
+        return _chat_bom_dispatch(name, args)
     return {"error": f"Unknown tool '{name}'"}
 
 
