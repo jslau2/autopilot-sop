@@ -2,16 +2,22 @@ from __future__ import annotations
 
 """
 Alerts & notifications. Derives actionable alerts from live session state
-(a run paused for a decision, a KPI breaching threshold) and optionally relays
-them to a webhook (Slack/Teams/email-relay) — best-effort, stdlib only.
+(a run paused for a decision, a KPI breaching threshold) and relays them to any
+enabled channel — generic webhook (Slack/Teams), Telegram, and/or email —
+best-effort, stdlib only. SMTP server credentials live in backend/.env
+(SMTP_HOST/PORT/USER/PASS/FROM); everything else is configured from the UI.
 """
 
 import json
 import logging
+import os
+import smtplib
 import sqlite3
 import threading
 import time
+import urllib.parse
 import urllib.request
+from email.message import EmailMessage
 from pathlib import Path
 
 log = logging.getLogger("notifications")
@@ -85,24 +91,41 @@ def compute_alerts(sessions: dict) -> list[dict]:
     return alerts
 
 
-# --- webhook config -------------------------------------------------------
+# --- channel config -------------------------------------------------------
+_DEFAULTS = {
+    # generic webhook (Slack / Teams incoming webhooks)
+    "webhook_url": "",
+    "enabled": False,           # legacy name kept = webhook channel toggle
+    # telegram bot
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "telegram_enabled": False,
+    # email (recipient in db; SMTP server creds in backend/.env)
+    "email_to": "",
+    "email_enabled": False,
+}
+
+
 def get_config() -> dict:
+    cfg = dict(_DEFAULTS)
     try:
         with _lock:
             r = _db().execute("SELECT v FROM notify_config WHERE k='config'").fetchone()
         if r is not None:
-            return json.loads(r["v"] or "{}")
+            cfg.update(json.loads(r["v"] or "{}"))
     except Exception:
         log.exception("read notify config")
-    return {"webhook_url": "", "enabled": False}
+    return cfg
 
 
-def set_config(webhook_url: str | None, enabled: bool | None) -> dict:
+def set_config(**fields) -> dict:
+    """Patch config. Only keys present in ``_DEFAULTS`` (and not None) are saved;
+    strings are trimmed, booleans coerced."""
     cfg = get_config()
-    if webhook_url is not None:
-        cfg["webhook_url"] = webhook_url.strip()
-    if enabled is not None:
-        cfg["enabled"] = bool(enabled)
+    for k, v in fields.items():
+        if v is None or k not in _DEFAULTS:
+            continue
+        cfg[k] = v.strip() if isinstance(v, str) else bool(v)
     try:
         with _lock:
             conn = _db()
@@ -116,9 +139,25 @@ def set_config(webhook_url: str | None, enabled: bool | None) -> dict:
     return cfg
 
 
-def dispatch_webhook(text: str) -> dict:
-    """POST a simple JSON payload to the configured webhook. Best-effort."""
-    cfg = get_config()
+def public_state(cfg: dict | None = None) -> dict:
+    """What the UI is allowed to see — toggles + whether each channel is
+    configured, never the secrets themselves."""
+    cfg = cfg or get_config()
+    smtp_ready = bool(os.environ.get("SMTP_HOST"))
+    return {
+        # back-compat: top-level enabled/configured = webhook channel
+        "enabled": bool(cfg.get("enabled")),
+        "configured": bool(cfg.get("webhook_url")),
+        "telegram_enabled": bool(cfg.get("telegram_enabled")),
+        "telegram_configured": bool(cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id")),
+        "email_enabled": bool(cfg.get("email_enabled")),
+        "email_configured": bool(cfg.get("email_to") and smtp_ready),
+        "smtp_ready": smtp_ready,
+    }
+
+
+# --- per-channel senders (best-effort, run off-thread) ---------------------
+def _send_webhook(text: str, cfg: dict) -> dict:
     url = cfg.get("webhook_url", "")
     if not url:
         return {"sent": False, "reason": "no webhook configured"}
@@ -133,3 +172,108 @@ def dispatch_webhook(text: str) -> dict:
 
     threading.Thread(target=_post, daemon=True).start()
     return {"sent": True, "url_host": url.split("/")[2] if "//" in url else url[:24], "ts": time.time()}
+
+
+def _send_telegram(text: str, cfg: dict) -> dict:
+    token = cfg.get("telegram_bot_token", "")
+    chat_id = cfg.get("telegram_chat_id", "")
+    if not (token and chat_id):
+        return {"sent": False, "reason": "telegram not configured"}
+
+    def _post():
+        try:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = urllib.parse.urlencode({
+                "chat_id": chat_id,
+                "text": text,
+                "disable_web_page_preview": "true",
+            }).encode()
+            req = urllib.request.Request(url, data=data)
+            urllib.request.urlopen(req, timeout=5)
+        except Exception as exc:
+            log.warning("telegram send failed: %s", exc)
+
+    threading.Thread(target=_post, daemon=True).start()
+    return {"sent": True, "chat_id": chat_id, "ts": time.time()}
+
+
+def _send_email(text: str, cfg: dict) -> dict:
+    to = cfg.get("email_to", "")
+    host = os.environ.get("SMTP_HOST", "")
+    if not to:
+        return {"sent": False, "reason": "no recipient configured"}
+    if not host:
+        return {"sent": False, "reason": "SMTP not configured (set SMTP_HOST in backend/.env)"}
+
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER", "")
+    pwd = os.environ.get("SMTP_PASS", "")
+    sender = os.environ.get("SMTP_FROM", user or "autopilot-sop@localhost")
+    recipients = [a.strip() for a in to.replace(";", ",").split(",") if a.strip()]
+
+    def _post():
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = "Autopilot S&OP alert"
+            msg["From"] = sender
+            msg["To"] = ", ".join(recipients)
+            msg.set_content(text)
+            with smtplib.SMTP(host, port, timeout=10) as smtp:
+                smtp.ehlo()
+                if smtp.has_extn("starttls"):
+                    smtp.starttls()
+                    smtp.ehlo()
+                if user and pwd:
+                    smtp.login(user, pwd)
+                smtp.send_message(msg)
+        except Exception as exc:
+            log.warning("email send failed: %s", exc)
+
+    threading.Thread(target=_post, daemon=True).start()
+    return {"sent": True, "to": recipients, "ts": time.time()}
+
+
+def dispatch(text: str, *, force: bool = False) -> dict:
+    """Fan a message out to every enabled channel. ``force`` ignores the per-channel
+    toggle (used by the 'send test' button so a freshly-saved channel can be tried)."""
+    cfg = get_config()
+    results: dict[str, dict] = {}
+    if force or cfg.get("enabled"):
+        results["webhook"] = _send_webhook(text, cfg)
+    if force or cfg.get("telegram_enabled"):
+        results["telegram"] = _send_telegram(text, cfg)
+    if force or cfg.get("email_enabled"):
+        results["email"] = _send_email(text, cfg)
+    sent = [c for c, r in results.items() if r.get("sent")]
+    return {"sent": bool(sent), "channels": results, "reason": None if sent else "no channel enabled/configured"}
+
+
+# Back-compat alias — older callers used dispatch_webhook(text).
+def dispatch_webhook(text: str) -> dict:
+    return dispatch(text, force=True)
+
+
+# --- auto-dispatch of newly-raised alerts ----------------------------------
+_dispatched: set[str] = set()
+_dispatch_lock = threading.Lock()
+
+
+def dispatch_new_alerts(alerts: list[dict]) -> None:
+    """Push any alert we haven't relayed yet to the enabled channels, once.
+    Called from the notifications poll so alerts reach Telegram/email/webhook
+    even when nobody has the UI open. Ids that drop off re-arm for next time."""
+    cfg = get_config()
+    if not (cfg.get("enabled") or cfg.get("telegram_enabled") or cfg.get("email_enabled")):
+        # nothing to relay to; still track ids so we don't blast on first enable
+        with _dispatch_lock:
+            _dispatched.intersection_update({a["id"] for a in alerts})
+        return
+    with _dispatch_lock:
+        active = {a["id"] for a in alerts}
+        _dispatched.intersection_update(active)
+        fresh = [a for a in alerts if a["id"] not in _dispatched]
+        for a in fresh:
+            _dispatched.add(a["id"])
+    for a in fresh:
+        icon = "⏸" if a.get("type") == "decision" else "⚠"
+        dispatch(f"{icon} Autopilot S&OP — {a.get('message', '')}")

@@ -1074,35 +1074,49 @@ async def feedback_summary():
 # Alerts & notifications — derived from live session state + optional webhook
 # ---------------------------------------------------------------------------
 class WebhookBody(BaseModel):
+    # generic webhook (Slack / Teams)
     webhook_url: str | None = None
     enabled: bool | None = None
+    # telegram
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_enabled: bool | None = None
+    # email
+    email_to: str | None = None
+    email_enabled: bool | None = None
 
 
 @app.get("/api/notifications")
 async def get_notifications():
     from features import notifications
-    return {"alerts": notifications.compute_alerts(sessions)}
+    alerts = notifications.compute_alerts(sessions)
+    # Relay any newly-raised alert to the enabled channels (Telegram/email/webhook),
+    # once each, so they land even when no UI is open.
+    notifications.dispatch_new_alerts(alerts)
+    return {"alerts": alerts}
 
 
 @app.get("/api/notifications/webhook")
 async def get_webhook():
     from features import notifications
-    cfg = notifications.get_config()
-    # don't echo the full URL back for safety; just whether it's set
-    return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
+    # never echo secrets back; just toggles + whether each channel is configured
+    return notifications.public_state()
 
 
 @app.put("/api/notifications/webhook")
 async def set_webhook(body: WebhookBody):
     from features import notifications
-    cfg = notifications.set_config(body.webhook_url, body.enabled)
-    return {"enabled": cfg.get("enabled", False), "configured": bool(cfg.get("webhook_url"))}
+    notifications.set_config(**body.model_dump())
+    return notifications.public_state()
 
 
 @app.post("/api/notifications/test")
 async def test_webhook():
     from features import notifications
-    return notifications.dispatch_webhook("✅ Autopilot S&OP test alert — your webhook is connected.")
+    return notifications.dispatch(
+        "✅ Autopilot S&OP test alert — your notifications are connected.",
+        force=True,
+    )
 
 
 # ---------------------------------------------------------------------------
