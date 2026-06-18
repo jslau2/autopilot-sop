@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Home from './pages/Home';
 import PipelineView from './pages/PipelineView';
 import AgentConsole from './pages/AgentConsole';
@@ -12,6 +12,7 @@ import Schedules from './pages/Schedules';
 import Admin from './pages/Admin';
 import PlannerChat from './components/PlannerChat';
 import NotificationCenter from './components/NotificationCenter';
+import SplashScreen from './components/SplashScreen';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -22,9 +23,19 @@ function ScrollToTop() {
 export default function App() {
   // Public read-only share pages get no app chrome (chat / notifications).
   const isShare = useLocation().pathname.startsWith('/share/');
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('sop-splash-seen'));
+
+  const shouldShowSplash = showSplash && !isShare;
+
   return (
     <>
       <ScrollToTop />
+      {shouldShowSplash && (
+        <SplashScreen onComplete={() => {
+          sessionStorage.setItem('sop-splash-seen', '1');
+          setShowSplash(false);
+        }} />
+      )}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/pipeline" element={<PipelineView />} />
