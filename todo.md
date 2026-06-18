@@ -2,11 +2,94 @@
 
 Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
-## ★★★ TOP PRIORITY — Real Intelligence (make it trustworthy · production-ready · commercially defensible)
+## ★★★ TOP PRIORITY — Phase 1 MVP: Two-stage rough-cut capacity check on real SAP plans
 
-> Everything below this section is UI shell. These items are what turn the app from
-> a demo into a product a supply chain planner would stake their job on.
-> Suggested order: SAP read → forecasting → accuracy tracking → optimization → negotiation → learning → SAP write-back.
+> Product thesis (converged 2026-05-30). The planner's real S&OP loop has two capacity
+> checks SAP never does for itself, both gated on capacity that lives only in planners'
+> heads (tribal):
+>
+> **Stage 1 — Assembly-line loading (in-house).** SAP receives the latest FG plan from
+> upstream IBP (sales demand). The planner checks it against **assembly-line capacity** and
+> produces a feasible **loading plan** (what each line builds, when). The loading plan goes
+> back into SAP.
+> **Stage 2 — Supplier capacity (procurement).** From the loading plan, SAP MRP generates
+> **planned orders** (component PR/PO demand). The planner checks those against **supplier
+> capacity** and flags over-allocation.
+>
+> SAP plans both stages on infinite capacity. The MVP turns each into a *feasible, agreed*
+> plan: ingest the SAP files from the local folder, check against the tribal capacity, flag
+> the breaches, and drive the human consensus (re-time / reallocate / dual-source) —
+> capturing the line- and supplier-capacity truth SAP never holds.
+>
+> We do NOT rebuild MRP, BOM, forecasting/IBP, or requirements optimization — upstream
+> systems already do all of that. Our value is the **two capacity reality checks +
+> consensus + the living constraint model.**
+>
+> Altitude: rough-cut (RCCP) — line-level loading and supplier-level allocation, NOT
+> detailed work-center sequencing / finite scheduling (that's APS — see future scope).
+>
+> Why this beats the old "rebuild the intelligence" plan: the multi-agent pipeline, human
+> checkpoint, audit/report/share, and approvals are all built. The MVP just points the
+> finished pipeline at REAL computations so its output stops being asserted constants and
+> becomes true. Smallest real value → planner adoption → feedback → climb the longer arc
+> below.
+
+### 1. Real data layer — ingest SAP snapshots from the local folder ("target, not gate")
+- [ ] **Data Resolver** — read the daily files the scheduled job drops into a local folder
+  and map each *toward* a canonical schema. The contract is a target the agent maps toward,
+  NOT a gate the data must pass: deterministic column hints → LLM semantic inference (on
+  names + sample values) → confidence score → confirm with the user ONLY when uncertain →
+  remember the mapping so it's never asked twice. Priority chain: user override → latest
+  snapshot → mock fallback (keeps demo mode alive).
+- [ ] **SAP-format robustness** — TSV/CRLF, trailing-minus negatives (`720-`), misspelled
+  headers (`Sales Forcast`), mixed UOM, multi-row-per-material roll-up, and filename-encoded
+  metadata (domain/plant/date, e.g. `SSTK2100…`, `2100FGPLAN…`).
+- [ ] **Data Steward** — elevate the Master Data agent from BOM-only to universal: it
+  profiles the resolved data, reports what it understood vs. what's missing, and coaches the
+  user to upload/correct — it never rejects. Parsing is deterministic Python + an
+  orchestrator pre-flight; the agent narrates and grades.
+- Sources & open dependencies:
+  - FG demand plan (IBP output; PCD Plan v001) ✅ sampled — Stage 1 input.
+  - Stock snapshot ✅ sampled — starting position.
+  - **Needed: FG→assembly-line eligibility** (from `Production Version`? or tribal) — Stage 1.
+  - **Needed: MRP planned-order output** (component PR/PO demand per period, with vendor if
+    present, else tribal) — Stage 2.
+
+### 2. Tribal capacity model — the proprietary, compounding asset (two resource types)
+- [ ] **Assembly-line capacity** — planners define line throughput/availability per period,
+  and which lines can build which FG families. Stage-1 input; entirely tribal.
+- [ ] **Supplier capacity** — planners define supplier (× component × period) ceilings,
+  allocation limits, qualified alternative sources. Stage-2 input; entirely tribal. Start
+  with the Pareto-few that actually bind.
+- [ ] **Living constraint model** — planner corrections persist and compound every cycle.
+  This is the moat SAP doesn't have and the real first job of the learning loop.
+
+### 3. The two-stage check + consensus loop — the value moment
+- [ ] **Stage 1 — line loading** — allocate the FG plan to assembly lines within tribal
+  capacity; flag overloaded lines/periods; produce the feasible loading plan.
+- [ ] **Stage 2 — supplier check** — sum MRP planned-order demand per supplier × period,
+  compare to the captured ceiling, flag the breaches. Honest, auditable arithmetic.
+- [ ] **Replace the asserted plan with the computed one** — the Planner's hardcoded KPIs and
+  scripted decision (constants in `agent_defs.py` + `orchestrator._handle_complete_session`)
+  give way to the real results; the capacity + procurement + risk agents narrate real gaps.
+- [ ] **Real human checkpoint(s)** — e.g. "Line L3 overloaded +20% in W24–W26 — overtime /
+  reallocate / defer?" and "Supplier X over-allocated +40% — confirm / re-time / dual-source?"
+  Capture the resolution + any new constraint back into the model; approve + share the plan.
+
+### 4. Deprioritized for MVP — upstream systems already do these (don't rebuild)
+- Forecasting / demand sensing — IBP already produces the FG plan; we ingest it.
+- BOM explosion / component netting — MRP already produces planned orders + projected balance.
+- MILP optimization & detailed finite scheduling — out of MVP (the latter is APS).
+
+---
+
+## ★★ The longer Real-Intelligence arc (post-MVP — pursue with planner feedback)
+
+> Kept from the original plan. The RCCP MVP above reframes it: #1 (data layer) is now
+> MVP §1; forecasting (#2) and optimization (#4) are deprioritized because MRP does them;
+> negotiation (#5) ≈ the consensus loop; learning (#6) ≈ the supplier-capacity model.
+> **Accuracy tracking (#3) and SAP write-back (#7) remain the genuine next frontiers**
+> once the MVP earns trust.
 
 ### 1. Real data layer — the non-negotiable foundation
 - [ ] **SAP S/4HANA read integration** — replace `mock_data.py` tool responses with
@@ -247,6 +330,17 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   `/api/conversations[...]`; threads persisted via `PUT .../messages`. The old
   single-thread `sop-chat-history` is migrated once on first open. **Markdown**
   in chat bubbles also rendered (dependency-free).
+
+## Future scope — beyond S&OP (heavier, different products)
+
+- [ ] **APS / finite-capacity scheduling** — detailed, resource-level finite scheduling
+  (sequencing, setup/changeover, lot-sizing) for in-house work-centers — the layer the MVP
+  deliberately excludes. A genuinely different and much heavier product than rough-cut
+  S&OP; pursue only after the supplier-capacity RCCP MVP is sticky.
+- [ ] **S&OE — Sales & Operations Execution** — the short-horizon, weekly/daily execution
+  layer below S&OP: react to today's actuals, expedites, and disruptions and re-balance
+  the near-term plan. Natural extension once the monthly S&OP loop is trusted; pairs with
+  the in-house finite scheduling above.
 
 ## Known limitations (by design, document if asked)
 
