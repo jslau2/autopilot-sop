@@ -18,6 +18,7 @@ from session import SessionState
 from .agent_defs import AGENT_DEFS
 import mock_data
 import bom_graph
+from engines import forecast_client, planning_client, handoff
 
 # ---------------------------------------------------------------------------
 # Azure OpenAI client — lazy init so missing creds don't break imports
@@ -79,12 +80,15 @@ TOOL_DISPATCH: dict = {
         "standard": max(0, len(args.get("gaps", [])) - 3),
         "recommended_action": "Issue urgent POs for DRG-XTR-001 and BRK-HYD-XTR within 48 hours",
     },
-    # demand
-    "get_demand_history": lambda args: mock_data.get_demand_history(),
-    "run_forecast_models": lambda args: mock_data.run_forecast_models(
+    # demand — live booking-curve engine (forecast_client), falls back to mock data
+    "get_demand_history": lambda args: forecast_client.get_demand_history()
+    or mock_data.get_demand_history(),
+    "run_forecast_models": lambda args: forecast_client.run_forecast_models(
         args.get("horizon_weeks", 13)
-    ),
-    "generate_demand_plan": lambda args: {
+    ) or mock_data.run_forecast_models(args.get("horizon_weeks", 13)),
+    "generate_demand_plan": lambda args: forecast_client.generate_demand_plan(
+        args.get("winning_model"), args.get("adjust_spike_pct", 34.0)
+    ) or {
         "model": args.get("winning_model"),
         "total_units": 312_400,
         "spike_skus": 1,
@@ -160,10 +164,11 @@ TOOL_DISPATCH: dict = {
         "expedite_orders": 8,
         "bottleneck_lines_addressed": args.get("bottleneck_lines", []),
     },
-    # optimizer
-    "run_milp_optimization": lambda args: mock_data.run_milp_optimization(
+    # optimizer — live fg-planning-optimizer (planning_client), falls back to mock data.
+    # If the Demand agent forecast ran this session, the MILP solves against it.
+    "run_milp_optimization": lambda args: planning_client.run_milp_optimization(
         args.get("constraints", {})
-    ),
+    ) or mock_data.run_milp_optimization(args.get("constraints", {})),
     "compute_pareto_frontier": lambda args: {
         "scenarios": args.get("num_scenarios", 3),
         "frontier_points": [
@@ -228,8 +233,16 @@ TOOL_DISPATCH: dict = {
 }
 
 
-def _execute_tool(name: str, args: dict) -> dict:
-    """Execute a tool from TOOL_DISPATCH, returning an error dict on failure."""
+def _execute_tool(name: str, args: dict, session: SessionState | None = None) -> dict:
+    """
+    Execute a tool from TOOL_DISPATCH, returning an error dict on failure.
+
+    Binds the active session (thread-local) so engine-backed tools can share a
+    cross-tool hand-off within a run (e.g. the forecast -> optimizer demand
+    chain). Runs synchronously; the caller offloads it to a thread so a slow
+    engine (HTTP / MILP solve) never blocks the event loop.
+    """
+    handoff.bind_session(session)
     try:
         fn = TOOL_DISPATCH[name]
         result = fn(args)
@@ -345,7 +358,11 @@ async def run_worker_agent(
                     step_id=task_id,
                 )
 
-                tool_result = _execute_tool(tool_name, args)
+                # Offload to a thread: an engine-backed tool may do blocking HTTP
+                # or wait on a MILP solve, which must not stall the event loop.
+                tool_result = await loop.run_in_executor(
+                    None, _execute_tool, tool_name, args, session
+                )
 
                 logger.debug("[%s] tool_result: %s → %s", agent_id, tool_name, str(tool_result)[:300])
                 await session.emit_log(

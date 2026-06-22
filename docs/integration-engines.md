@@ -1,6 +1,19 @@
 # Design Doc — Integrating the Deterministic Engines
 
-**Status:** Proposed · **Date:** 2026-06-22 · **Owner:** S&OP platform
+**Status:** Implemented · **Date:** 2026-06-22 · **Owner:** S&OP platform
+
+> **Implementation note (shipped):** Phases 0–3 are built and verified end to
+> end against live engines. In `autopilot-sop` the `backend/engines/` package
+> (`forecast_client`, `planning_client`, `grain_map`, `handoff`) wires the
+> booking-curve and optimizer engines into the `demand` and `optimizer` agents
+> through `workers.TOOL_DISPATCH`, with `or mock_data` fallback; tool dispatch is
+> now offloaded to a thread so a slow solve never blocks the event loop. The
+> booking-curve repo gained `predict.py` + `serve.py`; the optimizer repo now
+> boots as a lean sidecar (lazy LLM/DB imports). Verified: demand history,
+> forecast and demand-plan tools return live data; the forecast hands off to the
+> optimizer, which solves against it when a master-data crosswalk exists and
+> degrades safely to its own demand otherwise. The remaining open item is the
+> production `sales_model_code -> Material` crosswalk (§8/§10).
 
 How the two standalone engines —
 [`fg-planning-optimizer`](https://github.com/jslau2/fg-planning-optimizer) (MIP/LP

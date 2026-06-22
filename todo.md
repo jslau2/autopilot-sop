@@ -27,15 +27,17 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   ground truth instead of hardcoded assumptions.
 
 ### 2. Real forecasting engine — replace AutoML Forecast agent's mock tools
-- [ ] **Statistical baseline** — Prophet or `statsforecast` hierarchical time-series
-  for SKU-level demand; bottom-up aggregation across the 847-SKU catalogue.
-- [ ] **ML layer** — LightGBM/XGBoost with features: seasonality, promotions, price,
-  channel, weather. Materially outperforms statistical baseline on intermittent demand.
+> **DONE (booking-curve engine wired):** the `demand` agent's tools now call the
+> incoming-sales-booking-curve XGBoost engine over HTTP (`backend/engines/forecast_client.py`)
+> with mock fallback. See `docs/integration-engines.md`.
+- [x] **ML layer** — XGBoost booking-ratio model (incoming-sales-booking-curve);
+  the demand agent reports real held-out WMAPE.
+- [x] **LLM agent role shift** — agent interprets the engine output; accuracy is the
+  engine's pinned validation metric, auditable independently of the LLM.
+- [ ] **Statistical baseline** — Prophet/`statsforecast` as a tournament entrant
+  alongside the GBDT engine.
 - [ ] **Prediction intervals, not point forecasts** — the Risk agent needs probability
   distributions; single-number forecasts hide the uncertainty that drives safety stock.
-- [ ] **LLM agent role shift** — agent interprets the model output, flags anomalies,
-  adjusts for known events (promos, NPIs) the model doesn't see. Forecast accuracy
-  becomes auditable and improvable independently of the LLM.
 
 ### 3. Plan accuracy tracking — proves (or disproves) the system is working
 - [ ] **Actuals ingestion loop** — pull SAP delivery actuals weekly; compare to the
@@ -49,13 +51,16 @@ Ideas for future work. Roughly ordered by leverage. Tick off as done.
   Creates accountability and a prioritised improvement backlog.
 
 ### 4. Real optimization engine — replace Plan Optimizer agent's mock tools
-- [ ] **LP/MIP solver** — `PuLP` or `OR-Tools` mixed-integer program: maximise OTIF
-  subject to capacity by plant/line, safety stock floors, lead-time constraints,
-  budget cap. Deterministic, auditable, reproducible — properties an LLM alone can't
-  provide for a plan that moves real inventory.
-- [ ] **LLM agent as interpreter** — translates business constraints into solver
-  parameters, runs the solver tool, explains the output and trade-offs in plain
-  language. Optimization is math; communication is LLM.
+> **DONE (fg-planning-optimizer wired):** `run_milp_optimization` now calls the
+> fg-planning-optimizer MIP/LP service (`backend/engines/planning_client.py`) with
+> mock fallback, and consumes the demand agent's forecast when a crosswalk exists
+> (forecast→optimizer chain). See `docs/integration-engines.md`.
+- [x] **LP/MIP solver** — PuLP + HiGHS CLSP-with-setups (fg-planning-optimizer);
+  capacity-by-line, setup costs, shortage penalties; deterministic and auditable.
+- [x] **LLM agent as interpreter** — the optimizer agent passes constraints as solver
+  params, runs the solve tool, and explains the schedule/trade-offs.
+- [ ] **Pareto frontier / operating-point** — `compute_pareto_frontier` and
+  `select_operating_point` still mock; run multi-weight solves to make them real.
 - [ ] **Sensitivity analysis** — solver re-runs with ±10% demand and capacity to show
   how fragile the plan is. Directly feeds the what-if simulator with real numbers.
 

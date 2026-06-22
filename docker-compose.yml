@@ -1,0 +1,65 @@
+# Local dev topology for Autopilot S&OP + its two deterministic engines.
+#
+#   orchestrator (this repo, :8000)  -> the multi-agent S&OP backend
+#   forecast     (:8200)             -> incoming-sales-booking-curve (demand)
+#   optimizer    (:8100)             -> fg-planning-optimizer (MIP/LP)
+#
+# Assumes the three repos are checked out side by side:
+#   ../autopilot-sop  ../fg-planning-optimizer  ../incoming-sales-booking-curve
+#
+# Engines run from python:3.11-slim with pip-install-on-start (no Dockerfiles
+# needed). The orchestrator reaches them by service name on the compose network.
+# Put Azure creds in backend/.env (gitignored).
+#
+#   docker compose up                # start all three
+#   docker compose up optimizer      # just one engine
+#
+# The frontend (Vite) is run separately: cd frontend && npm run dev.
+
+services:
+  forecast:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ../incoming-sales-booking-curve:/app
+    command: >
+      bash -lc "pip install -q -r requirements.txt &&
+                python prepare.py &&
+                ([ -f models/xgb_booking_ratio.json ] || python train.py) &&
+                python -m uvicorn serve:app --host 0.0.0.0 --port 8200"
+    ports:
+      - "8200:8200"
+
+  optimizer:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ../fg-planning-optimizer:/app
+    # Lean sidecar: solver core + FastAPI only (LLM/DB imports are lazy).
+    command: >
+      bash -lc "pip install -q pulp highspy pandas numpy python-dotenv
+                fastapi 'uvicorn[standard]' pydantic pydantic-settings
+                sse-starlette python-multipart &&
+                python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8100"
+    ports:
+      - "8100:8100"
+
+  orchestrator:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    volumes:
+      - ./:/app
+    command: >
+      bash -lc "pip install -q -e . &&
+                python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+    environment:
+      FORECAST_ENGINE_URL: http://forecast:8200
+      OPTIMIZER_ENGINE_URL: http://optimizer:8100
+      OPTIMIZER_MAX_WAIT_SEC: "180"
+    env_file:
+      - backend/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - forecast
+      - optimizer

@@ -46,6 +46,17 @@ Backend:
   `agents:[]` on `POST /api/sessions` (or kickoff) → `SessionState.active_agents`;
   enable/disable is an `enabled` flag in `agent_config` (planner never disable-able).
 - `backend/workers.py` — how each specialist agent runs its tool-use loop.
+  `TOOL_DISPATCH` is the seam where agent tools resolve to compute; engine-backed
+  tools call `backend/engines/*` and fall back to `mock_data` via `or`. Each tool
+  call is offloaded to a thread (`run_in_executor`) so a slow engine (HTTP / MILP
+  solve) never blocks the event loop.
+- `backend/engines/` — clients for the real deterministic engines, mirroring the
+  `bom_graph.py` contract (config from `.env`, `None` on failure → mock fallback).
+  `forecast_client` → incoming-sales-booking-curve (demand agent); `planning_client`
+  → fg-planning-optimizer MIP/LP (optimizer agent); `grain_map` + `handoff` chain
+  the demand forecast into the optimizer's demand input within a run. URLs in
+  `.env` (`FORECAST_ENGINE_URL`, `OPTIMIZER_ENGINE_URL`). See
+  `docs/integration-engines.md`; run all three services via `docker-compose.yml`.
 - `backend/mock_data.py` — the data/compute behind agent tools + Data Sources
   preview.
 - `backend/session.py` — `SessionState` (events, steps, kpis, status, …) and
