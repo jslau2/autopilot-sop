@@ -2,6 +2,12 @@
 
 Ideas for future work. Roughly ordered by leverage. Tick off as done.
 
+> **Engine integration plan:** `docs/integration-engines.md` — how
+> `fg-planning-optimizer` (MIP/LP) and `incoming-sales-booking-curve` (forecast)
+> plug in behind the `optimizer` and `demand` agents via the `workers.TOOL_DISPATCH`
+> seam + `.env` HTTP clients with mock fallback (the `bom_graph.py` pattern). Covers
+> §2 (forecasting) and the optimization line below.
+
 ## ★★★ TOP PRIORITY — Real Intelligence (make it trustworthy · production-ready · commercially defensible)
 
 > Everything below this section is UI shell. These items are what turn the app from
